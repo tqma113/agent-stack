@@ -7,6 +7,7 @@ agent-stack/
 ├── packages/                    # 业务包目录
 │   ├── provider/               # @agent-stack/provider
 │   ├── mcp/                    # @agent-stack/mcp
+│   ├── skill/                  # @agent-stack/skill
 │   └── index/                  # @agent-stack/index
 ├── common/                     # Rush 公共目录
 │   ├── config/rush/           # Rush 配置
@@ -162,9 +163,55 @@ packages/mcp/
 
 ---
 
-## 5. Rush 配置目录
+## 5. @agent-stack/skill 包
 
-### 4.1 common/config/rush/
+### 5.1 目录结构
+
+```
+packages/skill/
+├── src/
+│   ├── index.ts               # 包入口
+│   ├── types.ts               # 类型定义
+│   ├── config.ts              # 配置加载
+│   ├── loader.ts              # Skill 加载器
+│   ├── manager.ts             # SkillManager 类
+│   ├── bridge.ts              # 工具桥接
+│   └── helpers.ts             # 辅助函数
+├── dist/                      # 构建输出
+├── package.json
+├── tsconfig.json
+└── tsup.config.ts
+```
+
+### 5.2 文件职责
+
+| 文件 | 职责 |
+|------|------|
+| `src/index.ts` | 统一导出入口 |
+| `src/types.ts` | Skill 相关类型定义和错误类 |
+| `src/config.ts` | 配置文件加载和目录发现 |
+| `src/loader.ts` | Skill 加载和处理函数解析 |
+| `src/manager.ts` | SkillManager 管理 Skill 生命周期 |
+| `src/bridge.ts` | 将 Skill 工具转换为 Agent Tool 接口 |
+| `src/helpers.ts` | 工具名处理、路径解析等辅助函数 |
+
+### 5.3 package.json 关键配置
+
+```json
+{
+  "name": "@agent-stack/skill",
+  "version": "0.0.1",
+  "dependencies": {}
+}
+```
+
+注：skill 包不需要外部运行时依赖，仅使用 Node.js 原生能力实现动态加载。
+
+---
+
+## 7. Rush 配置目录
+
+### 7.1 common/config/rush/
 
 ```
 common/config/rush/
@@ -176,7 +223,7 @@ common/config/rush/
 └── ... (其他 Rush 配置)
 ```
 
-### 4.2 common/scripts/
+### 7.2 common/scripts/
 
 ```
 common/scripts/
@@ -188,9 +235,9 @@ common/scripts/
 
 ---
 
-## 6. 开发工具配置
+## 8. 开发工具配置
 
-### 5.1 .claude/ 目录
+### 8.1 .claude/ 目录
 
 ```
 .claude/
@@ -206,7 +253,7 @@ common/scripts/
     └── common-knowledge/    # 通用知识库
 ```
 
-### 5.2 .ttadk/ 目录
+### 8.2 .ttadk/ 目录
 
 ```
 .ttadk/
@@ -222,9 +269,9 @@ common/scripts/
 
 ---
 
-## 7. 构建输出
+## 9. 构建输出
 
-### 6.1 dist/ 目录结构
+### 9.1 dist/ 目录结构
 
 每个包的 `dist/` 目录输出：
 
@@ -237,7 +284,7 @@ dist/
 └── index.js.map       # Source Map
 ```
 
-### 6.2 构建命令
+### 9.2 构建命令
 
 ```bash
 # 单包构建

@@ -2,33 +2,33 @@
 
 ## 1. 核心业务模型
 
-Agent Stack 的核心业务是提供一个可扩展的 AI Agent 开发框架，主要包含三层：
+Agent Stack 的核心业务是提供一个可扩展的 AI Agent 开发框架，主要包含四层：
 
 ```
-┌─────────────────────────────────────────┐
-│          @agent-stack/index             │
-│  ┌───────────────────────────────────┐  │
-│  │            Agent 类               │  │
-│  │  - 对话管理                       │  │
-│  │  - 工具注册与执行                 │  │
-│  │  - 流式响应                       │  │
-│  └───────────────────────────────────┘  │
-└─────────────────────────────────────────┘
-          │                     │
-          ▼                     ▼
-┌──────────────────┐   ┌──────────────────┐
-│ @agent-stack/    │   │ @agent-stack/mcp │
-│    provider      │   │                  │
-│  ┌────────────┐  │   │  ┌────────────┐  │
-│  │ OpenAI    │  │   │  │ MCPClient  │  │
-│  │ Client    │  │   │  │ Manager    │  │
-│  └────────────┘  │   │  └────────────┘  │
-└──────────────────┘   └──────────────────┘
-          │                     │
-          ▼                     ▼
-   ┌────────────┐       ┌────────────┐
-   │ OpenAI API │       │ MCP Servers│
-   └────────────┘       └────────────┘
+┌─────────────────────────────────────────────────────────┐
+│                   @agent-stack/index                     │
+│  ┌───────────────────────────────────────────────────┐  │
+│  │                    Agent 类                        │  │
+│  │  - 对话管理                                        │  │
+│  │  - 工具注册与执行                                  │  │
+│  │  - 流式响应                                        │  │
+│  └───────────────────────────────────────────────────┘  │
+└─────────────────────────────────────────────────────────┘
+          │                     │                     │
+          ▼                     ▼                     ▼
+┌──────────────────┐   ┌──────────────────┐   ┌──────────────────┐
+│ @agent-stack/    │   │ @agent-stack/mcp │   │ @agent-stack/    │
+│    provider      │   │                  │   │    skill         │
+│  ┌────────────┐  │   │  ┌────────────┐  │   │  ┌────────────┐  │
+│  │ OpenAI    │  │   │  │ MCPClient  │  │   │  │ Skill      │  │
+│  │ Client    │  │   │  │ Manager    │  │   │  │ Manager    │  │
+│  └────────────┘  │   │  └────────────┘  │   │  └────────────┘  │
+└──────────────────┘   └──────────────────┘   └──────────────────┘
+          │                     │                     │
+          ▼                     ▼                     ▼
+   ┌────────────┐       ┌────────────┐       ┌────────────┐
+   │ OpenAI API │       │ MCP Servers│       │ Local Skills│
+   └────────────┘       └────────────┘       └────────────┘
 ```
 
 ---
@@ -537,4 +537,194 @@ agent.registerTools(toolProvider.getTools());
 
 const response = await agent.chat('搜索 OpenAI 文档');
 await mcpManager.close();
+```
+
+---
+
+## 8. @agent-stack/skill 业务逻辑
+
+### 8.1 SkillManager 类
+
+**职责**：管理 Skill 生命周期和状态
+
+```typescript
+class SkillManager {
+  // 初始化
+  initialize(config)     // 初始化配置
+
+  // 生命周期
+  loadAll()              // 加载所有 skill
+  load(skillName)        // 加载单个 skill
+  unload(skillName)      // 卸载 skill
+  activate(skillName)    // 激活 skill
+  deactivate(skillName)  // 停用 skill
+  close()                // 关闭所有 skill
+
+  // 目录发现
+  discoverAndLoad(directory) // 发现并加载目录中的 skills
+
+  // 工具访问
+  getTools()             // 获取所有工具
+  getToolsFromSkill(name) // 获取特定 skill 的工具
+
+  // 状态查询
+  getSkillNames()        // 获取 skill 名称列表
+  getSkill(name)         // 获取 skill 信息
+  getState(name)         // 获取 skill 状态
+  isLoaded(name)         // 检查是否已加载
+  isActive(name)         // 检查是否激活
+}
+```
+
+### 8.2 SkillToolProvider 类
+
+**职责**：将 Skill 工具桥接为 Agent Tool 接口
+
+```typescript
+class SkillToolProvider {
+  constructor(manager, options)
+
+  getTools()                    // 获取所有桥接工具
+  getToolsFromSkill(skillName)  // 获取特定 skill 工具
+  refresh()                     // 刷新工具列表
+  findTool(name)                // 查找工具
+}
+```
+
+### 8.3 Skill 加载流程
+
+```
+配置加载 (skills.json 或目录发现)
+    │
+    ▼
+┌─────────────────────┐
+│ 解析 skill 配置      │
+│ - path: 本地路径    │
+│ - package: npm 包   │
+└─────────────────────┘
+    │
+    ▼
+┌─────────────────────┐
+│ 加载 skill.json     │
+│ - name             │
+│ - tools[]          │
+│ - hooks            │
+└─────────────────────┘
+    │
+    ▼
+┌─────────────────────┐
+│ 解析工具处理函数     │
+│ - ./handler.js#fn  │
+│ - 动态 import      │
+└─────────────────────┘
+    │
+    ▼
+┌─────────────────────┐
+│ 执行 onLoad 钩子    │
+└─────────────────────┘
+    │
+    ▼
+┌─────────────────────┐
+│ 状态: loaded        │
+└─────────────────────┘
+```
+
+### 8.4 Skill 状态机
+
+```
+unloaded ──────► loading ──────► loaded ◄─────► active
+    ▲               │              │               │
+    │               ▼              │               │
+    │            error             │               │
+    │               │              │               │
+    └───────────────┴──────────────┴───────────────┘
+                 (unload)
+```
+
+### 8.5 Skill 配置格式
+
+**skills.json** (配置文件):
+```json
+{
+  "skills": {
+    "web-search": {
+      "path": "./skills/web-search",
+      "enabled": true
+    },
+    "my-npm-skill": {
+      "package": "@my/skill-package"
+    }
+  },
+  "autoLoad": true
+}
+```
+
+**skill.json** (Skill 定义):
+```json
+{
+  "name": "web-search",
+  "version": "1.0.0",
+  "description": "Web search capabilities",
+  "tools": [
+    {
+      "name": "search",
+      "description": "Search the web",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "query": { "type": "string" }
+        },
+        "required": ["query"]
+      },
+      "handler": "./handlers.js#search"
+    }
+  ],
+  "hooks": {
+    "onLoad": "./handlers.js#onLoad"
+  }
+}
+```
+
+### 8.6 使用示例
+
+```typescript
+import { Agent } from '@agent-stack/index';
+
+// 方式 1: 使用配置文件
+const agent = new Agent({
+  name: 'Skill Agent',
+  skill: {
+    configPath: './skills.json',
+    autoLoad: true
+  }
+});
+await agent.initializeSkills();
+
+// 方式 2: 目录自动发现
+const agent2 = new Agent({
+  skill: {
+    directories: ['./skills/', './my-skills/'],
+    autoLoad: true
+  }
+});
+
+// 方式 3: 内联配置
+const agent3 = new Agent({
+  skill: {
+    skills: {
+      'web-search': { path: './skills/web-search' }
+    }
+  }
+});
+await agent3.initializeSkills();
+
+// 使用
+const response = await agent.chat('Search for TypeScript tips');
+
+// 动态管理
+const skillManager = agent.getSkillManager();
+await skillManager.activate('new-skill');
+
+// 清理
+await agent.closeSkills();
 ```

@@ -16,9 +16,15 @@ import {
   MCPToolProvider,
   type MCPConfig,
 } from '@agent-stack/mcp';
+import {
+  SkillManager,
+  SkillToolProvider,
+  type SkillConfig,
+} from '@agent-stack/skill';
 import type {
   AgentConfig,
   AgentMCPConfig,
+  AgentSkillConfig,
   Tool,
   AgentResponse,
   ToolCallResult,
@@ -39,6 +45,11 @@ export class Agent {
   private mcpToolProvider: MCPToolProvider | null = null;
   private mcpConfig: AgentMCPConfig | null = null;
 
+  // Skill integration
+  private skillManager: SkillManager | null = null;
+  private skillToolProvider: SkillToolProvider | null = null;
+  private skillConfig: AgentSkillConfig | null = null;
+
   constructor(config: AgentConfig = {}) {
     this.client = new OpenAIClient({
       apiKey: config.apiKey,
@@ -56,6 +67,11 @@ export class Agent {
     // Store MCP config for later initialization
     if (config.mcp) {
       this.mcpConfig = config.mcp;
+    }
+
+    // Store Skill config for later initialization
+    if (config.skill) {
+      this.skillConfig = config.skill;
     }
   }
 
@@ -150,6 +166,119 @@ export class Agent {
     }
   }
 
+  // ============================================
+  // Skill Integration
+  // ============================================
+
+  /**
+   * Initialize Skills
+   * Call this before using Skill tools, or set autoLoad: true in config
+   */
+  async initializeSkills(): Promise<void> {
+    if (!this.skillConfig) {
+      throw new Error('No Skill configuration provided');
+    }
+
+    this.skillManager = new SkillManager();
+
+    // Build skill config
+    let skillConfig: SkillConfig;
+    if (this.skillConfig.configPath) {
+      // Load from file
+      const { loadConfig } = await import('@agent-stack/skill');
+      skillConfig = await loadConfig(this.skillConfig.configPath);
+    } else if (this.skillConfig.skills) {
+      // Use inline config
+      skillConfig = {
+        skills: this.skillConfig.skills,
+        autoLoad: this.skillConfig.autoLoad,
+      };
+    } else {
+      // Empty config - will rely on directory discovery
+      skillConfig = { skills: {} };
+    }
+
+    await this.skillManager.initialize(skillConfig);
+
+    // Load from configured skills
+    if (skillConfig.autoLoad !== false && Object.keys(skillConfig.skills).length > 0) {
+      await this.skillManager.loadAll();
+    }
+
+    // Discover and load from directories if specified
+    if (this.skillConfig.directories) {
+      for (const dir of this.skillConfig.directories) {
+        await this.skillManager.discoverAndLoad(dir);
+      }
+    }
+
+    // Activate all loaded skills
+    for (const skillName of this.skillManager.getSkillNames()) {
+      await this.skillManager.activate(skillName);
+    }
+
+    // Create tool provider with default options
+    const toolOptions = this.skillConfig.toolOptions ?? {
+      nameTransformer: (skill, tool) => `skill__${skill}__${tool}`,
+    };
+    this.skillToolProvider = new SkillToolProvider(this.skillManager, toolOptions);
+
+    // Register skill tools
+    this.registerTools(this.skillToolProvider.getTools());
+  }
+
+  /**
+   * Get the Skill Manager (for advanced usage)
+   */
+  getSkillManager(): SkillManager | null {
+    return this.skillManager;
+  }
+
+  /**
+   * Get the Skill tool provider (for advanced usage)
+   */
+  getSkillToolProvider(): SkillToolProvider | null {
+    return this.skillToolProvider;
+  }
+
+  /**
+   * Refresh Skill tools
+   */
+  async refreshSkillTools(): Promise<void> {
+    if (!this.skillToolProvider || !this.skillManager) {
+      throw new Error('Skills not initialized. Call initializeSkills() first.');
+    }
+
+    // Remove old skill tools
+    for (const tool of this.tools.values()) {
+      if (tool.name.startsWith('skill__')) {
+        this.tools.delete(tool.name);
+      }
+    }
+
+    // Refresh and re-register
+    await this.skillToolProvider.refresh();
+    this.registerTools(this.skillToolProvider.getTools());
+  }
+
+  /**
+   * Close Skill manager
+   */
+  async closeSkills(): Promise<void> {
+    if (this.skillManager) {
+      await this.skillManager.close();
+      this.skillManager = null;
+      this.skillToolProvider = null;
+
+      // Remove skill tools
+      for (const tool of this.tools.values()) {
+        if (tool.name.startsWith('skill__')) {
+          this.tools.delete(tool.name);
+        }
+      }
+    }
+  }
+
   /**
    * Get the agent's name
    */
@@ -229,6 +358,11 @@ export class Agent {
     // Auto-initialize MCP if configured with autoConnect
     if (this.mcpConfig?.autoConnect && !this.mcpManager) {
       await this.initializeMCP();
+    }
+
+    // Auto-initialize Skills if configured with autoLoad
+    if (this.skillConfig?.autoLoad && !this.skillManager) {
+      await this.initializeSkills();
     }
 
     const { maxIterations = 10, signal } = options;
@@ -337,6 +471,11 @@ export class Agent {
 
     const { maxIterations = 10, signal } = options;
     const { onToken, onToolCall, onToolResult, onComplete, onError } = callbacks;
+
+    // Auto-initialize Skills if configured with autoLoad
+    if (this.skillConfig?.autoLoad && !this.skillManager) {
+      await this.initializeSkills();
+    }
 
     try {
       // Add user message to history

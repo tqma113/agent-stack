@@ -4,6 +4,7 @@
 
 import type { ChatCompletionMessageParam } from '@agent-stack/provider';
 import type { MCPToolBridgeOptions } from '@agent-stack/mcp';
+import type { SkillToolBridgeOptions, SkillEntry } from '@agent-stack/skill';
 
 /**
  * MCP configuration for Agent
@@ -26,6 +27,22 @@ export interface AgentMCPConfig {
   autoConnect?: boolean;
 }
 
+/**
+ * Skill configuration for Agent
+ */
+export interface AgentSkillConfig {
+  /** Path to skill configuration file (e.g., 'skills.json') */
+  configPath?: string;
+  /** Directories to auto-discover skills from */
+  directories?: string[];
+  /** Inline skill configurations */
+  skills?: Record<string, SkillEntry>;
+  /** Tool bridge options for naming and filtering */
+  toolOptions?: SkillToolBridgeOptions;
+  /** Whether to auto-load all skills on agent initialization */
+  autoLoad?: boolean;
+}
+
 export interface AgentConfig {
   /** Agent name for identification */
   name?: string;
@@ -43,6 +60,8 @@ export interface AgentConfig {
   baseURL?: string;
   /** MCP configuration for connecting to MCP servers */
   mcp?: AgentMCPConfig;
+  /** Skill configuration for loading and managing skills */
+  skill?: AgentSkillConfig;
 }
 
 export interface Tool {

@@ -32,3 +32,19 @@ export {
   type MCPToolBridgeOptions,
   type BridgedTool,
 } from '@agent-stack/mcp';
+
+// Re-export Skill types and classes for convenience
+export {
+  SkillManager,
+  SkillToolProvider,
+  loadConfig as loadSkillConfig,
+  discoverSkills,
+  type SkillConfig,
+  type SkillEntry,
+  type SkillDefinition,
+  type SkillToolDefinition,
+  type SkillToolBridgeOptions,
+  type BridgedSkillTool,
+  type LoadedSkill,
+  type SkillState,
+} from '@agent-stack/skill';

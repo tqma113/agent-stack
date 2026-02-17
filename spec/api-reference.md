@@ -275,6 +275,7 @@ constructor(config?: AgentConfig)
 | `apiKey` | `string` | 环境变量 | API 密钥 |
 | `baseURL` | `string` | - | 自定义端点 |
 | `mcp` | `AgentMCPConfig` | - | MCP 配置 |
+| `skill` | `AgentSkillConfig` | - | Skill 配置 |
 
 **AgentMCPConfig**:
 
@@ -284,6 +285,16 @@ constructor(config?: AgentConfig)
 | `servers` | `Record<string, MCPServerConfig>` | 内联服务器配置 |
 | `toolOptions` | `MCPToolBridgeOptions` | 工具桥接选项 |
 | `autoConnect` | `boolean` | 是否自动连接 |
+
+**AgentSkillConfig**:
+
+| 参数 | 类型 | 描述 |
+|------|------|------|
+| `configPath` | `string` | Skill 配置文件路径 |
+| `directories` | `string[]` | 自动发现目录列表 |
+| `skills` | `Record<string, SkillEntry>` | 内联 Skill 配置 |
+| `toolOptions` | `SkillToolBridgeOptions` | 工具桥接选项 |
+| `autoLoad` | `boolean` | 是否自动加载 |
 
 ---
 
@@ -316,6 +327,27 @@ async refreshMCPTools(): Promise<void>
 
 // 关闭 MCP 连接
 async closeMCP(): Promise<void>
+```
+
+---
+
+#### Skill 方法
+
+```typescript
+// 初始化 Skill
+async initializeSkills(): Promise<void>
+
+// 获取 Skill 管理器
+getSkillManager(): SkillManager | null
+
+// 获取 Skill 工具提供者
+getSkillToolProvider(): SkillToolProvider | null
+
+// 刷新 Skill 工具
+async refreshSkillTools(): Promise<void>
+
+// 关闭 Skill
+async closeSkills(): Promise<void>
 ```
 
 ---
@@ -680,7 +712,236 @@ class MCPTimeoutError extends MCPError {}
 
 ---
 
-## 4. 类型导出
+## 4. @agent-stack/skill
+
+### 4.1 SkillManager 类
+
+管理 Skill 生命周期和状态。
+
+#### 构造函数
+
+```typescript
+constructor(options?: SkillManagerOptions)
+```
+
+**SkillManagerOptions**:
+
+| 参数 | 类型 | 描述 |
+|------|------|------|
+| `onStateChange` | `(skillName, state, error?) => void` | 状态变化回调 |
+| `onToolsChange` | `(skillName, tools) => void` | 工具列表变化回调 |
+
+---
+
+#### 生命周期方法
+
+```typescript
+// 初始化配置
+async initialize(config?: SkillConfig | string): Promise<void>
+
+// 加载所有 skill
+async loadAll(): Promise<void>
+
+// 加载单个 skill
+async load(skillName: string): Promise<void>
+
+// 卸载 skill
+async unload(skillName: string): Promise<void>
+
+// 激活 skill
+async activate(skillName: string): Promise<void>
+
+// 停用 skill
+async deactivate(skillName: string): Promise<void>
+
+// 关闭所有
+async close(): Promise<void>
+```
+
+---
+
+#### 目录发现
+
+```typescript
+// 发现并加载目录中的 skills
+async discoverAndLoad(directory: string): Promise<void>
+```
+
+---
+
+#### 工具方法
+
+```typescript
+// 获取所有工具
+getTools(): AgentTool[]
+
+// 获取特定 skill 的工具
+getToolsFromSkill(skillName: string): AgentTool[]
+```
+
+---
+
+#### 状态查询
+
+```typescript
+// 获取 skill 名称列表
+getSkillNames(): string[]
+
+// 获取 skill 信息
+getSkill(name: string): LoadedSkill | undefined
+
+// 获取 skill 状态
+getState(name: string): SkillState
+
+// 检查是否已加载
+isLoaded(name: string): boolean
+
+// 检查是否激活
+isActive(name: string): boolean
+```
+
+---
+
+### 4.2 SkillToolProvider 类
+
+将 Skill 工具桥接为 Agent Tool 接口。
+
+#### 构造函数
+
+```typescript
+constructor(manager: SkillManager, options?: SkillToolBridgeOptions)
+```
+
+**SkillToolBridgeOptions**:
+
+| 参数 | 类型 | 描述 |
+|------|------|------|
+| `namePrefix` | `string` | 工具名前缀，如 `"skill_"` |
+| `includeSkillName` | `boolean` | 是否在名称中包含 skill 名 |
+| `nameTransformer` | `(skill, tool) => string` | 自定义名称转换函数 |
+| `filter` | `(skill, tool) => boolean` | 工具过滤函数 |
+
+---
+
+#### 方法
+
+```typescript
+// 获取所有桥接工具
+getTools(): AgentTool[]
+
+// 获取特定 skill 的工具
+getToolsFromSkill(skillName: string): AgentTool[]
+
+// 刷新工具列表
+async refresh(): Promise<void>
+
+// 查找工具
+findTool(name: string): BridgedSkillTool | undefined
+```
+
+---
+
+### 4.3 配置函数
+
+```typescript
+// 加载配置文件
+async loadConfig(configPath: string): Promise<SkillConfig>
+
+// 从默认位置加载配置
+async loadConfigFromDefaults(startDir?: string): Promise<SkillConfig | null>
+
+// 发现目录中的 skills
+async discoverSkills(directory: string): Promise<Array<{
+  name: string;
+  path: string;
+  definition: SkillDefinition;
+}>>
+```
+
+---
+
+### 4.4 Skill 类型定义
+
+```typescript
+// Skill 状态
+type SkillState = 'unloaded' | 'loading' | 'loaded' | 'active' | 'error';
+
+// Skill 配置文件
+interface SkillConfig {
+  skills: Record<string, SkillEntry>;
+  autoLoad?: boolean;
+}
+
+interface SkillEntry {
+  path?: string;      // 本地路径
+  package?: string;   // npm 包名
+  enabled?: boolean;  // 是否启用
+  config?: Record<string, unknown>; // skill 特定配置
+}
+
+// Skill 定义 (skill.json)
+interface SkillDefinition {
+  name: string;
+  version?: string;
+  description?: string;
+  author?: string;
+  tools?: SkillToolDefinition[];
+  prompts?: SkillPromptDefinition[];
+  resources?: SkillResourceDefinition[];
+  hooks?: {
+    onLoad?: string;
+    onActivate?: string;
+    onDeactivate?: string;
+    onUnload?: string;
+  };
+  dependencies?: string[];
+}
+
+// Skill 工具定义
+interface SkillToolDefinition {
+  name: string;
+  description: string;
+  parameters: Record<string, unknown>;
+  handler: string;  // 如 './handlers.js#myTool'
+}
+
+// 已加载的 Skill
+interface LoadedSkill {
+  name: string;
+  definition: SkillDefinition;
+  state: SkillState;
+  path: string;
+  tools: ResolvedTool[];
+  error?: Error;
+}
+
+// 桥接的工具
+interface BridgedSkillTool extends AgentTool {
+  skillName: string;
+  originalToolName: string;
+}
+```
+
+---
+
+### 4.5 错误类
+
+```typescript
+class SkillError extends Error {
+  code: string;
+  skillName?: string;
+}
+
+class SkillConfigurationError extends SkillError {}
+class SkillLoadError extends SkillError {}
+class SkillHandlerError extends SkillError {}
+class SkillToolExecutionError extends SkillError {}
+class SkillNotFoundError extends SkillError {}
+```
+
+---
+
+## 5. 类型导出
 
 ### 从 @agent-stack/provider 导出
 
@@ -802,5 +1063,65 @@ export {
   type MCPToolBridgeOptions,
   type BridgedTool,
   type MCPResourceAccessor,
+};
+```
+
+### 从 @agent-stack/skill 导出
+
+```typescript
+export {
+  // 类
+  SkillManager,
+  SkillToolProvider,
+
+  // 配置函数
+  loadConfig,
+  loadConfigFromDefaults,
+  findConfigFile,
+  discoverSkills,
+  discoverSkillsFromDefaults,
+  loadSkillDefinition,
+
+  // 加载函数
+  loadSkill,
+  loadSkillFromDirectory,
+  loadSkillFromPackage,
+  resolveToolHandler,
+
+  // 桥接函数
+  createSkillToolBridge,
+  bridgeSkillTool,
+
+  // 错误类
+  SkillError,
+  SkillConfigurationError,
+  SkillLoadError,
+  SkillHandlerError,
+  SkillToolExecutionError,
+  SkillNotFoundError,
+
+  // 辅助函数
+  sanitizeToolName,
+  generateToolName,
+  parseHandlerPath,
+  formatErrorResult,
+
+  // 类型
+  type SkillState,
+  type SkillConfig,
+  type SkillEntry,
+  type SkillDefinition,
+  type SkillToolDefinition,
+  type SkillPromptDefinition,
+  type SkillResourceDefinition,
+  type SkillHooks,
+  type LoadedSkill,
+  type ResolvedTool,
+  type ToolHandler,
+  type HookHandler,
+  type SkillToolBridgeOptions,
+  type BridgedSkillTool,
+  type SkillManagerOptions,
+  type AgentTool,
 };
 ```

@@ -50,6 +50,7 @@ Rush 是微软开源的 Monorepo 管理工具，主要特点：
   "projects": [
     { "packageName": "@agent-stack/provider", "projectFolder": "packages/provider" },
     { "packageName": "@agent-stack/mcp", "projectFolder": "packages/mcp" },
+    { "packageName": "@agent-stack/skill", "projectFolder": "packages/skill" },
     { "packageName": "@agent-stack/index", "projectFolder": "packages/index" }
   ]
 }

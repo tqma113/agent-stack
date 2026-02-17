@@ -2,7 +2,7 @@
 
 ## 项目概述
 
-Agent Stack 是一个基于 TypeScript 的 AI Agent 开发框架，采用 Rush monorepo 架构管理多个包。项目旨在提供一个简洁、易用的 OpenAI API 封装、MCP 协议支持和 AI Agent 实现。
+Agent Stack 是一个基于 TypeScript 的 AI Agent 开发框架，采用 Rush monorepo 架构管理多个包。项目旨在提供一个简洁、易用的 OpenAI API 封装、MCP 协议支持、Skill 系统和 AI Agent 实现。
 
 ---
 
@@ -54,6 +54,16 @@ agent-stack/
 │   │       ├── bridge.ts      # 工具桥接
 │   │       └── helpers.ts     # 辅助函数
 │   │
+│   ├── skill/                  # @agent-stack/skill - Skill 系统
+│   │   └── src/
+│   │       ├── index.ts       # 入口文件
+│   │       ├── types.ts       # 类型定义
+│   │       ├── config.ts      # 配置加载
+│   │       ├── loader.ts      # Skill 加载器
+│   │       ├── manager.ts     # SkillManager
+│   │       ├── bridge.ts      # 工具桥接
+│   │       └── helpers.ts     # 辅助函数
+│   │
 │   └── index/                  # @agent-stack/index - Agent 实现
 │       └── src/
 │           ├── index.ts
@@ -81,10 +91,15 @@ agent-stack/
         │
         └── @modelcontextprotocol/sdk (^1.0.0)
 
-@agent-stack/index     (Agent 实现，内置 MCP 支持)
+@agent-stack/skill     (Skill 系统)
+        │
+        └── (无外部依赖)
+
+@agent-stack/index     (Agent 实现，内置 MCP 和 Skill 支持)
         │
         ├── @agent-stack/provider (workspace:*)
-        └── @agent-stack/mcp (workspace:*)
+        ├── @agent-stack/mcp (workspace:*)
+        └── @agent-stack/skill (workspace:*)
 ```
 
 ---

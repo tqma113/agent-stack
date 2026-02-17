@@ -347,6 +347,14 @@
     {
       "packageName": "@agent-stack/mcp",
       "projectFolder": "packages/mcp"
+    },
+    {
+      "packageName": "@agent-stack/skill",
+      "projectFolder": "packages/skill"
+    },
+    {
+      "packageName": "agent-stack-example",
+      "projectFolder": "examples/basic"
     }
   ]
 }
