@@ -8,6 +8,7 @@ agent-stack/
 │   ├── provider/               # @agent-stack/provider
 │   ├── mcp/                    # @agent-stack/mcp
 │   ├── skill/                  # @agent-stack/skill
+│   ├── memory/                 # @agent-stack/memory
 │   └── index/                  # @agent-stack/index
 ├── examples/                   # 示例配置（非 Rush 项目）
 │   ├── .agent-stack.json      # Agent 配置示例
@@ -215,6 +216,100 @@ packages/skill/
 ```
 
 注：skill 包不需要外部运行时依赖，仅使用 Node.js 原生能力实现动态加载。
+
+---
+
+## 6. @agent-stack/memory 包
+
+### 6.1 目录结构
+
+```
+packages/memory/
+├── src/
+│   ├── index.ts               # 包入口
+│   ├── types.ts               # 类型定义 (800+ 行)
+│   ├── errors.ts              # 错误类
+│   ├── stores/                # 存储层
+│   │   ├── index.ts           # 存储导出
+│   │   ├── base.ts            # SQLiteStore 基类
+│   │   ├── event.ts           # EventStore (事件存储)
+│   │   ├── task-state.ts      # TaskStateStore (任务状态)
+│   │   ├── summary.ts         # SummaryStore (摘要)
+│   │   ├── profile.ts         # ProfileStore (用户偏好)
+│   │   └── semantic.ts        # SemanticStore (语义检索)
+│   ├── manager.ts             # MemoryManager 主入口
+│   ├── observer.ts            # 事件采集
+│   ├── retriever.ts           # 多路召回
+│   ├── injector.ts            # 模板注入
+│   ├── budgeter.ts            # Token 预算
+│   ├── write-policy.ts        # 写入策略
+│   ├── summarizer.ts          # 摘要生成
+│   └── state-reducer.ts       # 任务状态 Reducer
+├── tests/                     # 测试文件 (124 测试)
+│   ├── stores/
+│   │   ├── event.test.ts
+│   │   ├── task-state.test.ts
+│   │   ├── profile.test.ts
+│   │   ├── summary.test.ts
+│   │   └── semantic.test.ts
+│   ├── state-reducer.test.ts
+│   ├── write-policy.test.ts
+│   └── integration/
+│       └── regression.test.ts
+├── dist/                      # 构建输出
+├── package.json
+├── tsconfig.json
+├── tsup.config.ts
+└── vitest.config.ts
+```
+
+### 6.2 文件职责
+
+| 文件 | 职责 |
+|------|------|
+| `src/index.ts` | 统一导出入口 |
+| `src/types.ts` | 完整类型定义 (Memory, Task, Profile, Semantic) |
+| `src/errors.ts` | 错误类定义 |
+| `src/stores/base.ts` | SQLite 基类，提供连接管理 |
+| `src/stores/event.ts` | 事件日志存储 (CRUD, 批量操作, 查询) |
+| `src/stores/task-state.ts` | 任务状态存储 (幂等更新, 版本控制, 快照) |
+| `src/stores/summary.ts` | 对话摘要存储 |
+| `src/stores/profile.ts` | 用户偏好存储 (跨会话持久化) |
+| `src/stores/semantic.ts` | 语义检索 (FTS5 + 向量搜索) |
+| `src/manager.ts` | MemoryManager 主类，协调所有组件 |
+| `src/observer.ts` | 事件创建辅助函数 |
+| `src/retriever.ts` | 多路召回和优先级排序 |
+| `src/injector.ts` | 模板引擎，将记忆注入 Prompt |
+| `src/budgeter.ts` | Token 预算分配和管理 |
+| `src/write-policy.ts` | 写入决策和冲突解决 |
+| `src/summarizer.ts` | 摘要生成和合并 |
+| `src/state-reducer.ts` | 不可变任务状态更新 |
+
+### 6.3 五层记忆架构
+
+| 层级 | 存储类 | 用途 | 优先级 |
+|------|--------|------|--------|
+| Profile | `ProfileStore` | 用户偏好 (语言/格式/禁忌) | 1 (最高) |
+| TaskState | `TaskStateStore` | 当前任务状态 (目标/计划/进度) | 2 |
+| Summary | `SummaryStore` | 滚动摘要 (决策/结论/下一步) | 3 |
+| Episodic | `EventStore` | 事件日志 (对话/工具/决策) | 4 |
+| Semantic | `SemanticStore` | 可检索材料 (全文/向量) | 5 (最低) |
+
+### 6.4 package.json 关键配置
+
+```json
+{
+  "name": "@agent-stack/memory",
+  "version": "0.0.1",
+  "dependencies": {
+    "better-sqlite3": "^11.10.0"
+  },
+  "devDependencies": {
+    "vitest": "^2.1.0",
+    "@types/better-sqlite3": "^7.6.12"
+  }
+}
+```
 
 ---
 

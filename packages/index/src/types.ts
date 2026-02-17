@@ -5,6 +5,7 @@
 import type { ChatCompletionMessageParam } from '@agent-stack/provider';
 import type { MCPToolBridgeOptions } from '@agent-stack/mcp';
 import type { SkillToolBridgeOptions, SkillEntry } from '@agent-stack/skill';
+import type { MemoryConfig, TokenBudget, WritePolicyConfig, RetrievalConfig } from '@agent-stack/memory';
 
 /**
  * MCP configuration for Agent
@@ -43,6 +44,30 @@ export interface AgentSkillConfig {
   autoLoad?: boolean;
 }
 
+/**
+ * Memory configuration for Agent
+ */
+export interface AgentMemoryConfig {
+  /** Whether to enable memory (default: true if config provided) */
+  enabled?: boolean;
+  /** Database file path (default: '.agent-stack/memory.db') */
+  dbPath?: string;
+  /** Token budget configuration */
+  tokenBudget?: Partial<TokenBudget>;
+  /** Write policy configuration */
+  writePolicy?: Partial<WritePolicyConfig>;
+  /** Retrieval configuration */
+  retrieval?: Partial<RetrievalConfig>;
+  /** Whether to auto-initialize on first chat (default: true) */
+  autoInitialize?: boolean;
+  /** Whether to auto-inject memory context into prompts (default: true) */
+  autoInject?: boolean;
+  /** Whether to enable semantic search with embeddings (default: false, requires embedding generation) */
+  enableSemanticSearch?: boolean;
+  /** Enable debug logging */
+  debug?: boolean;
+}
+
 export interface AgentConfig {
   /** Agent name for identification */
   name?: string;
@@ -62,6 +87,8 @@ export interface AgentConfig {
   mcp?: AgentMCPConfig;
   /** Skill configuration for loading and managing skills */
   skill?: AgentSkillConfig;
+  /** Memory configuration for persistent memory */
+  memory?: AgentMemoryConfig | boolean;
 }
 
 export interface Tool {

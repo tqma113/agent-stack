@@ -21,10 +21,21 @@ import {
   SkillToolProvider,
   type SkillConfig,
 } from '@agent-stack/skill';
+import {
+  MemoryManager,
+  TaskStateReducer,
+  TaskActions,
+  type MemoryConfig,
+  type MemoryBundle,
+  type TaskState,
+  type TaskStep,
+  type TaskConstraint,
+} from '@agent-stack/memory';
 import type {
   AgentConfig,
   AgentMCPConfig,
   AgentSkillConfig,
+  AgentMemoryConfig,
   Tool,
   AgentResponse,
   ToolCallResult,
@@ -50,6 +61,11 @@ export class Agent {
   private skillToolProvider: SkillToolProvider | null = null;
   private skillConfig: AgentSkillConfig | null = null;
 
+  // Memory integration
+  private memoryManager: MemoryManager | null = null;
+  private memoryConfig: AgentMemoryConfig | null = null;
+  private taskReducer: TaskStateReducer = new TaskStateReducer();
+
   constructor(config: AgentConfig = {}) {
     this.client = new OpenAIClient({
       apiKey: config.apiKey,
@@ -72,6 +88,13 @@ export class Agent {
     // Store Skill config for later initialization
     if (config.skill) {
       this.skillConfig = config.skill;
+    }
+
+    // Store Memory config for later initialization
+    if (config.memory) {
+      this.memoryConfig = config.memory === true
+        ? { enabled: true }
+        : { enabled: true, ...config.memory };
     }
   }
 
@@ -279,6 +302,344 @@ export class Agent {
     }
   }
 
+  // ============================================
+  // Memory Integration
+  // ============================================
+
+  /**
+   * Initialize Memory system
+   * Call this before using memory features, or set autoInitialize: true in config
+   */
+  async initializeMemory(): Promise<void> {
+    if (!this.memoryConfig || !this.memoryConfig.enabled) {
+      throw new Error('No Memory configuration provided or memory is disabled');
+    }
+
+    // Build memory config
+    const config: Partial<MemoryConfig> = {
+      dbPath: this.memoryConfig.dbPath ?? '.agent-stack/memory.db',
+      debug: this.memoryConfig.debug ?? false,
+    };
+
+    if (this.memoryConfig.tokenBudget) {
+      config.tokenBudget = {
+        profile: 200,
+        taskState: 300,
+        recentEvents: 500,
+        semanticChunks: 800,
+        summary: 400,
+        total: 2200,
+        ...this.memoryConfig.tokenBudget,
+      };
+    }
+
+    if (this.memoryConfig.writePolicy) {
+      config.writePolicy = {
+        minConfidence: 0.5,
+        autoSummarize: true,
+        summarizeEveryNEvents: 20,
+        summarizeTokenThreshold: 4000,
+        profileKeyWhitelist: null,
+        conflictStrategy: 'latest',
+        timeDecayFactor: 0.9,
+        staleThresholdMs: 7 * 24 * 60 * 60 * 1000,
+        ...this.memoryConfig.writePolicy,
+      };
+    }
+
+    if (this.memoryConfig.retrieval) {
+      config.retrieval = {
+        maxRecentEvents: 10,
+        maxSemanticChunks: 5,
+        recentEventsWindowMs: 30 * 60 * 1000,
+        enableSemanticSearch: this.memoryConfig.enableSemanticSearch ?? false,
+        enableFtsSearch: true,
+        enableRerank: true,
+        ...this.memoryConfig.retrieval,
+      };
+    }
+
+    this.memoryManager = new MemoryManager(config);
+    await this.memoryManager.initialize();
+  }
+
+  /**
+   * Get the Memory Manager (for advanced usage)
+   */
+  getMemoryManager(): MemoryManager | null {
+    return this.memoryManager;
+  }
+
+  /**
+   * Get current session ID
+   */
+  getSessionId(): string | null {
+    return this.memoryManager?.getSessionId() ?? null;
+  }
+
+  /**
+   * Start a new memory session
+   */
+  newSession(): string | null {
+    if (!this.memoryManager) return null;
+    this.clearHistory();
+    return this.memoryManager.newSession();
+  }
+
+  /**
+   * Retrieve memory bundle for current context
+   */
+  async retrieveMemory(query?: string): Promise<MemoryBundle | null> {
+    if (!this.memoryManager) return null;
+    return this.memoryManager.retrieve({ query });
+  }
+
+  /**
+   * Get formatted memory context for prompt injection
+   */
+  async getMemoryContext(query?: string): Promise<string> {
+    if (!this.memoryManager) return '';
+    const bundle = await this.memoryManager.retrieve({ query });
+    return this.memoryManager.inject(bundle);
+  }
+
+  /**
+   * Close Memory manager
+   */
+  async closeMemory(): Promise<void> {
+    if (this.memoryManager) {
+      await this.memoryManager.close();
+      this.memoryManager = null;
+    }
+  }
+
+  // ============================================
+  // Task Management
+  // ============================================
+
+  /**
+   * Create a new task
+   */
+  async createTask(
+    goal: string,
+    options: {
+      constraints?: TaskConstraint[];
+      plan?: TaskStep[];
+    } = {}
+  ): Promise<TaskState | null> {
+    if (!this.memoryManager) return null;
+
+    return this.memoryManager.createTask({
+      goal,
+      status: 'pending',
+      constraints: options.constraints || [],
+      plan: options.plan || [],
+      done: [],
+      blocked: [],
+      sessionId: this.memoryManager.getSessionId(),
+    });
+  }
+
+  /**
+   * Get current active task
+   */
+  async getCurrentTask(): Promise<TaskState | null> {
+    if (!this.memoryManager) return null;
+    return this.memoryManager.getCurrentTask();
+  }
+
+  /**
+   * Update current task
+   */
+  async updateTask(
+    taskId: string,
+    update: Partial<TaskState> & { actionId?: string }
+  ): Promise<TaskState | null> {
+    if (!this.memoryManager) return null;
+    return this.memoryManager.updateTask(taskId, update);
+  }
+
+  /**
+   * Add a step to the current task's plan
+   */
+  async addTaskStep(step: Omit<TaskStep, 'id' | 'status'>): Promise<TaskState | null> {
+    const task = await this.getCurrentTask();
+    if (!task) return null;
+
+    const newStep: TaskStep = {
+      ...step,
+      id: this.taskReducer.createStepId(),
+      status: 'pending',
+    };
+
+    const result = this.taskReducer.reduce(task, TaskActions.addStep(newStep));
+    return this.updateTask(task.id, {
+      plan: result.state.plan,
+      actionId: `add-step-${newStep.id}`,
+    });
+  }
+
+  /**
+   * Mark a task step as completed
+   */
+  async completeTaskStep(stepId: string, result?: string): Promise<TaskState | null> {
+    const task = await this.getCurrentTask();
+    if (!task) return null;
+
+    const reducerResult = this.taskReducer.reduce(
+      task,
+      TaskActions.completeStep(stepId, result)
+    );
+
+    // Auto-complete task if all steps done
+    const updates: Partial<TaskState> & { actionId?: string } = {
+      plan: reducerResult.state.plan,
+      done: reducerResult.state.done,
+      blocked: reducerResult.state.blocked,
+      nextAction: reducerResult.state.nextAction,
+      actionId: reducerResult.actionId,
+    };
+
+    if (this.taskReducer.isCompleted(reducerResult.state)) {
+      updates.status = 'completed';
+    }
+
+    return this.updateTask(task.id, updates);
+  }
+
+  /**
+   * Block a task step
+   */
+  async blockTaskStep(stepId: string, reason: string): Promise<TaskState | null> {
+    const task = await this.getCurrentTask();
+    if (!task) return null;
+
+    const reducerResult = this.taskReducer.reduce(
+      task,
+      TaskActions.blockStep(stepId, reason)
+    );
+
+    return this.updateTask(task.id, {
+      plan: reducerResult.state.plan,
+      blocked: reducerResult.state.blocked,
+      nextAction: reducerResult.state.nextAction,
+      actionId: reducerResult.actionId,
+    });
+  }
+
+  /**
+   * Unblock a task step
+   */
+  async unblockTaskStep(stepId: string): Promise<TaskState | null> {
+    const task = await this.getCurrentTask();
+    if (!task) return null;
+
+    const reducerResult = this.taskReducer.reduce(
+      task,
+      TaskActions.unblockStep(stepId)
+    );
+
+    return this.updateTask(task.id, {
+      plan: reducerResult.state.plan,
+      blocked: reducerResult.state.blocked,
+      actionId: `unblock-${stepId}-${Date.now()}`,
+    });
+  }
+
+  /**
+   * Get task progress
+   */
+  async getTaskProgress(): Promise<{ percentage: number; done: number; total: number } | null> {
+    const task = await this.getCurrentTask();
+    if (!task) return null;
+
+    return {
+      percentage: this.taskReducer.getProgress(task),
+      done: task.done.length,
+      total: task.plan.length,
+    };
+  }
+
+  /**
+   * Get next actionable step
+   */
+  async getNextStep(): Promise<TaskStep | null> {
+    const task = await this.getCurrentTask();
+    if (!task) return null;
+    return this.taskReducer.getNextStep(task);
+  }
+
+  /**
+   * Set task status
+   */
+  async setTaskStatus(status: 'pending' | 'in_progress' | 'completed' | 'cancelled' | 'blocked'): Promise<TaskState | null> {
+    const task = await this.getCurrentTask();
+    if (!task) return null;
+
+    return this.updateTask(task.id, {
+      status,
+      actionId: `set-status-${status}-${Date.now()}`,
+    });
+  }
+
+  // ============================================
+  // Profile Management
+  // ============================================
+
+  /**
+   * Set a user profile preference
+   */
+  async setProfile(
+    key: string,
+    value: unknown,
+    options: { confidence?: number; explicit?: boolean; expiresAt?: number } = {}
+  ): Promise<unknown | null> {
+    if (!this.memoryManager) return null;
+
+    const item = await this.memoryManager.setProfile({
+      key,
+      value,
+      confidence: options.confidence ?? 0.8,
+      explicit: options.explicit ?? true,
+      expiresAt: options.expiresAt,
+    });
+
+    return item.value;
+  }
+
+  /**
+   * Get a user profile preference
+   */
+  async getProfile(key: string): Promise<unknown | null> {
+    if (!this.memoryManager) return null;
+    const item = await this.memoryManager.getProfile(key);
+    return item?.value ?? null;
+  }
+
+  /**
+   * Get all user profile preferences
+   */
+  async getAllProfiles(): Promise<Record<string, unknown>> {
+    if (!this.memoryManager) return {};
+    const items = await this.memoryManager.getAllProfiles();
+    const result: Record<string, unknown> = {};
+    for (const item of items) {
+      result[item.key] = item.value;
+    }
+    return result;
+  }
+
+  /**
+   * Close all resources (MCP, Skills, Memory)
+   */
+  async close(): Promise<void> {
+    await Promise.all([
+      this.closeMCP(),
+      this.closeSkills(),
+      this.closeMemory(),
+    ]);
+  }
+
   /**
    * Get the agent's name
    */
@@ -365,14 +726,36 @@ export class Agent {
       await this.initializeSkills();
     }
 
+    // Auto-initialize Memory if configured with autoInitialize
+    if (this.memoryConfig?.enabled && this.memoryConfig.autoInitialize !== false && !this.memoryManager) {
+      await this.initializeMemory();
+    }
+
     const { maxIterations = 10, signal } = options;
+
+    // Record user message to memory
+    if (this.memoryManager) {
+      const observer = this.memoryManager.getObserver();
+      await this.memoryManager.recordEvent(
+        observer.createUserMessageEvent(input)
+      );
+    }
 
     // Add user message to history
     this.conversationHistory.push(userMessage(input));
 
+    // Build system prompt with memory context
+    let effectiveSystemPrompt = this.config.systemPrompt;
+    if (this.memoryManager && this.memoryConfig?.autoInject !== false) {
+      const memoryContext = await this.getMemoryContext(input);
+      if (memoryContext) {
+        effectiveSystemPrompt = `${this.config.systemPrompt}\n\n---\n\n## Memory Context\n\n${memoryContext}`;
+      }
+    }
+
     // Build messages with system prompt
     const messages: ChatCompletionMessageParam[] = [
-      systemMessage(this.config.systemPrompt),
+      systemMessage(effectiveSystemPrompt),
       ...this.conversationHistory,
     ];
 
@@ -405,6 +788,16 @@ export class Agent {
         const content = response.content ?? '';
         this.conversationHistory.push(assistantMessage(content));
 
+        // Record assistant message to memory
+        if (this.memoryManager) {
+          const observer = this.memoryManager.getObserver();
+          await this.memoryManager.recordEvent(
+            observer.createAssistantMessageEvent(content, {
+              hasToolCalls: toolCallResults.length > 0,
+            })
+          );
+        }
+
         return {
           content,
           toolCalls: toolCallResults.length > 0 ? toolCallResults : undefined,
@@ -430,7 +823,26 @@ export class Agent {
 
         try {
           const args = JSON.parse(toolCall.function.arguments);
+
+          // Record tool call to memory
+          let toolCallEventId: string | undefined;
+          if (this.memoryManager) {
+            const observer = this.memoryManager.getObserver();
+            const event = await this.memoryManager.recordEvent(
+              observer.createToolCallEvent(toolCall.function.name, args)
+            );
+            toolCallEventId = event.id;
+          }
+
           const result = await tool.execute(args);
+
+          // Record tool result to memory
+          if (this.memoryManager) {
+            const observer = this.memoryManager.getObserver();
+            await this.memoryManager.recordEvent(
+              observer.createToolResultEvent(toolCall.function.name, result, toolCallEventId)
+            );
+          }
 
           toolCallResults.push({
             name: toolCall.function.name,
@@ -477,13 +889,35 @@ export class Agent {
       await this.initializeSkills();
     }
 
+    // Auto-initialize Memory if configured with autoInitialize
+    if (this.memoryConfig?.enabled && this.memoryConfig.autoInitialize !== false && !this.memoryManager) {
+      await this.initializeMemory();
+    }
+
     try {
+      // Record user message to memory
+      if (this.memoryManager) {
+        const observer = this.memoryManager.getObserver();
+        await this.memoryManager.recordEvent(
+          observer.createUserMessageEvent(input)
+        );
+      }
+
       // Add user message to history
       this.conversationHistory.push(userMessage(input));
 
+      // Build system prompt with memory context
+      let effectiveSystemPrompt = this.config.systemPrompt;
+      if (this.memoryManager && this.memoryConfig?.autoInject !== false) {
+        const memoryContext = await this.getMemoryContext(input);
+        if (memoryContext) {
+          effectiveSystemPrompt = `${this.config.systemPrompt}\n\n---\n\n## Memory Context\n\n${memoryContext}`;
+        }
+      }
+
       // Build messages with system prompt
       const messages: ChatCompletionMessageParam[] = [
-        systemMessage(this.config.systemPrompt),
+        systemMessage(effectiveSystemPrompt),
         ...this.conversationHistory,
       ];
 
@@ -532,6 +966,16 @@ export class Agent {
         if (!finalResult.toolCalls || finalResult.toolCalls.length === 0) {
           this.conversationHistory.push(assistantMessage(fullContent));
 
+          // Record assistant message to memory
+          if (this.memoryManager) {
+            const observer = this.memoryManager.getObserver();
+            await this.memoryManager.recordEvent(
+              observer.createAssistantMessageEvent(fullContent, {
+                hasToolCalls: toolCallResults.length > 0,
+              })
+            );
+          }
+
           const response: AgentResponse = {
             content: fullContent,
             toolCalls: toolCallResults.length > 0 ? toolCallResults : undefined,
@@ -561,6 +1005,16 @@ export class Agent {
 
           onToolCall?.(toolCall.function.name, args);
 
+          // Record tool call to memory
+          let toolCallEventId: string | undefined;
+          if (this.memoryManager) {
+            const observer = this.memoryManager.getObserver();
+            const event = await this.memoryManager.recordEvent(
+              observer.createToolCallEvent(toolCall.function.name, args)
+            );
+            toolCallEventId = event.id;
+          }
+
           if (!tool) {
             const errorResult = `Error: Unknown tool "${toolCall.function.name}"`;
             messages.push(toolMessage(toolCall.id, errorResult));
@@ -570,6 +1024,14 @@ export class Agent {
 
           try {
             const result = await tool.execute(args);
+
+            // Record tool result to memory
+            if (this.memoryManager) {
+              const observer = this.memoryManager.getObserver();
+              await this.memoryManager.recordEvent(
+                observer.createToolResultEvent(toolCall.function.name, result, toolCallEventId)
+              );
+            }
 
             toolCallResults.push({
               name: toolCall.function.name,

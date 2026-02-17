@@ -771,3 +771,138 @@ await skillManager.activate('new-skill');
 // 清理
 await agent.closeSkills();
 ```
+
+---
+
+## 9. @agent-stack/memory 业务逻辑
+
+### 9.1 MemoryManager 类
+
+**职责**：管理持久化记忆的完整生命周期
+
+```typescript
+class MemoryManager {
+  // 生命周期
+  initialize()             // 初始化数据库和存储
+  close()                  // 关闭连接
+
+  // 会话管理
+  getSessionId()           // 获取当前会话ID
+  setSessionId(id)         // 设置会话ID
+  newSession()             // 开始新会话
+
+  // 事件操作
+  recordEvent(event)       // 记录事件
+  onEvent(callback)        // 订阅事件
+
+  // 任务操作
+  createTask(task)         // 创建任务
+  updateTask(id, update)   // 更新任务
+  getCurrentTask()         // 获取当前任务
+
+  // 配置操作
+  setProfile(item)         // 设置用户偏好
+  getProfile(key)          // 获取用户偏好
+  getAllProfiles()         // 获取所有偏好
+
+  // 检索
+  retrieve(options)        // 检索 MemoryBundle
+  inject(bundle)           // 注入到 prompt
+
+  // 摘要
+  summarize(sessionId)     // 生成摘要
+
+  // 语义
+  addChunk(chunk)          // 添加语义块
+  searchChunks(query)      // 语义搜索
+}
+```
+
+### 9.2 五层记忆存储
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                        MemoryBundle                              │
+├─────────────────────────────────────────────────────────────────┤
+│  Profile (200 tokens)     用户偏好，优先级最高                   │
+│  TaskState (300 tokens)   当前任务状态                          │
+│  Summary (400 tokens)     滚动摘要                              │
+│  RecentEvents (500 tokens) 最近事件                             │
+│  SemanticChunks (800 tokens) 语义检索结果                       │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### 9.3 Agent 集成
+
+```typescript
+import { Agent } from '@agent-stack/index';
+
+// 启用 Memory
+const agent = new Agent({
+  name: 'Memory Agent',
+  memory: {
+    enabled: true,
+    dbPath: '.agent-stack/memory.db',
+    autoInitialize: true,
+    autoInject: true,
+  }
+});
+
+// 对话自动记录到 memory
+const response = await agent.chat('Hello!');
+
+// 手动检索 memory
+const bundle = await agent.retrieveMemory('search query');
+const context = await agent.getMemoryContext('search query');
+
+// 会话管理
+const sessionId = agent.newSession();
+
+// 任务管理
+const task = await agent.createTask('Implement feature X', {
+  plan: [
+    { id: '1', description: 'Step 1', status: 'pending' },
+    { id: '2', description: 'Step 2', status: 'pending' },
+  ],
+});
+await agent.completeTaskStep('1', 'Done');
+const progress = await agent.getTaskProgress(); // { percentage: 50, done: 1, total: 2 }
+
+// Profile 管理
+await agent.setProfile('language', 'Chinese', { explicit: true });
+const lang = await agent.getProfile('language'); // 'Chinese'
+
+// 清理
+await agent.close();  // 关闭所有资源 (MCP, Skill, Memory)
+```
+
+### 9.4 Memory 配置
+
+```json
+{
+  "memory": {
+    "enabled": true,
+    "dbPath": ".agent-stack/memory.db",
+    "autoInitialize": true,
+    "autoInject": true,
+    "tokenBudget": {
+      "profile": 200,
+      "taskState": 300,
+      "recentEvents": 500,
+      "semanticChunks": 800,
+      "summary": 400,
+      "total": 2200
+    },
+    "writePolicy": {
+      "autoSummarize": true,
+      "summarizeEveryNEvents": 20,
+      "conflictStrategy": "latest"
+    },
+    "retrieval": {
+      "maxRecentEvents": 10,
+      "maxSemanticChunks": 5,
+      "enableSemanticSearch": true
+    }
+  }
+}
+```

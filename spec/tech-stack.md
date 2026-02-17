@@ -51,6 +51,7 @@ Rush 是微软开源的 Monorepo 管理工具，主要特点：
     { "packageName": "@agent-stack/provider", "projectFolder": "packages/provider" },
     { "packageName": "@agent-stack/mcp", "projectFolder": "packages/mcp" },
     { "packageName": "@agent-stack/skill", "projectFolder": "packages/skill" },
+    { "packageName": "@agent-stack/memory", "projectFolder": "packages/memory" },
     { "packageName": "@agent-stack/index", "projectFolder": "packages/index" }
   ]
 }
@@ -194,3 +195,61 @@ TikTok Agent Development Kit 插件系统，提供：
 - 模板资源
 - MCP 服务配置
 - 辅助脚本
+
+---
+
+## 7. 数据存储
+
+### better-sqlite3 (^11.10.0)
+
+同步的 SQLite3 绑定库，用于 `@agent-stack/memory` 包：
+
+- **同步 API**: 简化异步处理
+- **预编译语句**: 提高性能
+- **事务支持**: 原子操作
+
+**用途**：
+- EventStore - 事件日志存储
+- TaskStateStore - 任务状态存储
+- ProfileStore - 用户偏好存储
+- SummaryStore - 对话摘要存储
+- SemanticStore - 语义检索 (FTS5)
+
+### SQLite FTS5
+
+全文搜索扩展，用于语义检索：
+
+```sql
+-- 全文搜索表
+CREATE VIRTUAL TABLE chunks_fts USING fts5(
+  text,
+  content='semantic_chunks',
+  content_rowid='rowid',
+  tokenize='unicode61'
+);
+```
+
+---
+
+## 8. 测试框架
+
+### Vitest (^2.1.0)
+
+用于 `@agent-stack/memory` 包的单元测试和集成测试：
+
+```typescript
+// vitest.config.ts
+export default defineConfig({
+  test: {
+    globals: true,
+    environment: 'node',
+    include: ['tests/**/*.test.ts'],
+    testTimeout: 30000,
+  },
+});
+```
+
+**测试覆盖**：
+- 124 个测试用例
+- 单元测试 (Stores, Reducer, Policy)
+- 集成测试 (长对话模拟, 性能测试)

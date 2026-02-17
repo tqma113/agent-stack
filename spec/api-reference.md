@@ -1047,7 +1047,422 @@ class SkillNotFoundError extends SkillError {}
 
 ---
 
-## 5. 类型导出
+## 5. @agent-stack/memory
+
+### 5.1 MemoryManager 类
+
+管理五层记忆存储和检索。
+
+#### 构造函数
+
+```typescript
+constructor(config?: Partial<MemoryConfig>)
+```
+
+**MemoryConfig**:
+
+| 参数 | 类型 | 默认值 | 描述 |
+|------|------|--------|------|
+| `dbPath` | `string` | `.agent-stack/memory.db` | SQLite 数据库路径 |
+| `tokenBudget` | `TokenBudget` | 默认配置 | Token 预算配置 |
+| `writePolicy` | `WritePolicyConfig` | 默认配置 | 写入策略配置 |
+| `retrieval` | `RetrievalConfig` | 默认配置 | 检索配置 |
+| `debug` | `boolean` | `false` | 调试模式 |
+
+---
+
+#### 生命周期方法
+
+```typescript
+// 初始化
+async initialize(): Promise<void>
+
+// 关闭
+async close(): Promise<void>
+```
+
+---
+
+#### 事件操作
+
+```typescript
+// 记录事件
+async recordEvent(event: EventInput): Promise<MemoryEvent>
+
+// 批量记录事件
+async recordEvents(events: EventInput[]): Promise<MemoryEvent[]>
+
+// 订阅事件
+onEvent(callback: ObserverCallback): () => void
+
+// 获取 Observer
+getObserver(): MemoryObserver
+```
+
+**EventInput**:
+
+| 字段 | 类型 | 描述 |
+|------|------|------|
+| `type` | `EventType` | 事件类型 |
+| `summary` | `string` | 事件摘要 |
+| `payload` | `Record<string, unknown>` | 事件数据 |
+| `sessionId` | `string` | 会话 ID |
+| `tags` | `string[]` | 标签 |
+| `entities` | `EventEntity[]` | 提取的实体 |
+
+**EventType**:
+
+- `USER_MSG` - 用户消息
+- `ASSISTANT_MSG` - 助手回复
+- `TOOL_CALL` - 工具调用
+- `TOOL_RESULT` - 工具结果
+- `DECISION` - 重要决策
+- `STATE_CHANGE` - 状态变更
+- `ERROR` - 错误事件
+
+---
+
+#### 任务操作
+
+```typescript
+// 创建任务
+async createTask(task: Omit<TaskState, 'id' | 'version' | 'updatedAt'>): Promise<TaskState>
+
+// 更新任务
+async updateTask(id: UUID, update: TaskStateUpdate): Promise<TaskState>
+
+// 获取当前任务
+async getCurrentTask(sessionId?: string): Promise<TaskState | null>
+```
+
+**TaskState**:
+
+| 字段 | 类型 | 描述 |
+|------|------|------|
+| `id` | `UUID` | 任务 ID |
+| `goal` | `string` | 任务目标 |
+| `status` | `TaskStatus` | 任务状态 |
+| `constraints` | `TaskConstraint[]` | 约束条件 |
+| `plan` | `PlanStep[]` | 计划步骤 |
+| `done` | `string[]` | 已完成步骤 ID |
+| `blocked` | `string[]` | 被阻塞步骤 ID |
+| `nextAction` | `string` | 下一步操作 |
+| `version` | `number` | 版本号 (乐观锁) |
+
+---
+
+#### Profile 操作
+
+```typescript
+// 设置偏好
+async setProfile(item: ProfileItemInput): Promise<ProfileItem>
+
+// 获取偏好
+async getProfile(key: string): Promise<ProfileItem | null>
+
+// 获取所有偏好
+async getAllProfiles(): Promise<ProfileItem[]>
+```
+
+**ProfileItem**:
+
+| 字段 | 类型 | 描述 |
+|------|------|------|
+| `key` | `string` | 偏好键 |
+| `value` | `unknown` | 偏好值 |
+| `confidence` | `number` | 置信度 (0-1) |
+| `explicit` | `boolean` | 是否显式设置 |
+| `sourceEventId` | `UUID` | 来源事件 ID |
+
+---
+
+#### 语义检索
+
+```typescript
+// 添加语义块
+async addChunk(chunk: SemanticChunkInput): Promise<SemanticChunk>
+
+// 搜索语义块
+async searchChunks(
+  query: string,
+  options?: {
+    tags?: string[];
+    sessionId?: string;
+    limit?: number;
+  }
+): Promise<SemanticSearchResult[]>
+```
+
+---
+
+#### 记忆检索与注入
+
+```typescript
+// 检索记忆 Bundle
+async retrieve(options?: {
+  sessionId?: string;
+  query?: string;
+  taskId?: UUID;
+}): Promise<MemoryBundle>
+
+// 注入 Bundle 到 Prompt
+inject(bundle: MemoryBundle, options?: { template?: string }): string
+```
+
+**MemoryBundle**:
+
+| 字段 | 类型 | 描述 |
+|------|------|------|
+| `profile` | `ProfileItem[]` | 用户偏好 |
+| `taskState` | `TaskState` | 当前任务状态 |
+| `recentEvents` | `MemoryEvent[]` | 最近事件 |
+| `retrievedChunks` | `SemanticSearchResult[]` | 检索的语义块 |
+| `summary` | `Summary` | 对话摘要 |
+| `warnings` | `MemoryWarning[]` | 警告信息 |
+| `totalTokens` | `number` | 总 token 数 |
+
+---
+
+#### 会话管理
+
+```typescript
+// 设置会话 ID
+setSessionId(sessionId: string): void
+
+// 获取会话 ID
+getSessionId(): string
+
+// 创建新会话
+newSession(): string
+```
+
+---
+
+#### Embedding 配置
+
+```typescript
+// 设置 Embedding 函数 (启用自动混合搜索)
+setEmbedFunction(fn: EmbedFunction): void
+
+// 检查是否设置了 Embedding 函数
+hasEmbedFunction(): boolean
+
+// 检查向量搜索是否可用
+isVectorSearchEnabled(): boolean
+
+// 获取 SemanticStore 进行高级操作
+getSemanticStore(): SemanticStore
+```
+
+**EmbedFunction**:
+
+```typescript
+type EmbedFunction = (text: string) => Promise<number[]>;
+```
+
+**使用示例**:
+
+```typescript
+// 使用 @agent-stack/provider
+const client = new OpenAIClient();
+memory.setEmbedFunction(async (text) => {
+  const result = await client.embed(text);
+  return result[0].embedding;
+});
+
+// 或使用 OpenAI SDK
+const openai = new OpenAI();
+memory.setEmbedFunction(async (text) => {
+  const response = await openai.embeddings.create({
+    model: 'text-embedding-3-small',
+    input: text,
+  });
+  return response.data[0].embedding;
+});
+```
+
+设置 `setEmbedFunction()` 后：
+- `addChunk()` 会自动生成 embedding
+- `searchChunks()` 会自动使用混合搜索 (FTS + Vector)
+- 默认权重: FTS 0.3, Vector 0.7
+
+---
+
+### 5.2 MemoryObserver 类
+
+事件创建辅助类。
+
+```typescript
+// 创建用户消息事件
+createUserMessageEvent(content: string): EventInput
+
+// 创建助手消息事件
+createAssistantMessageEvent(content: string): EventInput
+
+// 创建工具调用事件
+createToolCallEvent(name: string, args: Record<string, unknown>): EventInput
+
+// 创建工具结果事件
+createToolResultEvent(name: string, result: string, parentId?: string): EventInput
+
+// 创建决策事件
+createDecisionEvent(decision: string, reasoning?: string): EventInput
+```
+
+---
+
+### 5.3 TaskStateReducer 类
+
+不可变任务状态更新。
+
+```typescript
+// 应用 action
+reduce(state: TaskState, action: TaskAction): ReducerResult
+
+// 检查是否完成
+isCompleted(state: TaskState): boolean
+
+// 获取进度百分比
+getProgress(state: TaskState): number
+
+// 获取下一步
+getNextStep(state: TaskState): TaskStep | null
+
+// 验证状态
+validate(state: TaskState): string[]
+```
+
+**TaskActions**:
+
+```typescript
+TaskActions.setGoal(goal: string)
+TaskActions.setStatus(status: TaskStatus)
+TaskActions.addStep(step: TaskStep)
+TaskActions.updateStep(stepId: string, updates: Partial<TaskStep>)
+TaskActions.completeStep(stepId: string, result?: string)
+TaskActions.blockStep(stepId: string, reason: string)
+TaskActions.unblockStep(stepId: string)
+TaskActions.addConstraint(constraint: TaskConstraint)
+TaskActions.removeConstraint(constraintId: string)
+TaskActions.resetProgress()
+TaskActions.batch(...actions: TaskAction[])
+```
+
+---
+
+### 5.4 Store 接口
+
+#### EventStore
+
+```typescript
+// 添加事件
+async add(event: EventInput): Promise<MemoryEvent>
+
+// 批量添加
+async addBatch(events: EventInput[]): Promise<MemoryEvent[]>
+
+// 获取事件
+async get(id: UUID): Promise<MemoryEvent | null>
+
+// 查询事件
+async query(options: EventQueryOptions): Promise<MemoryEvent[]>
+
+// 获取最近事件
+async getRecent(limit: number, sessionId?: string): Promise<MemoryEvent[]>
+
+// 删除事件
+async delete(id: UUID): Promise<boolean>
+
+// 批量删除
+async deleteBatch(ids: UUID[]): Promise<number>
+
+// 按会话删除
+async deleteBySession(sessionId: string): Promise<number>
+
+// 按时间删除
+async deleteBeforeTimestamp(timestamp: number): Promise<number>
+```
+
+#### TaskStateStore
+
+```typescript
+// 创建任务
+async create(task): Promise<TaskState>
+
+// 更新任务 (幂等)
+async update(id: UUID, update: TaskStateUpdate): Promise<TaskState>
+
+// 回滚版本
+async rollback(taskId: UUID, version: number): Promise<TaskState>
+
+// 获取快照
+async getSnapshots(taskId: UUID, limit?: number): Promise<TaskStateSnapshot[]>
+```
+
+#### SemanticStore
+
+```typescript
+// 全文搜索
+async searchFts(query: string, options?): Promise<SemanticSearchResult[]>
+
+// 向量搜索
+async searchVector(embedding: number[], options?): Promise<SemanticSearchResult[]>
+
+// 混合搜索
+async search(query: string, options?): Promise<SemanticSearchResult[]>
+```
+
+---
+
+### 5.5 配置类型
+
+**TokenBudget**:
+
+```typescript
+interface TokenBudget {
+  profile: number;        // 默认 200
+  taskState: number;      // 默认 300
+  recentEvents: number;   // 默认 500
+  semanticChunks: number; // 默认 800
+  summary: number;        // 默认 400
+  total: number;          // 默认 2200
+}
+```
+
+**WritePolicyConfig**:
+
+```typescript
+interface WritePolicyConfig {
+  minConfidence: number;        // 最小置信度
+  autoSummarize: boolean;       // 自动摘要
+  summarizeEveryNEvents: number; // 每 N 事件触发摘要
+  summarizeTokenThreshold: number; // Token 阈值
+  profileKeyWhitelist: string[] | null; // Profile 键白名单
+  conflictStrategy: 'latest' | 'confidence' | 'explicit' | 'manual';
+  timeDecayFactor: number;      // 时间衰减因子
+  staleThresholdMs: number;     // 陈旧阈值
+}
+```
+
+---
+
+### 5.6 错误类
+
+```typescript
+class MemoryError extends Error {
+  code: string;
+}
+
+class DatabaseError extends MemoryError {}
+class EventRecordError extends MemoryError {}
+class TaskStateConflictError extends MemoryError {}
+class ProfileKeyNotAllowedError extends MemoryError {}
+class RetrievalError extends MemoryError {}
+```
+
+---
+
+## 6. 类型导出
 
 ### 从 @agent-stack/provider 导出
 
@@ -1241,5 +1656,80 @@ export {
   type BridgedSkillTool,
   type SkillManagerOptions,
   type AgentTool,
+};
+```
+
+### 从 @agent-stack/memory 导出
+
+```typescript
+export {
+  // 类
+  MemoryManager,
+  MemoryObserver,
+  MemoryRetriever,
+  MemoryInjector,
+  MemoryBudgeter,
+  MemorySummarizer,
+  WritePolicyEngine,
+  TaskStateReducer,
+  TaskActions,
+
+  // Store 类
+  EventStore,
+  TaskStateStore,
+  SummaryStore,
+  ProfileStore,
+  SemanticStore,
+
+  // 错误类
+  MemoryError,
+  DatabaseError,
+  EventRecordError,
+  TaskStateConflictError,
+  ProfileKeyNotAllowedError,
+  RetrievalError,
+
+  // 类型
+  type MemoryConfig,
+  type TokenBudget,
+  type WritePolicyConfig,
+  type RetrievalConfig,
+  type MemoryBundle,
+  type MemoryWarning,
+  type MemoryEvent,
+  type EventInput,
+  type EventType,
+  type EventEntity,
+  type TaskState,
+  type TaskStatus,
+  type TaskStep,
+  type TaskConstraint,
+  type TaskStateUpdate,
+  type TaskStateSnapshot,
+  type TaskAction,
+  type ProfileItem,
+  type ProfileItemInput,
+  type ProfileKey,
+  type Summary,
+  type SummaryInput,
+  type SummaryDecision,
+  type SummaryTodo,
+  type SemanticChunk,
+  type SemanticChunkInput,
+  type SemanticSearchResult,
+  type SemanticMatchType,
+  type ObserverCallback,
+  type UUID,
+  type Timestamp,
+  type TokenCount,
+  type Confidence,
+  type ConflictStrategy,
+
+  // 常量
+  PROFILE_KEYS,
+  DEFAULT_TOKEN_BUDGET,
+  DEFAULT_WRITE_POLICY,
+  DEFAULT_RETRIEVAL_CONFIG,
+  DEFAULT_MEMORY_CONFIG,
 };
 ```

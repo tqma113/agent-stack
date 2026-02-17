@@ -2,7 +2,7 @@
 
 ## 项目概述
 
-Agent Stack 是一个基于 TypeScript 的 AI Agent 开发框架，采用 Rush monorepo 架构管理多个包。项目旨在提供一个简洁、易用的 OpenAI API 封装、MCP 协议支持、Skill 系统和 AI Agent 实现。
+Agent Stack 是一个基于 TypeScript 的 AI Agent 开发框架，采用 Rush monorepo 架构管理多个包。项目旨在提供一个简洁、易用的 OpenAI API 封装、MCP 协议支持、Skill 系统、Memory 系统和 AI Agent 实现。
 
 ---
 
@@ -19,6 +19,8 @@ Agent Stack 是一个基于 TypeScript 的 AI Agent 开发框架，采用 Rush m
 | 构建工具 | tsup | ^8.3.5 |
 | AI SDK | openai | ^4.77.0 |
 | MCP SDK | @modelcontextprotocol/sdk | ^1.0.0 |
+| 数据库 | better-sqlite3 | ^11.7.0 |
+| 向量搜索 | sqlite-vec | ^0.1.6 |
 
 ### 开发依赖
 
@@ -64,6 +66,20 @@ agent-stack/
 │   │       ├── bridge.ts      # 工具桥接
 │   │       └── helpers.ts     # 辅助函数
 │   │
+│   ├── memory/                 # @agent-stack/memory - Memory 系统
+│   │   └── src/
+│   │       ├── index.ts       # 入口文件
+│   │       ├── types.ts       # 类型定义
+│   │       ├── errors.ts      # 错误类
+│   │       ├── manager.ts     # MemoryManager
+│   │       ├── stores/        # 存储层 (Event/TaskState/Summary/Profile/Semantic)
+│   │       ├── observer.ts    # 事件采集
+│   │       ├── retriever.ts   # 多路召回
+│   │       ├── injector.ts    # 模板注入
+│   │       ├── budgeter.ts    # Token 预算
+│   │       ├── write-policy.ts # 写入策略
+│   │       └── summarizer.ts  # 摘要生成
+│   │
 │   └── index/                  # @agent-stack/index - Agent 实现 + CLI
 │       └── src/
 │           ├── index.ts       # 包入口
@@ -104,11 +120,17 @@ agent-stack/
         │
         └── (无外部依赖)
 
-@agent-stack/index     (Agent 实现 + CLI，内置 MCP 和 Skill 支持)
+@agent-stack/memory    (Memory 系统)
+        │
+        ├── better-sqlite3 (^11.7.0)
+        └── sqlite-vec (^0.1.6)
+
+@agent-stack/index     (Agent 实现 + CLI，内置 MCP、Skill 和 Memory 支持)
         │
         ├── @agent-stack/provider (workspace:*)
         ├── @agent-stack/mcp (workspace:*)
         ├── @agent-stack/skill (workspace:*)
+        ├── @agent-stack/memory (workspace:*)
         └── commander (^12.1.0) - CLI 框架
 ```
 

@@ -1,0 +1,146 @@
+/**
+ * @agent-stack/memory
+ *
+ * Memory system for AI agents with multi-layer storage.
+ *
+ * Features:
+ * - Episodic memory (event log)
+ * - Working memory (task state)
+ * - Summary memory (compressed context)
+ * - Profile memory (user preferences)
+ * - Semantic memory (searchable content)
+ *
+ * @packageDocumentation
+ */
+
+// Main manager
+export { MemoryManager } from './manager.js';
+
+// Components
+export { MemoryObserver, DEFAULT_ENTITY_PATTERNS } from './observer.js';
+export type { ObserverOptions, EntityPattern } from './observer.js';
+
+export { MemoryRetriever } from './retriever.js';
+export type { RetrievalOptions, RetrieverStores } from './retriever.js';
+
+export { MemoryInjector, DEFAULT_INJECTION_TEMPLATE } from './injector.js';
+export type { InjectionOptions } from './injector.js';
+
+export { MemoryBudgeter } from './budgeter.js';
+export type { BudgetAllocation, TokenEstimationOptions } from './budgeter.js';
+
+export { WritePolicyEngine } from './write-policy.js';
+export type { WriteDecision, ConflictResolution } from './write-policy.js';
+
+export { MemorySummarizer } from './summarizer.js';
+export type { SummarizerOptions, SummaryResult } from './summarizer.js';
+
+export { TaskStateReducer, TaskActions } from './state-reducer.js';
+export type { TaskAction, ReducerResult } from './state-reducer.js';
+
+// Stores
+export {
+  SQLiteStore,
+  EventStore,
+  TaskStateStore,
+  SummaryStore,
+  ProfileStore,
+  SemanticStore,
+} from './stores/index.js';
+
+export {
+  DEFAULT_SEMANTIC_CONFIG,
+  type SemanticStoreConfig,
+  type VectorSearchOptions,
+  type HybridSearchOptions,
+  type EmbedFunction,
+} from './stores/index.js';
+
+// Errors
+export {
+  MemoryError,
+  StoreInitializationError,
+  EventRecordError,
+  TaskStateError,
+  TaskStateConflictError,
+  ProfileError,
+  ProfileKeyNotAllowedError,
+  RetrievalError,
+  SummarizationError,
+  SemanticSearchError,
+  TokenBudgetExceededError,
+  WritePolicyError,
+  DatabaseError,
+} from './errors.js';
+
+// Types
+export type {
+  // Common
+  UUID,
+  Timestamp,
+  Confidence,
+  TokenCount,
+
+  // Events
+  EventType,
+  EventEntity,
+  EventLink,
+  MemoryEvent,
+  EventInput,
+
+  // Task State
+  TaskStatus,
+  TaskConstraint,
+  PlanStep,
+  TaskStep,
+  TaskState,
+  TaskStateUpdate,
+  TaskStateSnapshot,
+
+  // Summary
+  SummaryDecision,
+  SummaryTodo,
+  Summary,
+  SummaryInput,
+
+  // Profile
+  ConflictStrategy,
+  ProfileItem,
+  ProfileItemInput,
+  ProfileKey,
+
+  // Semantic
+  SemanticChunk,
+  SemanticChunkInput,
+  SemanticSearchResult,
+  SemanticMatchType,
+
+  // Bundle
+  MemoryWarning,
+  MemoryBundle,
+
+  // Configuration
+  TokenBudget,
+  WritePolicyConfig,
+  RetrievalConfig,
+  MemoryConfig,
+
+  // Store interfaces
+  BaseStore,
+  IEventStore,
+  ITaskStateStore,
+  ISummaryStore,
+  IProfileStore,
+  ISemanticStore,
+  IMemoryManager,
+  ObserverCallback,
+} from './types.js';
+
+// Constants
+export {
+  PROFILE_KEYS,
+  DEFAULT_TOKEN_BUDGET,
+  DEFAULT_WRITE_POLICY,
+  DEFAULT_RETRIEVAL_CONFIG,
+  DEFAULT_MEMORY_CONFIG,
+} from './types.js';

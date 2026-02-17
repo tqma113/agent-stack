@@ -353,6 +353,10 @@
       "projectFolder": "packages/skill"
     },
     {
+      "packageName": "@agent-stack/memory",
+      "projectFolder": "packages/memory"
+    },
+    {
       "packageName": "@agent-stack/example",
       "projectFolder": "example"
     }

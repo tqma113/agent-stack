@@ -1,7 +1,7 @@
 {
-  "name": "@agent-stack/index",
+  "name": "@agent-stack/memory",
   "version": "0.0.1",
-  "description": "Main entry point for agent-stack AI agents",
+  "description": "Memory system for agent-stack - persistent memory management with multi-layer storage",
   "main": "./dist/index.js",
   "module": "./dist/index.mjs",
   "types": "./dist/index.d.ts",
@@ -12,9 +12,6 @@
       "require": "./dist/index.js"
     }
   },
-  "bin": {
-    "agent-stack": "./dist/cli.js"
-  },
   "files": [
     "dist"
   ],
@@ -22,29 +19,32 @@
     "build": "tsup",
     "dev": "tsup --watch",
     "clean": "rimraf dist",
-    "start": "node dist/cli.js",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage"
   },
   "keywords": [
     "agent",
-    "ai",
-    "openai",
+    "memory",
+    "persistent",
     "llm",
-    "mcp"
+    "ai",
+    "context",
+    "rag"
   ],
   "author": "",
   "license": "MIT",
   "dependencies": {
-    "@agent-stack/provider": "workspace:*",
-    "@agent-stack/mcp": "workspace:*",
-    "@agent-stack/skill": "workspace:*",
-    "@agent-stack/memory": "workspace:*",
-    "commander": "^12.1.0"
+    "better-sqlite3": "^11.7.0",
+    "sqlite-vec": "^0.1.6"
   },
   "devDependencies": {
+    "@types/better-sqlite3": "^7.6.12",
     "@types/node": "^22.10.0",
     "rimraf": "^6.0.1",
     "tsup": "^8.3.5",
-    "typescript": "~5.7.2"
+    "typescript": "~5.7.2",
+    "vitest": "^2.1.0"
   }
 }
