@@ -112,6 +112,18 @@ export default defineConfig({
 | 图像 | dall-e-3, dall-e-2 |
 | 语音 | tts-1, tts-1-hd, whisper-1 |
 
+### Commander (^12.1.0)
+
+Node.js 命令行框架，用于 CLI 实现：
+
+```bash
+# CLI 命令结构
+agent-stack chat       # 交互式聊天
+agent-stack run        # 单次执行任务
+agent-stack tools      # 工具管理
+agent-stack config     # 配置管理
+```
+
 ### MCP SDK (@modelcontextprotocol/sdk ^1.0.0)
 
 Model Context Protocol SDK，支持连接 MCP 服务器：

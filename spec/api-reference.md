@@ -469,6 +469,112 @@ async complete(
 
 ---
 
+### 2.2 配置函数
+
+#### loadConfig()
+
+加载配置文件。
+
+```typescript
+function loadConfig(configPath?: string): LoadConfigResult
+```
+
+**参数**:
+
+| 参数 | 类型 | 描述 |
+|------|------|------|
+| `configPath` | `string` | 可选，配置文件路径。不指定则自动查找 |
+
+**返回值**:
+
+```typescript
+{
+  config: AgentStackConfig;   // 加载的配置
+  configPath?: string;        // 配置文件路径 (如果找到)
+}
+```
+
+---
+
+#### findConfigFile()
+
+查找配置文件。
+
+```typescript
+function findConfigFile(startDir?: string): string | undefined
+```
+
+按优先级搜索：`.agent-stack.json`、`agent-stack.config.json`
+
+---
+
+#### toAgentConfig()
+
+将 AgentStackConfig 转换为 AgentConfig。
+
+```typescript
+function toAgentConfig(
+  stackConfig: AgentStackConfig,
+  baseDir?: string
+): AgentConfig
+```
+
+---
+
+#### generateConfigTemplate()
+
+生成默认配置模板。
+
+```typescript
+function generateConfigTemplate(): AgentStackConfig
+```
+
+---
+
+### 2.3 配置类型
+
+**AgentStackConfig**:
+
+```typescript
+interface AgentStackConfig {
+  model?: string;              // 模型名称
+  temperature?: number;        // 温度
+  maxTokens?: number;          // 最大 token
+  systemPrompt?: string;       // 系统提示词
+  apiKey?: string;             // API 密钥
+  baseURL?: string;            // 自定义 API 端点
+  skill?: SkillConfigSection;  // Skill 配置
+  mcp?: MCPConfigSection;      // MCP 配置
+  security?: SecurityConfigSection;  // 安全配置
+}
+```
+
+**SkillConfigSection**:
+
+```typescript
+interface SkillConfigSection {
+  directories?: string[];      // 自动发现目录
+  skills?: Record<string, {    // 单独 skill 配置
+    path?: string;
+    package?: string;
+    enabled?: boolean;
+    config?: Record<string, unknown>;
+  }>;
+  autoLoad?: boolean;          // 是否自动加载
+}
+```
+
+**MCPConfigSection**:
+
+```typescript
+interface MCPConfigSection {
+  configPath?: string;         // MCP 配置文件路径
+  autoConnect?: boolean;       // 是否自动连接
+}
+```
+
+---
+
 ## 3. @agent-stack/mcp
 
 ### 3.1 MCPClientManager 类
@@ -995,8 +1101,20 @@ export {
   // 类
   Agent,
 
+  // 配置函数
+  loadConfig,
+  findConfigFile,
+  toAgentConfig,
+  generateConfigTemplate,
+  serializeConfig,
+
   // 类型
   type AgentConfig,
+  type AgentStackConfig,
+  type SkillConfigSection,
+  type MCPConfigSection,
+  type SecurityConfigSection,
+  type LoadConfigResult,
   type Tool,
   type AgentResponse,
   type ToolCallResult,

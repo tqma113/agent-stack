@@ -9,6 +9,10 @@ agent-stack/
 │   ├── mcp/                    # @agent-stack/mcp
 │   ├── skill/                  # @agent-stack/skill
 │   └── index/                  # @agent-stack/index
+├── examples/                   # 示例配置（非 Rush 项目）
+│   ├── .agent-stack.json      # Agent 配置示例
+│   ├── .mcp.json              # MCP 配置示例
+│   └── skills/                # 示例 Skills
 ├── common/                     # Rush 公共目录
 │   ├── config/rush/           # Rush 配置
 │   ├── scripts/               # Rush 脚本
@@ -83,9 +87,10 @@ packages/provider/
 packages/index/
 ├── src/
 │   ├── index.ts               # 包入口
-│   ├── agent.ts               # Agent 类实现 (371 行)
-│   ├── types.ts               # 类型定义 (78 行)
-│   └── cli.ts                 # CLI 入口 (78 行)
+│   ├── agent.ts               # Agent 类实现
+│   ├── types.ts               # 类型定义
+│   ├── config.ts              # 配置文件加载
+│   └── cli.ts                 # 命令式 CLI
 ├── dist/                      # 构建输出
 ├── package.json
 └── tsup.config.ts
@@ -95,10 +100,11 @@ packages/index/
 
 | 文件 | 职责 |
 |------|------|
-| `src/index.ts` | 统一导出入口，re-export agent 和 provider |
+| `src/index.ts` | 统一导出入口，re-export agent、config 和 provider |
 | `src/agent.ts` | Agent 核心类，实现对话和工具调用 |
 | `src/types.ts` | Agent 相关类型定义 |
-| `src/cli.ts` | 命令行交互入口 |
+| `src/config.ts` | 配置文件加载和解析 (.agent-stack.json) |
+| `src/cli.ts` | 命令式 CLI，支持 chat/run/tools/config 命令 |
 
 ### 3.3 package.json 关键配置
 
@@ -110,7 +116,10 @@ packages/index/
     "agent-stack": "./dist/cli.js"
   },
   "dependencies": {
-    "@agent-stack/provider": "workspace:*"
+    "@agent-stack/provider": "workspace:*",
+    "@agent-stack/mcp": "workspace:*",
+    "@agent-stack/skill": "workspace:*",
+    "commander": "^12.1.0"
   }
 }
 ```

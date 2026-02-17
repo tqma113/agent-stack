@@ -209,36 +209,79 @@ LLM 返回 tool_calls
 
 ### 3.4 CLI 应用
 
-**命令行参数**：
+**命令结构**：
 
 ```bash
-agent-stack [--model=MODEL] [--system=PROMPT]
+# 交互式聊天
+agent-stack chat [--config PATH] [--model NAME] [--mcp PATH] [--skill DIR]
+
+# 单次执行任务
+agent-stack run "<task>" [--config PATH] [--model NAME] [--yes] [--json]
+
+# 工具管理
+agent-stack tools list [--config PATH]
+agent-stack tools info <name> [--config PATH]
+
+# 配置管理
+agent-stack config init [--force]
+agent-stack config show [--config PATH]
 ```
 
-**交互流程**：
+**交互式聊天流程**：
 
 ```
-启动 CLI
+启动 agent-stack chat
     │
     ▼
-┌─────────────────────┐
-│ 初始化 Agent        │
-│ 配置 readline       │
-└─────────────────────┘
+┌─────────────────────────┐
+│ 加载配置文件            │
+│ (.agent-stack.json)     │
+└─────────────────────────┘
     │
     ▼
-┌─────────────────────┐◄────┐
-│ 等待用户输入        │     │
-└─────────────────────┘     │
-    │                       │
-    ▼                       │
-┌─────────────────────┐     │
-│ 流式输出响应        │     │
-│ - onToken → stdout  │     │
-│ - onToolCall → 日志 │     │
-└─────────────────────┘     │
-    │                       │
-    └───────────────────────┘
+┌─────────────────────────┐
+│ 初始化 Agent            │
+│ - 连接 MCP 服务器       │
+│ - 加载 Skills           │
+└─────────────────────────┘
+    │
+    ▼
+┌─────────────────────────┐◄────┐
+│ 等待用户输入            │     │
+│ - /tools: 列出工具      │     │
+│ - /clear: 清除历史      │     │
+│ - /help: 显示帮助       │     │
+│ - exit: 退出            │     │
+└─────────────────────────┘     │
+    │                           │
+    ▼                           │
+┌─────────────────────────┐     │
+│ 流式输出响应            │     │
+│ - onToken → stdout      │     │
+│ - onToolCall → 日志     │     │
+│ - onToolResult → 日志   │     │
+└─────────────────────────┘     │
+    │                           │
+    └───────────────────────────┘
+```
+
+**配置文件格式** (`.agent-stack.json`):
+
+```json
+{
+  "model": "gpt-4o",
+  "temperature": 0.7,
+  "maxTokens": 4096,
+  "systemPrompt": "You are a helpful assistant...",
+  "skill": {
+    "directories": ["./skills"],
+    "autoLoad": true
+  },
+  "mcp": {
+    "configPath": ".mcp.json",
+    "autoConnect": true
+  }
+}
 ```
 
 ---

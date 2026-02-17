@@ -37,7 +37,8 @@
   "dependencies": {
     "@agent-stack/provider": "workspace:*",
     "@agent-stack/mcp": "workspace:*",
-    "@agent-stack/skill": "workspace:*"
+    "@agent-stack/skill": "workspace:*",
+    "commander": "^12.1.0"
   },
   "devDependencies": {
     "@types/node": "^22.10.0",

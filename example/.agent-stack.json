@@ -1,0 +1,17 @@
+{
+  "model": "gpt-4o",
+  "temperature": 0.7,
+  "maxTokens": 4096,
+  "systemPrompt": "You are a helpful AI assistant with access to file, shell, and search tools. Use them to help the user accomplish their tasks. Always explain what you're doing before using a tool.",
+  "skill": {
+    "directories": ["./skills"],
+    "autoLoad": true
+  },
+  "mcp": {
+    "configPath": "./.mcp.json",
+    "autoConnect": true
+  },
+  "security": {
+    "confirmDangerousCommands": true
+  }
+}

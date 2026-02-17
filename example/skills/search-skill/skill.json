@@ -1,0 +1,65 @@
+{
+  "name": "search",
+  "version": "1.0.0",
+  "description": "Search files by pattern and content",
+  "tools": [
+    {
+      "name": "search_files",
+      "description": "Search for files matching a glob pattern (e.g., '**/*.ts', 'src/**/*.json')",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "pattern": {
+            "type": "string",
+            "description": "Glob pattern to match files (e.g., '**/*.ts', 'src/**/*.json')"
+          },
+          "cwd": {
+            "type": "string",
+            "description": "Base directory to search from (default: current directory)"
+          },
+          "maxResults": {
+            "type": "number",
+            "description": "Maximum number of results to return (default: 100)",
+            "default": 100
+          }
+        },
+        "required": ["pattern"]
+      },
+      "handler": "./handlers.js#searchFiles"
+    },
+    {
+      "name": "grep_content",
+      "description": "Search for text content within files",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "pattern": {
+            "type": "string",
+            "description": "Text or regex pattern to search for"
+          },
+          "glob": {
+            "type": "string",
+            "description": "Glob pattern to filter files (default: '**/*')",
+            "default": "**/*"
+          },
+          "cwd": {
+            "type": "string",
+            "description": "Base directory to search from (default: current directory)"
+          },
+          "caseSensitive": {
+            "type": "boolean",
+            "description": "Case-sensitive search (default: false)",
+            "default": false
+          },
+          "maxResults": {
+            "type": "number",
+            "description": "Maximum number of matches to return (default: 50)",
+            "default": 50
+          }
+        },
+        "required": ["pattern"]
+      },
+      "handler": "./handlers.js#grepContent"
+    }
+  ]
+}

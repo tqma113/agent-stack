@@ -6,6 +6,7 @@
 
 export { Agent } from './agent';
 export * from './types';
+export * from './config';
 
 // Re-export useful types from provider
 export {

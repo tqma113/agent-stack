@@ -64,12 +64,21 @@ agent-stack/
 │   │       ├── bridge.ts      # 工具桥接
 │   │       └── helpers.ts     # 辅助函数
 │   │
-│   └── index/                  # @agent-stack/index - Agent 实现
+│   └── index/                  # @agent-stack/index - Agent 实现 + CLI
 │       └── src/
-│           ├── index.ts
-│           ├── agent.ts
-│           ├── types.ts
-│           └── cli.ts
+│           ├── index.ts       # 包入口
+│           ├── agent.ts       # Agent 核心类
+│           ├── types.ts       # 类型定义
+│           ├── config.ts      # 配置文件加载
+│           └── cli.ts         # 命令行工具
+│
+├── examples/                   # 示例配置
+│   ├── .agent-stack.json      # Agent 配置示例
+│   ├── .mcp.json              # MCP 配置示例
+│   └── skills/                # 示例 Skills
+│       ├── file-skill/        # 文件操作
+│       ├── shell-skill/       # Shell 命令
+│       └── search-skill/      # 文件搜索
 │
 ├── common/                     # Rush 公共配置
 ├── .github/workflows/          # CI/CD 配置
@@ -95,11 +104,12 @@ agent-stack/
         │
         └── (无外部依赖)
 
-@agent-stack/index     (Agent 实现，内置 MCP 和 Skill 支持)
+@agent-stack/index     (Agent 实现 + CLI，内置 MCP 和 Skill 支持)
         │
         ├── @agent-stack/provider (workspace:*)
         ├── @agent-stack/mcp (workspace:*)
-        └── @agent-stack/skill (workspace:*)
+        ├── @agent-stack/skill (workspace:*)
+        └── commander (^12.1.0) - CLI 框架
 ```
 
 ---
