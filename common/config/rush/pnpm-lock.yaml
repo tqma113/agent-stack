@@ -10,6 +10,12 @@ importers:
 
   .: {}
 
+  ../../example:
+    dependencies:
+      '@agent-stack/index':
+        specifier: workspace:*
+        version: link:../packages/index
+
   ../../packages/index:
     dependencies:
       '@agent-stack/mcp':

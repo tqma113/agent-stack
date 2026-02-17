@@ -5,7 +5,7 @@
   "private": true,
   "description": "Example project for testing @agent-stack/index",
   "scripts": {
-    "start": "node src/index.ts"
+    "start": "agent-stack chat"
   },
   "dependencies": {
     "@agent-stack/index": "workspace:*"
