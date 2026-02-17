@@ -4,16 +4,16 @@
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import Database from 'better-sqlite3';
-import { EventStore } from '../../src/stores/event.js';
+import { createEventStore, type EventStoreInstance } from '../../src/stores/event.js';
 import type { EventInput } from '../../src/types.js';
 
 describe('EventStore', () => {
   let db: Database.Database;
-  let store: EventStore;
+  let store: EventStoreInstance;
 
   beforeEach(async () => {
     db = new Database(':memory:');
-    store = new EventStore();
+    store = createEventStore();
     store.setDatabase(db);
     await store.initialize();
   });

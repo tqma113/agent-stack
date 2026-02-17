@@ -4,15 +4,15 @@
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import Database from 'better-sqlite3';
-import { ProfileStore } from '../../src/stores/profile.js';
+import { createProfileStore, type ProfileStoreInstance } from '../../src/stores/profile.js';
 
 describe('ProfileStore', () => {
   let db: Database.Database;
-  let store: ProfileStore;
+  let store: ProfileStoreInstance;
 
   beforeEach(async () => {
     db = new Database(':memory:');
-    store = new ProfileStore();
+    store = createProfileStore();
     store.setDatabase(db);
     await store.initialize();
   });

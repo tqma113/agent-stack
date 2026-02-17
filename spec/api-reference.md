@@ -2,12 +2,12 @@
 
 ## 1. @agent-stack/provider
 
-### 1.1 OpenAIClient 类
+### 1.1 createOpenAIClient() 工厂函数
 
-#### 构造函数
+#### 创建实例
 
 ```typescript
-constructor(config?: OpenAIClientConfig)
+const client = createOpenAIClient(config?: OpenAIClientConfig): OpenAIClientInstance
 ```
 
 **OpenAIClientConfig**:
@@ -255,12 +255,12 @@ chunkText(text: string, maxTokensPerChunk: number): string[]
 
 ## 2. @agent-stack/index
 
-### 2.1 Agent 类
+### 2.1 createAgent() 工厂函数
 
-#### 构造函数
+#### 创建实例
 
 ```typescript
-constructor(config?: AgentConfig)
+const agent = createAgent(config?: AgentConfig): AgentInstance
 ```
 
 **AgentConfig**:
@@ -317,10 +317,10 @@ configure(config: Partial<AgentConfig>): void
 async initializeMCP(): Promise<void>
 
 // 获取 MCP 管理器
-getMCPManager(): MCPClientManager | null
+getMCPManager(): MCPClientManagerInstance | null
 
 // 获取 MCP 工具提供者
-getMCPToolProvider(): MCPToolProvider | null
+getMCPToolProvider(): MCPToolProviderInstance | null
 
 // 刷新 MCP 工具
 async refreshMCPTools(): Promise<void>
@@ -338,10 +338,10 @@ async closeMCP(): Promise<void>
 async initializeSkills(): Promise<void>
 
 // 获取 Skill 管理器
-getSkillManager(): SkillManager | null
+getSkillManager(): SkillManagerInstance | null
 
 // 获取 Skill 工具提供者
-getSkillToolProvider(): SkillToolProvider | null
+getSkillToolProvider(): SkillToolProviderInstance | null
 
 // 刷新 Skill 工具
 async refreshSkillTools(): Promise<void>
@@ -577,14 +577,14 @@ interface MCPConfigSection {
 
 ## 3. @agent-stack/mcp
 
-### 3.1 MCPClientManager 类
+### 3.1 createMCPClientManager() 工厂函数
 
 管理多个 MCP 服务器连接。
 
-#### 构造函数
+#### 创建实例
 
 ```typescript
-constructor(options?: MCPClientManagerOptions)
+const manager = createMCPClientManager(options?: MCPClientManagerOptions): MCPClientManagerInstance
 ```
 
 **MCPClientManagerOptions**:
@@ -687,14 +687,14 @@ getState(serverName: string): MCPConnectionState
 
 ---
 
-### 3.2 MCPToolProvider 类
+### 3.2 createMCPToolProvider() 工厂函数
 
 将 MCP 工具桥接为 Agent Tool 接口。
 
-#### 构造函数
+#### 创建实例
 
 ```typescript
-constructor(manager: MCPClientManager, options?: MCPToolBridgeOptions)
+const provider = createMCPToolProvider(manager: MCPClientManagerInstance, options?: MCPToolBridgeOptions): MCPToolProviderInstance
 ```
 
 **MCPToolBridgeOptions**:
@@ -820,14 +820,14 @@ class MCPTimeoutError extends MCPError {}
 
 ## 4. @agent-stack/skill
 
-### 4.1 SkillManager 类
+### 4.1 createSkillManager() 工厂函数
 
 管理 Skill 生命周期和状态。
 
-#### 构造函数
+#### 创建实例
 
 ```typescript
-constructor(options?: SkillManagerOptions)
+const manager = createSkillManager(options?: SkillManagerOptions): SkillManagerInstance
 ```
 
 **SkillManagerOptions**:
@@ -908,14 +908,14 @@ isActive(name: string): boolean
 
 ---
 
-### 4.2 SkillToolProvider 类
+### 4.2 createSkillToolProvider() 工厂函数
 
 将 Skill 工具桥接为 Agent Tool 接口。
 
-#### 构造函数
+#### 创建实例
 
 ```typescript
-constructor(manager: SkillManager, options?: SkillToolBridgeOptions)
+const provider = createSkillToolProvider(manager: SkillManagerInstance, options?: SkillToolBridgeOptions): SkillToolProviderInstance
 ```
 
 **SkillToolBridgeOptions**:
@@ -1049,14 +1049,14 @@ class SkillNotFoundError extends SkillError {}
 
 ## 5. @agent-stack/memory
 
-### 5.1 MemoryManager 类
+### 5.1 createMemoryManager() 工厂函数
 
 管理五层记忆存储和检索。
 
-#### 构造函数
+#### 创建实例
 
 ```typescript
-constructor(config?: Partial<MemoryConfig>)
+const manager = createMemoryManager(config?: Partial<MemoryConfig>): MemoryManagerInstance
 ```
 
 **MemoryConfig**:
@@ -1096,7 +1096,7 @@ async recordEvents(events: EventInput[]): Promise<MemoryEvent[]>
 onEvent(callback: ObserverCallback): () => void
 
 // 获取 Observer
-getObserver(): MemoryObserver
+getObserver(): IMemoryObserver
 ```
 
 **EventInput**:
@@ -1251,7 +1251,7 @@ hasEmbedFunction(): boolean
 isVectorSearchEnabled(): boolean
 
 // 获取 SemanticStore 进行高级操作
-getSemanticStore(): SemanticStore
+getSemanticStore(): SemanticStoreInstance
 ```
 
 **EmbedFunction**:
@@ -1264,7 +1264,7 @@ type EmbedFunction = (text: string) => Promise<number[]>;
 
 ```typescript
 // 使用 @agent-stack/provider
-const client = new OpenAIClient();
+const client = createOpenAIClient();
 memory.setEmbedFunction(async (text) => {
   const result = await client.embed(text);
   return result[0].embedding;
@@ -1288,9 +1288,9 @@ memory.setEmbedFunction(async (text) => {
 
 ---
 
-### 5.2 MemoryObserver 类
+### 5.2 createMemoryObserver() 工厂函数
 
-事件创建辅助类。
+事件创建辅助函数。
 
 ```typescript
 // 创建用户消息事件
@@ -1311,7 +1311,7 @@ createDecisionEvent(decision: string, reasoning?: string): EventInput
 
 ---
 
-### 5.3 TaskStateReducer 类
+### 5.3 TaskStateReducer (纯函数)
 
 不可变任务状态更新。
 
@@ -1350,9 +1350,9 @@ TaskActions.batch(...actions: TaskAction[])
 
 ---
 
-### 5.4 Store 接口
+### 5.4 Store 工厂函数
 
-#### EventStore
+#### createEventStore()
 
 ```typescript
 // 添加事件
@@ -1383,7 +1383,7 @@ async deleteBySession(sessionId: string): Promise<number>
 async deleteBeforeTimestamp(timestamp: number): Promise<number>
 ```
 
-#### TaskStateStore
+#### createTaskStateStore()
 
 ```typescript
 // 创建任务
@@ -1399,7 +1399,7 @@ async rollback(taskId: UUID, version: number): Promise<TaskState>
 async getSnapshots(taskId: UUID, limit?: number): Promise<TaskStateSnapshot[]>
 ```
 
-#### SemanticStore
+#### createSemanticStore()
 
 ```typescript
 // 全文搜索
@@ -1468,8 +1468,9 @@ class RetrievalError extends MemoryError {}
 
 ```typescript
 export {
-  // 类
-  OpenAIClient,
+  // 工厂函数
+  createOpenAIClient,
+  type OpenAIClientInstance,
 
   // 辅助函数
   systemMessage,
@@ -1513,8 +1514,9 @@ export {
 
 ```typescript
 export {
-  // 类
-  Agent,
+  // 工厂函数
+  createAgent,
+  type AgentInstance,
 
   // 配置函数
   loadConfig,
@@ -1538,7 +1540,7 @@ export {
   type Message,
 
   // 从 provider re-export
-  OpenAIClient,
+  createOpenAIClient,
   systemMessage,
   userMessage,
   assistantMessage,
@@ -1554,9 +1556,11 @@ export {
 
 ```typescript
 export {
-  // 类
-  MCPClientManager,
-  MCPToolProvider,
+  // 工厂函数
+  createMCPClientManager,
+  createMCPToolProvider,
+  type MCPClientManagerInstance,
+  type MCPToolProviderInstance,
 
   // 配置函数
   loadConfig,
@@ -1603,9 +1607,11 @@ export {
 
 ```typescript
 export {
-  // 类
-  SkillManager,
-  SkillToolProvider,
+  // 工厂函数
+  createSkillManager,
+  createSkillToolProvider,
+  type SkillManagerInstance,
+  type SkillToolProviderInstance,
 
   // 配置函数
   loadConfig,
@@ -1663,23 +1669,37 @@ export {
 
 ```typescript
 export {
-  // 类
-  MemoryManager,
-  MemoryObserver,
-  MemoryRetriever,
-  MemoryInjector,
-  MemoryBudgeter,
-  MemorySummarizer,
-  WritePolicyEngine,
-  TaskStateReducer,
+  // 工厂函数
+  createMemoryManager,
+  createMemoryObserver,
+  createMemoryRetriever,
+  createMemoryInjector,
+  createMemoryBudgeter,
+  createMemorySummarizer,
+  createWritePolicyEngine,
+  TaskStateReducer,  // 纯函数对象
   TaskActions,
 
-  // Store 类
-  EventStore,
-  TaskStateStore,
-  SummaryStore,
-  ProfileStore,
-  SemanticStore,
+  // Store 工厂函数
+  createEventStore,
+  createTaskStateStore,
+  createSummaryStore,
+  createProfileStore,
+  createSemanticStore,
+
+  // Instance 类型
+  type MemoryManagerInstance,
+  type IMemoryObserver,
+  type IMemoryRetriever,
+  type IMemoryInjector,
+  type IMemoryBudgeter,
+  type IMemorySummarizer,
+  type IWritePolicyEngine,
+  type EventStoreInstance,
+  type TaskStateStoreInstance,
+  type SummaryStoreInstance,
+  type ProfileStoreInstance,
+  type SemanticStoreInstance,
 
   // 错误类
   MemoryError,

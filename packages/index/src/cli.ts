@@ -7,7 +7,7 @@ import { Command } from 'commander';
 import * as readline from 'readline';
 import { writeFileSync, existsSync, readFileSync } from 'fs';
 import { dirname, resolve, join } from 'path';
-import { Agent } from './agent';
+import { createAgent, type AgentInstance } from './agent';
 import {
   loadConfig,
   toAgentConfig,
@@ -236,7 +236,7 @@ async function runChat(options: ChatOptions) {
 
     // Create agent
     const agentConfig = toAgentConfig(config, baseDir);
-    const agent = new Agent(agentConfig);
+    const agent = createAgent(agentConfig);
 
     // Initialize MCP if configured
     if (agentConfig.mcp?.configPath || agentConfig.mcp?.servers) {
@@ -381,7 +381,7 @@ async function runTask(task: string, options: RunOptions) {
 
     // Create agent
     const agentConfig = toAgentConfig(config, baseDir);
-    const agent = new Agent(agentConfig);
+    const agent = createAgent(agentConfig);
 
     // Initialize MCP if configured
     if (agentConfig.mcp?.configPath || agentConfig.mcp?.servers) {
@@ -432,7 +432,7 @@ async function listTools(options: ToolsOptions) {
     const { config, configPath } = loadConfig(options.config);
     const baseDir = configPath ? dirname(configPath) : process.cwd();
     const agentConfig = toAgentConfig(config, baseDir);
-    const agent = new Agent(agentConfig);
+    const agent = createAgent(agentConfig);
 
     // Initialize MCP and Skills
     try {
@@ -481,7 +481,7 @@ async function showToolInfo(name: string, options: ToolsOptions) {
     const { config, configPath } = loadConfig(options.config);
     const baseDir = configPath ? dirname(configPath) : process.cwd();
     const agentConfig = toAgentConfig(config, baseDir);
-    const agent = new Agent(agentConfig);
+    const agent = createAgent(agentConfig);
 
     // Initialize MCP and Skills
     try {
@@ -561,7 +561,7 @@ async function showConfig(options: ShowConfigOptions) {
   console.log(serializeConfig(config));
 }
 
-async function cleanup(agent: Agent) {
+async function cleanup(agent: AgentInstance) {
   try {
     await agent.closeMCP();
     await agent.closeSkills();

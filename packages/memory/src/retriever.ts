@@ -55,83 +55,103 @@ export interface RetrieverStores {
 }
 
 /**
- * Memory Retriever - assembles MemoryBundle from multiple stores
+ * Memory Retriever instance interface
  */
-export class MemoryRetriever {
-  constructor(
-    private stores: RetrieverStores,
-    private defaultConfig: RetrievalConfig,
-    private defaultBudget: TokenBudget
-  ) {}
+export interface IMemoryRetriever {
+  /** Retrieve memory bundle */
+  retrieve(options?: RetrievalOptions): Promise<MemoryBundle>;
+}
 
-  /**
-   * Retrieve memory bundle
-   */
-  async retrieve(options: RetrievalOptions = {}): Promise<MemoryBundle> {
-    const config = { ...this.defaultConfig, ...options.config };
-    const budget = { ...this.defaultBudget, ...options.budget };
-    const warnings: MemoryWarning[] = [];
+/**
+ * Estimate tokens for a string (rough approximation)
+ */
+function estimateTokens(text: string): number {
+  // Rough estimate: ~4 characters per token
+  return Math.ceil(text.length / 4);
+}
 
-    try {
-      // Retrieve from all layers in parallel
-      const [profile, taskState, recentEvents, summary, semanticResults] = await Promise.all([
-        this.retrieveProfile(budget.profile),
-        this.retrieveTaskState(options.taskId, options.sessionId),
-        this.retrieveRecentEvents(options.sessionId, config, budget.recentEvents),
-        this.retrieveSummary(options.sessionId),
-        options.query && config.enableSemanticSearch
-          ? this.retrieveSemantic(options.query, options.sessionId, config, budget.semanticChunks)
-          : Promise.resolve([]),
-      ]);
+/**
+ * Trim array to fit within token budget
+ */
+function trimToTokenBudget<T>(
+  items: T[],
+  budget: number,
+  estimator: (item: T) => number
+): T[] {
+  const result: T[] = [];
+  let totalTokens = 0;
 
-      // Check for stale data
-      if (taskState && this.isStale(taskState.updatedAt)) {
-        warnings.push({
-          type: 'stale',
-          message: `Task state may be outdated (last updated: ${new Date(taskState.updatedAt).toISOString()})`,
-        });
-      }
-
-      // Calculate total tokens
-      const totalTokens = this.estimateBundleTokens({
-        profile,
-        taskState,
-        recentEvents,
-        summary,
-        semanticResults,
-      });
-
-      if (totalTokens > budget.total) {
-        warnings.push({
-          type: 'overflow',
-          message: `Token budget exceeded: ${totalTokens} > ${budget.total}`,
-          details: { actual: totalTokens, budget: budget.total },
-        });
-      }
-
-      return {
-        profile,
-        taskState: taskState || undefined,
-        recentEvents,
-        retrievedChunks: semanticResults,
-        summary: summary || undefined,
-        warnings,
-        totalTokens,
-        timestamp: Date.now(),
-      };
-    } catch (error) {
-      throw new RetrievalError(
-        `Failed to retrieve memory: ${(error as Error).message}`,
-        error as Error
-      );
-    }
+  for (const item of items) {
+    const tokens = estimator(item);
+    if (totalTokens + tokens > budget) break;
+    result.push(item);
+    totalTokens += tokens;
   }
 
+  return result;
+}
+
+/**
+ * Check if timestamp is stale
+ */
+function isStale(timestamp: number, thresholdMs = 24 * 60 * 60 * 1000): boolean {
+  return Date.now() - timestamp > thresholdMs;
+}
+
+/**
+ * Estimate total tokens for a bundle
+ */
+function estimateBundleTokens(data: {
+  profile: ProfileItem[];
+  taskState: TaskState | null;
+  recentEvents: MemoryEvent[];
+  summary: Summary | null;
+  semanticResults: SemanticSearchResult[];
+}): number {
+  let total = 0;
+
+  // Profile
+  for (const item of data.profile) {
+    total += estimateTokens(JSON.stringify(item));
+  }
+
+  // Task state
+  if (data.taskState) {
+    total += estimateTokens(JSON.stringify(data.taskState));
+  }
+
+  // Recent events
+  for (const event of data.recentEvents) {
+    total += estimateTokens(event.summary);
+  }
+
+  // Summary
+  if (data.summary) {
+    total += estimateTokens(data.summary.short);
+    total += data.summary.bullets.reduce((acc, b) => acc + estimateTokens(b), 0);
+  }
+
+  // Semantic results
+  for (const result of data.semanticResults) {
+    total += estimateTokens(result.chunk.text);
+  }
+
+  return total;
+}
+
+/**
+ * Create a Memory Retriever instance
+ */
+export function createMemoryRetriever(
+  stores: RetrieverStores,
+  defaultConfig: RetrievalConfig,
+  defaultBudget: TokenBudget
+): IMemoryRetriever {
   /**
    * Retrieve profile items
    */
-  private async retrieveProfile(tokenBudget: number): Promise<ProfileItem[]> {
-    const items = await this.stores.profileStore.getAll();
+  async function retrieveProfile(tokenBudget: number): Promise<ProfileItem[]> {
+    const items = await stores.profileStore.getAll();
 
     // Sort by explicit first, then by confidence
     items.sort((a, b) => {
@@ -140,148 +160,135 @@ export class MemoryRetriever {
     });
 
     // Trim to budget
-    return this.trimToTokenBudget(items, tokenBudget, (item) =>
-      this.estimateTokens(JSON.stringify(item))
+    return trimToTokenBudget(items, tokenBudget, (item) =>
+      estimateTokens(JSON.stringify(item))
     );
   }
 
   /**
    * Retrieve current task state
    */
-  private async retrieveTaskState(
+  async function retrieveTaskState(
     taskId?: UUID,
     sessionId?: string
   ): Promise<TaskState | null> {
     if (taskId) {
-      return this.stores.taskStateStore.get(taskId);
+      return stores.taskStateStore.get(taskId);
     }
-    return this.stores.taskStateStore.getCurrent(sessionId);
+    return stores.taskStateStore.getCurrent(sessionId);
   }
 
   /**
    * Retrieve recent events
    */
-  private async retrieveRecentEvents(
+  async function retrieveRecentEvents(
     sessionId: string | undefined,
     config: RetrievalConfig,
     tokenBudget: number
   ): Promise<MemoryEvent[]> {
     const since = Date.now() - config.recentEventsWindowMs;
 
-    const events = await this.stores.eventStore.query({
+    const events = await stores.eventStore.query({
       sessionId,
       since,
       limit: config.maxRecentEvents * 2, // Fetch extra for trimming
     });
 
     // Trim to budget
-    return this.trimToTokenBudget(events, tokenBudget, (event) =>
-      this.estimateTokens(event.summary + JSON.stringify(event.payload))
+    return trimToTokenBudget(events, tokenBudget, (event) =>
+      estimateTokens(event.summary + JSON.stringify(event.payload))
     );
   }
 
   /**
    * Retrieve latest summary
    */
-  private async retrieveSummary(sessionId?: string): Promise<Summary | null> {
+  async function retrieveSummary(sessionId?: string): Promise<Summary | null> {
     if (!sessionId) return null;
-    return this.stores.summaryStore.getLatest(sessionId);
+    return stores.summaryStore.getLatest(sessionId);
   }
 
   /**
    * Retrieve semantic chunks
    */
-  private async retrieveSemantic(
+  async function retrieveSemantic(
     query: string,
     sessionId: string | undefined,
     config: RetrievalConfig,
     tokenBudget: number
   ): Promise<SemanticSearchResult[]> {
-    const results = await this.stores.semanticStore.search(query, {
+    const results = await stores.semanticStore.search(query, {
       sessionId,
       limit: config.maxSemanticChunks * 2,
     });
 
     // Trim to budget
-    return this.trimToTokenBudget(results, tokenBudget, (result) =>
-      this.estimateTokens(result.chunk.text)
+    return trimToTokenBudget(results, tokenBudget, (result) =>
+      estimateTokens(result.chunk.text)
     );
   }
 
-  /**
-   * Trim array to fit within token budget
-   */
-  private trimToTokenBudget<T>(
-    items: T[],
-    budget: number,
-    estimator: (item: T) => number
-  ): T[] {
-    const result: T[] = [];
-    let totalTokens = 0;
+  // Return the instance object
+  return {
+    async retrieve(options: RetrievalOptions = {}): Promise<MemoryBundle> {
+      const config = { ...defaultConfig, ...options.config };
+      const budget = { ...defaultBudget, ...options.budget };
+      const warnings: MemoryWarning[] = [];
 
-    for (const item of items) {
-      const tokens = estimator(item);
-      if (totalTokens + tokens > budget) break;
-      result.push(item);
-      totalTokens += tokens;
-    }
+      try {
+        // Retrieve from all layers in parallel
+        const [profile, taskState, recentEvents, summary, semanticResults] = await Promise.all([
+          retrieveProfile(budget.profile),
+          retrieveTaskState(options.taskId, options.sessionId),
+          retrieveRecentEvents(options.sessionId, config, budget.recentEvents),
+          retrieveSummary(options.sessionId),
+          options.query && config.enableSemanticSearch
+            ? retrieveSemantic(options.query, options.sessionId, config, budget.semanticChunks)
+            : Promise.resolve([]),
+        ]);
 
-    return result;
-  }
+        // Check for stale data
+        if (taskState && isStale(taskState.updatedAt)) {
+          warnings.push({
+            type: 'stale',
+            message: `Task state may be outdated (last updated: ${new Date(taskState.updatedAt).toISOString()})`,
+          });
+        }
 
-  /**
-   * Estimate tokens for a string (rough approximation)
-   */
-  private estimateTokens(text: string): number {
-    // Rough estimate: ~4 characters per token
-    return Math.ceil(text.length / 4);
-  }
+        // Calculate total tokens
+        const totalTokens = estimateBundleTokens({
+          profile,
+          taskState,
+          recentEvents,
+          summary,
+          semanticResults,
+        });
 
-  /**
-   * Estimate total tokens for a bundle
-   */
-  private estimateBundleTokens(data: {
-    profile: ProfileItem[];
-    taskState: TaskState | null;
-    recentEvents: MemoryEvent[];
-    summary: Summary | null;
-    semanticResults: SemanticSearchResult[];
-  }): number {
-    let total = 0;
+        if (totalTokens > budget.total) {
+          warnings.push({
+            type: 'overflow',
+            message: `Token budget exceeded: ${totalTokens} > ${budget.total}`,
+            details: { actual: totalTokens, budget: budget.total },
+          });
+        }
 
-    // Profile
-    for (const item of data.profile) {
-      total += this.estimateTokens(JSON.stringify(item));
-    }
-
-    // Task state
-    if (data.taskState) {
-      total += this.estimateTokens(JSON.stringify(data.taskState));
-    }
-
-    // Recent events
-    for (const event of data.recentEvents) {
-      total += this.estimateTokens(event.summary);
-    }
-
-    // Summary
-    if (data.summary) {
-      total += this.estimateTokens(data.summary.short);
-      total += data.summary.bullets.reduce((acc, b) => acc + this.estimateTokens(b), 0);
-    }
-
-    // Semantic results
-    for (const result of data.semanticResults) {
-      total += this.estimateTokens(result.chunk.text);
-    }
-
-    return total;
-  }
-
-  /**
-   * Check if timestamp is stale
-   */
-  private isStale(timestamp: number, thresholdMs = 24 * 60 * 60 * 1000): boolean {
-    return Date.now() - timestamp > thresholdMs;
-  }
+        return {
+          profile,
+          taskState: taskState || undefined,
+          recentEvents,
+          retrievedChunks: semanticResults,
+          summary: summary || undefined,
+          warnings,
+          totalTokens,
+          timestamp: Date.now(),
+        };
+      } catch (error) {
+        throw new RetrievalError(
+          `Failed to retrieve memory: ${(error as Error).message}`,
+          error as Error
+        );
+      }
+    },
+  };
 }
+

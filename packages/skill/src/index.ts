@@ -77,14 +77,18 @@ export {
 } from './loader';
 
 // Export manager
-export { SkillManager } from './manager';
+export {
+  createSkillManager,
+  type SkillManagerInstance,
+} from './manager';
 
 // Export bridge
 export {
+  createSkillToolProvider,
   createSkillToolBridge,
   bridgeSkillTool,
   convertToolParameters,
-  SkillToolProvider,
+  type SkillToolProviderInstance,
 } from './bridge';
 
 // Export helpers

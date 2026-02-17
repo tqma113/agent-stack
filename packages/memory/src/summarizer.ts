@@ -50,43 +50,160 @@ const DEFAULT_OPTIONS: Required<Omit<SummarizerOptions, 'summarizeFunction'>> = 
 };
 
 /**
- * Memory Summarizer - compresses events into summaries
+ * Memory Summarizer instance interface
  */
-export class MemorySummarizer {
-  private options: Required<Omit<SummarizerOptions, 'summarizeFunction'>> & {
-    summarizeFunction?: SummarizerOptions['summarizeFunction'];
-  };
-
-  constructor(options: SummarizerOptions = {}) {
-    this.options = {
-      ...DEFAULT_OPTIONS,
-      ...options,
-    };
-  }
-
-  /**
-   * Summarize a list of events
-   */
-  async summarize(
+export interface IMemorySummarizer {
+  /** Summarize a list of events */
+  summarize(
     events: MemoryEvent[],
     sessionId: string,
     previousSummary?: Summary
-  ): Promise<SummaryInput> {
-    // If custom summarization function provided, use it
-    if (this.options.summarizeFunction) {
-      const result = await this.options.summarizeFunction(events);
-      return this.buildSummaryInput(result, events, sessionId, previousSummary);
-    }
+  ): Promise<SummaryInput>;
 
-    // Otherwise, use rule-based extraction
-    const result = this.extractSummary(events, previousSummary);
-    return this.buildSummaryInput(result, events, sessionId, previousSummary);
+  /** Mark todos as completed based on events */
+  markTodosCompleted(todos: SummaryTodo[], events: MemoryEvent[]): SummaryTodo[];
+
+  /** Merge two summaries, combining their content */
+  mergeSummaries(older: Summary, newer: Summary): SummaryResult;
+
+  /** Set custom summarization function for LLM integration */
+  setSummarizeFunction(fn: (events: MemoryEvent[]) => Promise<SummaryResult>): void;
+
+  /** Create LLM summarization prompt */
+  createLLMPrompt(events: MemoryEvent[]): string;
+}
+
+/**
+ * Check if tool call is significant enough to include
+ */
+function isSignificantToolCall(event: MemoryEvent): boolean {
+  const toolName = event.payload.toolName as string;
+
+  // File operations, searches, and external calls are significant
+  const significantPatterns = [
+    /read|write|create|delete|modify/i,
+    /search|find|query/i,
+    /api|fetch|request/i,
+    /execute|run|shell/i,
+  ];
+
+  return significantPatterns.some((p) => p.test(toolName));
+}
+
+/**
+ * Check if user message is significant
+ */
+function isSignificantUserMessage(event: MemoryEvent): boolean {
+  const content = String(event.payload.content || '');
+
+  // Short messages or simple confirmations are not significant
+  if (content.length < 20) return false;
+  if (/^(yes|no|ok|okay|sure|thanks|thank you)\.?$/i.test(content.trim())) return false;
+
+  return true;
+}
+
+/**
+ * Check if assistant message contains a conclusion
+ */
+function containsConclusion(event: MemoryEvent): boolean {
+  const content = String(event.payload.content || '').toLowerCase();
+
+  const conclusionPatterns = [
+    /in conclusion/i,
+    /to summarize/i,
+    /the result is/i,
+    /successfully (completed|created|updated|deleted)/i,
+    /here('s| is) (the|your)/i,
+  ];
+
+  return conclusionPatterns.some((p) => p.test(content));
+}
+
+/**
+ * Extract todos from user message
+ */
+function extractTodos(event: MemoryEvent): SummaryTodo[] {
+  const content = String(event.payload.content || '');
+  const todos: SummaryTodo[] = [];
+
+  // Common todo patterns
+  const todoPatterns = [
+    /(?:please|can you|could you|i need you to|i want you to)\s+(.+?)(?:\.|$)/gi,
+    /(?:todo|task|action item):\s*(.+?)(?:\.|$)/gi,
+    /(?:don't forget to|remember to|make sure to)\s+(.+?)(?:\.|$)/gi,
+  ];
+
+  for (const pattern of todoPatterns) {
+    let match;
+    while ((match = pattern.exec(content)) !== null) {
+      const description = match[1].trim();
+      if (description.length > 5 && description.length < 200) {
+        todos.push({
+          description,
+          completed: false,
+        });
+      }
+    }
   }
+
+  return todos;
+}
+
+/**
+ * Generate a short one-line summary
+ */
+function generateShortSummary(
+  events: MemoryEvent[],
+  decisions: SummaryDecision[],
+  todos: SummaryTodo[]
+): string {
+  const parts: string[] = [];
+
+  // Count event types
+  const userMsgs = events.filter((e) => e.type === 'USER_MSG').length;
+  const toolCalls = events.filter((e) => e.type === 'TOOL_CALL').length;
+
+  if (userMsgs > 0) {
+    parts.push(`${userMsgs} message${userMsgs > 1 ? 's' : ''}`);
+  }
+
+  if (toolCalls > 0) {
+    parts.push(`${toolCalls} tool call${toolCalls > 1 ? 's' : ''}`);
+  }
+
+  if (decisions.length > 0) {
+    parts.push(`${decisions.length} decision${decisions.length > 1 ? 's' : ''}`);
+  }
+
+  const pendingTodos = todos.filter((t) => !t.completed).length;
+  if (pendingTodos > 0) {
+    parts.push(`${pendingTodos} pending todo${pendingTodos > 1 ? 's' : ''}`);
+  }
+
+  if (parts.length === 0) {
+    return 'Session with no significant events';
+  }
+
+  return `Session: ${parts.join(', ')}`;
+}
+
+/**
+ * Create a Memory Summarizer instance
+ */
+export function createMemorySummarizer(options: SummarizerOptions = {}): IMemorySummarizer {
+  // Private state via closure
+  const config: Required<Omit<SummarizerOptions, 'summarizeFunction'>> & {
+    summarizeFunction?: SummarizerOptions['summarizeFunction'];
+  } = {
+    ...DEFAULT_OPTIONS,
+    ...options,
+  };
 
   /**
    * Rule-based summary extraction
    */
-  private extractSummary(events: MemoryEvent[], previousSummary?: Summary): SummaryResult {
+  function extractSummary(events: MemoryEvent[], previousSummary?: Summary): SummaryResult {
     const bullets: string[] = [];
     const decisions: SummaryDecision[] = [];
     const todos: SummaryTodo[] = [];
@@ -119,25 +236,25 @@ export class MemorySummarizer {
 
         case 'TOOL_CALL':
           // Only include significant tool calls
-          if (this.isSignificantToolCall(event)) {
+          if (isSignificantToolCall(event)) {
             bullets.push(`Tool: ${event.payload.toolName}`);
           }
           break;
 
         case 'USER_MSG':
           // Extract todos from user messages
-          const extractedTodos = this.extractTodos(event);
+          const extractedTodos = extractTodos(event);
           todos.push(...extractedTodos);
 
           // Add significant user requests to bullets
-          if (this.isSignificantUserMessage(event)) {
+          if (isSignificantUserMessage(event)) {
             bullets.push(`User: ${event.summary}`);
           }
           break;
 
         case 'ASSISTANT_MSG':
           // Only add very significant assistant messages
-          if (event.payload.hasToolCalls || this.containsConclusion(event)) {
+          if (event.payload.hasToolCalls || containsConclusion(event)) {
             bullets.push(`Assistant: ${event.summary}`);
           }
           break;
@@ -145,21 +262,21 @@ export class MemorySummarizer {
     }
 
     // Generate short summary
-    const short = this.generateShortSummary(events, decisions, todos);
+    const short = generateShortSummary(events, decisions, todos);
 
     // Trim to limits
     return {
       short,
-      bullets: bullets.slice(-this.options.maxBullets),
-      decisions: decisions.slice(-this.options.maxDecisions),
-      todos: todos.slice(0, this.options.maxTodos),
+      bullets: bullets.slice(-config.maxBullets),
+      decisions: decisions.slice(-config.maxDecisions),
+      todos: todos.slice(0, config.maxTodos),
     };
   }
 
   /**
    * Build SummaryInput from result
    */
-  private buildSummaryInput(
+  function buildSummaryInput(
     result: SummaryResult,
     events: MemoryEvent[],
     sessionId: string,
@@ -183,215 +300,106 @@ export class MemorySummarizer {
     };
   }
 
-  /**
-   * Generate a short one-line summary
-   */
-  private generateShortSummary(
-    events: MemoryEvent[],
-    decisions: SummaryDecision[],
-    todos: SummaryTodo[]
-  ): string {
-    const parts: string[] = [];
+  // Return the instance object
+  return {
+    async summarize(
+      events: MemoryEvent[],
+      sessionId: string,
+      previousSummary?: Summary
+    ): Promise<SummaryInput> {
+      // If custom summarization function provided, use it
+      if (config.summarizeFunction) {
+        const result = await config.summarizeFunction(events);
+        return buildSummaryInput(result, events, sessionId, previousSummary);
+      }
 
-    // Count event types
-    const userMsgs = events.filter((e) => e.type === 'USER_MSG').length;
-    const toolCalls = events.filter((e) => e.type === 'TOOL_CALL').length;
+      // Otherwise, use rule-based extraction
+      const result = extractSummary(events, previousSummary);
+      return buildSummaryInput(result, events, sessionId, previousSummary);
+    },
 
-    if (userMsgs > 0) {
-      parts.push(`${userMsgs} message${userMsgs > 1 ? 's' : ''}`);
-    }
+    markTodosCompleted(todos: SummaryTodo[], events: MemoryEvent[]): SummaryTodo[] {
+      // Get all assistant messages and tool results
+      const completionIndicators = events
+        .filter((e) => e.type === 'ASSISTANT_MSG' || e.type === 'TOOL_RESULT')
+        .map((e) => String(e.payload.content || e.payload.result || '').toLowerCase());
 
-    if (toolCalls > 0) {
-      parts.push(`${toolCalls} tool call${toolCalls > 1 ? 's' : ''}`);
-    }
+      return todos.map((todo) => {
+        if (todo.completed) return todo;
 
-    if (decisions.length > 0) {
-      parts.push(`${decisions.length} decision${decisions.length > 1 ? 's' : ''}`);
-    }
+        // Check if any completion indicator matches the todo
+        const todoKeywords = todo.description.toLowerCase().split(/\s+/);
+        const isCompleted = completionIndicators.some((indicator) =>
+          todoKeywords.some(
+            (keyword) => keyword.length > 3 && indicator.includes(keyword)
+          )
+        );
 
-    const pendingTodos = todos.filter((t) => !t.completed).length;
-    if (pendingTodos > 0) {
-      parts.push(`${pendingTodos} pending todo${pendingTodos > 1 ? 's' : ''}`);
-    }
+        return isCompleted ? { ...todo, completed: true } : todo;
+      });
+    },
 
-    if (parts.length === 0) {
-      return 'Session with no significant events';
-    }
+    mergeSummaries(older: Summary, newer: Summary): SummaryResult {
+      // Combine bullets, prioritizing newer
+      const combinedBullets = [
+        ...older.bullets.slice(-Math.floor(config.maxBullets / 2)),
+        ...newer.bullets,
+      ].slice(-config.maxBullets);
 
-    return `Session: ${parts.join(', ')}`;
-  }
+      // Combine decisions, prioritizing newer
+      const combinedDecisions = [
+        ...older.decisions.slice(-Math.floor(config.maxDecisions / 2)),
+        ...newer.decisions,
+      ].slice(-config.maxDecisions);
 
-  /**
-   * Check if tool call is significant enough to include
-   */
-  private isSignificantToolCall(event: MemoryEvent): boolean {
-    const toolName = event.payload.toolName as string;
+      // Combine todos - carry over incomplete from older, add all from newer
+      const incompleteTodos = older.todos.filter((t) => !t.completed);
+      const combinedTodos = [...incompleteTodos, ...newer.todos].slice(0, config.maxTodos);
 
-    // File operations, searches, and external calls are significant
-    const significantPatterns = [
-      /read|write|create|delete|modify/i,
-      /search|find|query/i,
-      /api|fetch|request/i,
-      /execute|run|shell/i,
-    ];
+      // Merge short summaries
+      const short = `${older.short} -> ${newer.short}`;
 
-    return significantPatterns.some((p) => p.test(toolName));
-  }
+      return {
+        short,
+        bullets: combinedBullets,
+        decisions: combinedDecisions,
+        todos: combinedTodos,
+      };
+    },
 
-  /**
-   * Check if user message is significant
-   */
-  private isSignificantUserMessage(event: MemoryEvent): boolean {
-    const content = String(event.payload.content || '');
+    setSummarizeFunction(fn: (events: MemoryEvent[]) => Promise<SummaryResult>): void {
+      config.summarizeFunction = fn;
+    },
 
-    // Short messages or simple confirmations are not significant
-    if (content.length < 20) return false;
-    if (/^(yes|no|ok|okay|sure|thanks|thank you)\.?$/i.test(content.trim())) return false;
-
-    return true;
-  }
-
-  /**
-   * Check if assistant message contains a conclusion
-   */
-  private containsConclusion(event: MemoryEvent): boolean {
-    const content = String(event.payload.content || '').toLowerCase();
-
-    const conclusionPatterns = [
-      /in conclusion/i,
-      /to summarize/i,
-      /the result is/i,
-      /successfully (completed|created|updated|deleted)/i,
-      /here('s| is) (the|your)/i,
-    ];
-
-    return conclusionPatterns.some((p) => p.test(content));
-  }
-
-  /**
-   * Extract todos from user message
-   */
-  private extractTodos(event: MemoryEvent): SummaryTodo[] {
-    const content = String(event.payload.content || '');
-    const todos: SummaryTodo[] = [];
-
-    // Common todo patterns
-    const todoPatterns = [
-      /(?:please|can you|could you|i need you to|i want you to)\s+(.+?)(?:\.|$)/gi,
-      /(?:todo|task|action item):\s*(.+?)(?:\.|$)/gi,
-      /(?:don't forget to|remember to|make sure to)\s+(.+?)(?:\.|$)/gi,
-    ];
-
-    for (const pattern of todoPatterns) {
-      let match;
-      while ((match = pattern.exec(content)) !== null) {
-        const description = match[1].trim();
-        if (description.length > 5 && description.length < 200) {
-          todos.push({
-            description,
-            completed: false,
-          });
+    createLLMPrompt(events: MemoryEvent[]): string {
+      const eventTexts = events.map((e) => {
+        switch (e.type) {
+          case 'USER_MSG':
+            return `User: ${e.summary}`;
+          case 'ASSISTANT_MSG':
+            return `Assistant: ${e.summary}`;
+          case 'TOOL_CALL':
+            return `Tool Call: ${e.payload.toolName}`;
+          case 'TOOL_RESULT':
+            return `Tool Result: ${e.summary}`;
+          case 'DECISION':
+            return `Decision: ${e.summary}`;
+          case 'STATE_CHANGE':
+            return `State Change: ${e.summary}`;
+          default:
+            return e.summary;
         }
-      }
-    }
+      });
 
-    return todos;
-  }
-
-  /**
-   * Mark todos as completed based on events
-   */
-  markTodosCompleted(todos: SummaryTodo[], events: MemoryEvent[]): SummaryTodo[] {
-    // Get all assistant messages and tool results
-    const completionIndicators = events
-      .filter((e) => e.type === 'ASSISTANT_MSG' || e.type === 'TOOL_RESULT')
-      .map((e) => String(e.payload.content || e.payload.result || '').toLowerCase());
-
-    return todos.map((todo) => {
-      if (todo.completed) return todo;
-
-      // Check if any completion indicator matches the todo
-      const todoKeywords = todo.description.toLowerCase().split(/\s+/);
-      const isCompleted = completionIndicators.some((indicator) =>
-        todoKeywords.some(
-          (keyword) => keyword.length > 3 && indicator.includes(keyword)
-        )
-      );
-
-      return isCompleted ? { ...todo, completed: true } : todo;
-    });
-  }
-
-  /**
-   * Merge two summaries, combining their content
-   */
-  mergeSummaries(older: Summary, newer: Summary): SummaryResult {
-    // Combine bullets, prioritizing newer
-    const combinedBullets = [
-      ...older.bullets.slice(-Math.floor(this.options.maxBullets / 2)),
-      ...newer.bullets,
-    ].slice(-this.options.maxBullets);
-
-    // Combine decisions, prioritizing newer
-    const combinedDecisions = [
-      ...older.decisions.slice(-Math.floor(this.options.maxDecisions / 2)),
-      ...newer.decisions,
-    ].slice(-this.options.maxDecisions);
-
-    // Combine todos - carry over incomplete from older, add all from newer
-    const incompleteTodos = older.todos.filter((t) => !t.completed);
-    const combinedTodos = [...incompleteTodos, ...newer.todos].slice(0, this.options.maxTodos);
-
-    // Merge short summaries
-    const short = `${older.short} → ${newer.short}`;
-
-    return {
-      short,
-      bullets: combinedBullets,
-      decisions: combinedDecisions,
-      todos: combinedTodos,
-    };
-  }
-
-  /**
-   * Set custom summarization function for LLM integration
-   */
-  setSummarizeFunction(fn: (events: MemoryEvent[]) => Promise<SummaryResult>): void {
-    this.options.summarizeFunction = fn;
-  }
-
-  /**
-   * Create LLM summarization prompt
-   */
-  createLLMPrompt(events: MemoryEvent[]): string {
-    const eventTexts = events.map((e) => {
-      switch (e.type) {
-        case 'USER_MSG':
-          return `User: ${e.summary}`;
-        case 'ASSISTANT_MSG':
-          return `Assistant: ${e.summary}`;
-        case 'TOOL_CALL':
-          return `Tool Call: ${e.payload.toolName}`;
-        case 'TOOL_RESULT':
-          return `Tool Result: ${e.summary}`;
-        case 'DECISION':
-          return `Decision: ${e.summary}`;
-        case 'STATE_CHANGE':
-          return `State Change: ${e.summary}`;
-        default:
-          return e.summary;
-      }
-    });
-
-    return `Please summarize the following conversation events into a structured summary:
+      return `Please summarize the following conversation events into a structured summary:
 
 ${eventTexts.join('\n')}
 
 Provide:
 1. A short one-line summary
-2. Key bullet points (max ${this.options.maxBullets})
-3. Important decisions made (max ${this.options.maxDecisions})
-4. Pending action items/todos (max ${this.options.maxTodos})
+2. Key bullet points (max ${config.maxBullets})
+3. Important decisions made (max ${config.maxDecisions})
+4. Pending action items/todos (max ${config.maxTodos})
 
 Format your response as JSON:
 {
@@ -400,5 +408,7 @@ Format your response as JSON:
   "decisions": [{"description": "decision", "reasoning": "why"}],
   "todos": [{"description": "todo item", "completed": false}]
 }`;
-  }
+    },
+  };
 }
+

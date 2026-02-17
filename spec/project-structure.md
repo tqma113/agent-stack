@@ -52,7 +52,7 @@ packages/provider/
 | 文件 | 职责 |
 |------|------|
 | `src/index.ts` | 统一导出入口，re-export openai 模块 |
-| `src/openai/client.ts` | OpenAI API 客户端封装类 |
+| `src/openai/client.ts` | `createOpenAIClient()` 工厂函数 |
 | `src/openai/types.ts` | TypeScript 类型定义和接口 |
 | `src/openai/helpers.ts` | 消息构建、工具定义等辅助函数 |
 
@@ -102,7 +102,7 @@ packages/index/
 | 文件 | 职责 |
 |------|------|
 | `src/index.ts` | 统一导出入口，re-export agent、config 和 provider |
-| `src/agent.ts` | Agent 核心类，实现对话和工具调用 |
+| `src/agent.ts` | `createAgent()` 工厂函数，实现对话和工具调用 |
 | `src/types.ts` | Agent 相关类型定义 |
 | `src/config.ts` | 配置文件加载和解析 (.agent-stack.json) |
 | `src/cli.ts` | 命令式 CLI，支持 chat/run/tools/config 命令 |
@@ -155,8 +155,8 @@ packages/mcp/
 | `src/types.ts` | MCP 相关类型定义和错误类 |
 | `src/config.ts` | 配置文件加载和解析 |
 | `src/transport.ts` | 创建 stdio/http 传输 |
-| `src/client.ts` | MCPClientManager 管理多个 MCP 连接 |
-| `src/bridge.ts` | 将 MCP 工具转换为 Agent Tool 接口 |
+| `src/client.ts` | `createMCPClientManager()` 工厂函数 |
+| `src/bridge.ts` | `createMCPToolProvider()` 工厂函数 |
 | `src/helpers.ts` | 工具名处理、超时控制等辅助函数 |
 
 ### 4.3 package.json 关键配置
@@ -201,8 +201,8 @@ packages/skill/
 | `src/types.ts` | Skill 相关类型定义和错误类 |
 | `src/config.ts` | 配置文件加载和目录发现 |
 | `src/loader.ts` | Skill 加载和处理函数解析 |
-| `src/manager.ts` | SkillManager 管理 Skill 生命周期 |
-| `src/bridge.ts` | 将 Skill 工具转换为 Agent Tool 接口 |
+| `src/manager.ts` | `createSkillManager()` 工厂函数 |
+| `src/bridge.ts` | `createSkillToolProvider()` 工厂函数 |
 | `src/helpers.ts` | 工具名处理、路径解析等辅助函数 |
 
 ### 5.3 package.json 关键配置
@@ -231,12 +231,12 @@ packages/memory/
 │   ├── errors.ts              # 错误类
 │   ├── stores/                # 存储层
 │   │   ├── index.ts           # 存储导出
-│   │   ├── base.ts            # SQLiteStore 基类
-│   │   ├── event.ts           # EventStore (事件存储)
-│   │   ├── task-state.ts      # TaskStateStore (任务状态)
-│   │   ├── summary.ts         # SummaryStore (摘要)
-│   │   ├── profile.ts         # ProfileStore (用户偏好)
-│   │   └── semantic.ts        # SemanticStore (语义检索)
+│   │   ├── db-operations.ts   # 数据库操作组合函数
+│   │   ├── event.ts           # createEventStore() 工厂函数
+│   │   ├── task-state.ts      # createTaskStateStore() 工厂函数
+│   │   ├── summary.ts         # createSummaryStore() 工厂函数
+│   │   ├── profile.ts         # createProfileStore() 工厂函数
+│   │   └── semantic.ts        # createSemanticStore() 工厂函数
 │   ├── manager.ts             # MemoryManager 主入口
 │   ├── observer.ts            # 事件采集
 │   ├── retriever.ts           # 多路召回
@@ -270,30 +270,30 @@ packages/memory/
 | `src/index.ts` | 统一导出入口 |
 | `src/types.ts` | 完整类型定义 (Memory, Task, Profile, Semantic) |
 | `src/errors.ts` | 错误类定义 |
-| `src/stores/base.ts` | SQLite 基类，提供连接管理 |
-| `src/stores/event.ts` | 事件日志存储 (CRUD, 批量操作, 查询) |
-| `src/stores/task-state.ts` | 任务状态存储 (幂等更新, 版本控制, 快照) |
-| `src/stores/summary.ts` | 对话摘要存储 |
-| `src/stores/profile.ts` | 用户偏好存储 (跨会话持久化) |
-| `src/stores/semantic.ts` | 语义检索 (FTS5 + 向量搜索) |
-| `src/manager.ts` | MemoryManager 主类，协调所有组件 |
-| `src/observer.ts` | 事件创建辅助函数 |
-| `src/retriever.ts` | 多路召回和优先级排序 |
-| `src/injector.ts` | 模板引擎，将记忆注入 Prompt |
-| `src/budgeter.ts` | Token 预算分配和管理 |
-| `src/write-policy.ts` | 写入决策和冲突解决 |
-| `src/summarizer.ts` | 摘要生成和合并 |
-| `src/state-reducer.ts` | 不可变任务状态更新 |
+| `src/stores/db-operations.ts` | `createDbOperations()` 数据库操作组合函数 |
+| `src/stores/event.ts` | `createEventStore()` 事件日志存储 |
+| `src/stores/task-state.ts` | `createTaskStateStore()` 任务状态存储 |
+| `src/stores/summary.ts` | `createSummaryStore()` 对话摘要存储 |
+| `src/stores/profile.ts` | `createProfileStore()` 用户偏好存储 |
+| `src/stores/semantic.ts` | `createSemanticStore()` 语义检索 (FTS5 + 向量) |
+| `src/manager.ts` | `createMemoryManager()` 主入口，协调所有组件 |
+| `src/observer.ts` | `createMemoryObserver()` 事件创建辅助函数 |
+| `src/retriever.ts` | `createMemoryRetriever()` 多路召回和优先级排序 |
+| `src/injector.ts` | `createMemoryInjector()` 模板引擎 |
+| `src/budgeter.ts` | `createMemoryBudgeter()` Token 预算分配 |
+| `src/write-policy.ts` | `createWritePolicyEngine()` 写入决策和冲突解决 |
+| `src/summarizer.ts` | `createMemorySummarizer()` 摘要生成和合并 |
+| `src/state-reducer.ts` | `TaskStateReducer` 不可变任务状态更新 (纯函数) |
 
 ### 6.3 五层记忆架构
 
-| 层级 | 存储类 | 用途 | 优先级 |
-|------|--------|------|--------|
-| Profile | `ProfileStore` | 用户偏好 (语言/格式/禁忌) | 1 (最高) |
-| TaskState | `TaskStateStore` | 当前任务状态 (目标/计划/进度) | 2 |
-| Summary | `SummaryStore` | 滚动摘要 (决策/结论/下一步) | 3 |
-| Episodic | `EventStore` | 事件日志 (对话/工具/决策) | 4 |
-| Semantic | `SemanticStore` | 可检索材料 (全文/向量) | 5 (最低) |
+| 层级 | 工厂函数 | 用途 | 优先级 |
+|------|----------|------|--------|
+| Profile | `createProfileStore()` | 用户偏好 (语言/格式/禁忌) | 1 (最高) |
+| TaskState | `createTaskStateStore()` | 当前任务状态 (目标/计划/进度) | 2 |
+| Summary | `createSummaryStore()` | 滚动摘要 (决策/结论/下一步) | 3 |
+| Episodic | `createEventStore()` | 事件日志 (对话/工具/决策) | 4 |
+| Semantic | `createSemanticStore()` | 可检索材料 (全文/向量) | 5 (最低) |
 
 ### 6.4 package.json 关键配置
 

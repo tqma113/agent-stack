@@ -4,28 +4,32 @@
  * Main entry point for agent-stack AI agents
  */
 
-export { Agent } from './agent';
+// Agent - main export
+export { createAgent, type AgentInstance } from './agent';
 export * from './types';
 export * from './config';
 
-// Re-export useful types from provider
+// Re-export useful types and factory functions from provider
 export {
-  OpenAIClient,
+  createOpenAIClient,
   systemMessage,
   userMessage,
   assistantMessage,
   toolMessage,
   defineTool,
   defineParameters,
+  type OpenAIClientInstance,
   type ChatModel,
   type ChatCompletionMessageParam,
 } from '@agent-stack/provider';
 
-// Re-export MCP types and classes for convenience
+// Re-export MCP types and factory functions for convenience
 export {
-  MCPClientManager,
-  MCPToolProvider,
+  createMCPClientManager,
+  createMCPToolProvider,
   loadConfig as loadMCPConfig,
+  type MCPClientManagerInstance,
+  type MCPToolProviderInstance,
   type MCPConfig,
   type MCPServerConfig,
   type MCPTool,
@@ -34,12 +38,14 @@ export {
   type BridgedTool,
 } from '@agent-stack/mcp';
 
-// Re-export Skill types and classes for convenience
+// Re-export Skill types and factory functions for convenience
 export {
-  SkillManager,
-  SkillToolProvider,
+  createSkillManager,
+  createSkillToolProvider,
   loadConfig as loadSkillConfig,
   discoverSkills,
+  type SkillManagerInstance,
+  type SkillToolProviderInstance,
   type SkillConfig,
   type SkillEntry,
   type SkillDefinition,
@@ -50,22 +56,39 @@ export {
   type SkillState,
 } from '@agent-stack/skill';
 
-// Re-export Memory types and classes for convenience
+// Re-export Memory types and factory functions for convenience
 export {
-  MemoryManager,
-  MemoryObserver,
-  MemoryRetriever,
-  MemoryInjector,
-  MemoryBudgeter,
-  WritePolicyEngine,
-  MemorySummarizer,
+  // Manager
+  createMemoryManager,
+  type MemoryManagerInstance,
+  // Components
+  createMemoryObserver,
+  createMemoryRetriever,
+  createMemoryInjector,
+  createMemoryBudgeter,
+  createWritePolicyEngine,
+  createMemorySummarizer,
+  // Task reducer (already functional)
   TaskStateReducer,
   TaskActions,
-  EventStore,
-  TaskStateStore,
-  SummaryStore,
-  ProfileStore,
-  SemanticStore,
+  // Stores
+  createEventStore,
+  createTaskStateStore,
+  createSummaryStore,
+  createProfileStore,
+  createSemanticStore,
+  // Types
+  type IMemoryObserver,
+  type IMemoryRetriever,
+  type IMemoryInjector,
+  type IMemoryBudgeter,
+  type IWritePolicyEngine,
+  type IMemorySummarizer,
+  type EventStoreInstance,
+  type TaskStateStoreInstance,
+  type SummaryStoreInstance,
+  type ProfileStoreInstance,
+  type SemanticStoreInstance,
   type MemoryConfig,
   type MemoryBundle,
   type MemoryEvent,

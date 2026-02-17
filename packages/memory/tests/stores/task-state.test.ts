@@ -4,17 +4,17 @@
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import Database from 'better-sqlite3';
-import { TaskStateStore } from '../../src/stores/task-state.js';
+import { createTaskStateStore, type TaskStateStoreInstance } from '../../src/stores/task-state.js';
 import { TaskStateConflictError } from '../../src/errors.js';
 import type { TaskState } from '../../src/types.js';
 
 describe('TaskStateStore', () => {
   let db: Database.Database;
-  let store: TaskStateStore;
+  let store: TaskStateStoreInstance;
 
   beforeEach(async () => {
     db = new Database(':memory:');
-    store = new TaskStateStore();
+    store = createTaskStateStore();
     store.setDatabase(db);
     await store.initialize();
   });

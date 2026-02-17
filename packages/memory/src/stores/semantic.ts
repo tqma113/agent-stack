@@ -4,6 +4,7 @@
  * Stores searchable content chunks with FTS5 and sqlite-vec vector support.
  */
 
+import type Database from 'better-sqlite3';
 import type {
   ISemanticStore,
   SemanticChunk,
@@ -11,7 +12,7 @@ import type {
   SemanticSearchResult,
   UUID,
 } from '../types.js';
-import { SQLiteStore } from './base.js';
+import { createDbOperations, type DbOperationsInstance } from './db-operations.js';
 import { SemanticSearchError, DatabaseError } from '../errors.js';
 
 /**
@@ -64,56 +65,296 @@ export const DEFAULT_SEMANTIC_CONFIG: SemanticStoreConfig = {
 };
 
 /**
- * SQLite-based semantic store with FTS5 and sqlite-vec support
+ * Database row type
  */
-export class SemanticStore extends SQLiteStore implements ISemanticStore {
-  private config: SemanticStoreConfig;
-  private vecEnabled = false;
-  private embedFunction?: EmbedFunction;
+interface ChunkRow {
+  id: string;
+  rowid: number;
+  timestamp: number;
+  text: string;
+  tags: string;
+  source_event_id: string | null;
+  source_type: string | null;
+  session_id: string | null;
+  metadata: string | null;
+}
 
-  constructor(config: Partial<SemanticStoreConfig> = {}) {
-    super('SemanticStore');
-    this.config = { ...DEFAULT_SEMANTIC_CONFIG, ...config };
+/**
+ * Semantic store instance interface
+ */
+export interface SemanticStoreInstance extends ISemanticStore {
+  /** Set the database instance (called by MemoryManager) */
+  setDatabase(db: Database.Database): void;
+  /** Check if store is initialized */
+  isInitialized(): boolean;
+  /** Set the embedding function for automatic vector generation */
+  setEmbedFunction(fn: EmbedFunction): void;
+  /** Get the current embed function */
+  getEmbedFunction(): EmbedFunction | undefined;
+  /** Check if automatic embedding is available */
+  hasEmbedFunction(): boolean;
+  /** Check if vector search is enabled */
+  isVectorEnabled(): boolean;
+  /** Get vector dimensions */
+  getVectorDimensions(): number;
+  /** Add or update embedding for a chunk */
+  setEmbedding(chunkId: UUID, embedding: number[]): Promise<void>;
+  /** Convenience method for pure FTS search (no vector) */
+  searchText(query: string, options?: VectorSearchOptions): Promise<SemanticSearchResult[]>;
+  /** Convenience method for pure vector search */
+  searchSimilar(
+    queryOrEmbedding: string | number[],
+    options?: VectorSearchOptions
+  ): Promise<SemanticSearchResult[]>;
+  /** Delete a chunk by ID */
+  delete(id: UUID): Promise<boolean>;
+  /** Get chunk count */
+  count(sessionId?: string): Promise<number>;
+}
+
+/**
+ * Create a semantic store instance (functional style)
+ */
+export function createSemanticStore(
+  config: Partial<SemanticStoreConfig> = {}
+): SemanticStoreInstance {
+  // Private state via closure
+  const dbOps: DbOperationsInstance = createDbOperations('SemanticStore');
+  const storeConfig: SemanticStoreConfig = { ...DEFAULT_SEMANTIC_CONFIG, ...config };
+  let vecEnabled = false;
+  let embedFunction: EmbedFunction | undefined;
+
+  // ============================================================================
+  // Private helper functions
+  // ============================================================================
+
+  /**
+   * Convert database row to SemanticChunk
+   */
+  function rowToChunk(row: ChunkRow): SemanticChunk {
+    return {
+      id: row.id,
+      timestamp: row.timestamp,
+      text: row.text,
+      tags: JSON.parse(row.tags),
+      sourceEventId: row.source_event_id || undefined,
+      sourceType: row.source_type || undefined,
+      sessionId: row.session_id || undefined,
+      embedding: undefined, // Loaded separately from vec table
+      metadata: row.metadata ? JSON.parse(row.metadata) : undefined,
+    };
   }
 
   /**
-   * Set the embedding function for automatic vector generation
-   * This enables automatic hybrid search without manually providing embeddings
+   * Build FTS5 query from user input
    */
-  setEmbedFunction(fn: EmbedFunction): void {
-    this.embedFunction = fn;
+  function buildFtsQuery(query: string): string {
+    // Escape special characters and build phrase query
+    const escaped = query.replace(/['"]/g, '');
+    const terms = escaped.split(/\s+/).filter((t) => t.length > 0);
+
+    if (terms.length === 0) return '""';
+    if (terms.length === 1) return `"${terms[0]}"*`;
+
+    // Create OR query for multiple terms
+    return terms.map((t) => `"${t}"*`).join(' OR ');
   }
 
   /**
-   * Get the current embed function
+   * Calculate cosine similarity between two vectors
    */
-  getEmbedFunction(): EmbedFunction | undefined {
-    return this.embedFunction;
+  function cosineSimilarity(a: number[], b: number[]): number {
+    if (a.length !== b.length) return 0;
+
+    let dotProduct = 0;
+    let normA = 0;
+    let normB = 0;
+
+    for (let i = 0; i < a.length; i++) {
+      dotProduct += a[i] * b[i];
+      normA += a[i] * a[i];
+      normB += b[i] * b[i];
+    }
+
+    const magnitude = Math.sqrt(normA) * Math.sqrt(normB);
+    if (magnitude === 0) return 0;
+
+    return dotProduct / magnitude;
   }
 
   /**
-   * Check if automatic embedding is available
+   * Insert vector into vec0 table
    */
-  hasEmbedFunction(): boolean {
-    return !!this.embedFunction;
+  function insertVector(chunkId: string, embedding: number[]): void {
+    const db = dbOps.getDb();
+
+    try {
+      // Delete existing if any
+      db.prepare('DELETE FROM semantic_chunks_vec WHERE chunk_id = ?').run(chunkId);
+
+      // Insert new vector as JSON array
+      const vecJson = JSON.stringify(embedding);
+      db.prepare(`
+        INSERT INTO semantic_chunks_vec (chunk_id, embedding)
+        VALUES (?, ?)
+      `).run(chunkId, vecJson);
+    } catch (error) {
+      console.warn('[SemanticStore] Failed to insert vector:', (error as Error).message);
+    }
   }
 
-  async initialize(): Promise<void> {
-    const db = this.getDb();
+  /**
+   * Get vector from vec0 table
+   */
+  function getVector(chunkId: string): number[] | undefined {
+    const db = dbOps.getDb();
+
+    try {
+      const row = db
+        .prepare('SELECT embedding FROM semantic_chunks_vec WHERE chunk_id = ?')
+        .get(chunkId) as { embedding: string } | undefined;
+
+      if (row?.embedding) {
+        return JSON.parse(row.embedding);
+      }
+    } catch {
+      // Vector not found or error
+    }
+
+    return undefined;
+  }
+
+  /**
+   * Fallback vector search using in-memory cosine similarity
+   */
+  async function searchVectorFallback(
+    embedding: number[],
+    options?: VectorSearchOptions
+  ): Promise<SemanticSearchResult[]> {
+    const db = dbOps.getDb();
+
+    try {
+      // Get all chunks and compute similarity in memory
+      let sql = 'SELECT * FROM semantic_chunks';
+      const conditions: string[] = [];
+      const params: unknown[] = [];
+
+      if (options?.sessionId) {
+        conditions.push('session_id = ?');
+        params.push(options.sessionId);
+      }
+
+      if (options?.tags && options.tags.length > 0) {
+        const tagConditions = options.tags.map(() => 'tags LIKE ?');
+        conditions.push(`(${tagConditions.join(' OR ')})`);
+        params.push(...options.tags.map((tag) => `%"${tag}"%`));
+      }
+
+      if (conditions.length > 0) {
+        sql += ` WHERE ${conditions.join(' AND ')}`;
+      }
+
+      const rows = db.prepare(sql).all(...params) as ChunkRow[];
+
+      // Get embeddings from vec table and compute similarity
+      const results: SemanticSearchResult[] = [];
+
+      for (const row of rows) {
+        const storedEmbedding = getVector(row.id);
+        if (storedEmbedding) {
+          const score = cosineSimilarity(embedding, storedEmbedding);
+          results.push({
+            chunk: rowToChunk(row),
+            score,
+            matchType: 'vector' as const,
+          });
+        }
+      }
+
+      // Sort by score descending
+      results.sort((a, b) => b.score - a.score);
+
+      return options?.limit ? results.slice(0, options.limit) : results;
+    } catch (error) {
+      throw new SemanticSearchError(
+        `Vector search fallback failed: ${(error as Error).message}`,
+        error as Error
+      );
+    }
+  }
+
+  /**
+   * Merge FTS and vector results with weighted scoring
+   */
+  function mergeResults(
+    ftsResults: SemanticSearchResult[],
+    vectorResults: SemanticSearchResult[],
+    weights: { fts: number; vector: number }
+  ): SemanticSearchResult[] {
+    const scoreMap = new Map<string, { chunk: SemanticChunk; ftsScore: number; vecScore: number }>();
+
+    // Normalize FTS scores (0-1)
+    const maxFtsScore = Math.max(...ftsResults.map((r) => r.score), 1);
+    for (const result of ftsResults) {
+      scoreMap.set(result.chunk.id, {
+        chunk: result.chunk,
+        ftsScore: result.score / maxFtsScore,
+        vecScore: 0,
+      });
+    }
+
+    // Add vector scores
+    const maxVecScore = Math.max(...vectorResults.map((r) => r.score), 1);
+    for (const result of vectorResults) {
+      const existing = scoreMap.get(result.chunk.id);
+      if (existing) {
+        existing.vecScore = result.score / maxVecScore;
+      } else {
+        scoreMap.set(result.chunk.id, {
+          chunk: result.chunk,
+          ftsScore: 0,
+          vecScore: result.score / maxVecScore,
+        });
+      }
+    }
+
+    // Calculate combined scores
+    const combined: SemanticSearchResult[] = [];
+    for (const [, value] of scoreMap) {
+      const combinedScore = value.ftsScore * weights.fts + value.vecScore * weights.vector;
+      combined.push({
+        chunk: value.chunk,
+        score: combinedScore,
+        matchType: 'hybrid' as const,
+      });
+    }
+
+    // Sort by combined score
+    combined.sort((a, b) => b.score - a.score);
+
+    return combined;
+  }
+
+  // ============================================================================
+  // Public methods
+  // ============================================================================
+
+  async function initialize(): Promise<void> {
+    const db = dbOps.getDb();
 
     // Try to load sqlite-vec extension
-    if (this.config.enableVectorSearch) {
+    if (storeConfig.enableVectorSearch) {
       try {
         // Dynamic import to handle cases where sqlite-vec is not installed
         const sqliteVec = await import('sqlite-vec');
         sqliteVec.load(db);
-        this.vecEnabled = true;
+        vecEnabled = true;
       } catch (error) {
         console.warn(
           '[SemanticStore] sqlite-vec not available, falling back to FTS-only mode:',
           (error as Error).message
         );
-        this.vecEnabled = false;
+        vecEnabled = false;
       }
     }
 
@@ -137,7 +378,7 @@ export class SemanticStore extends SQLiteStore implements ISemanticStore {
     `);
 
     // Create FTS5 virtual table
-    if (this.config.enableFtsSearch) {
+    if (storeConfig.enableFtsSearch) {
       db.exec(`
         CREATE VIRTUAL TABLE IF NOT EXISTS semantic_chunks_fts USING fts5(
           text,
@@ -167,43 +408,33 @@ export class SemanticStore extends SQLiteStore implements ISemanticStore {
     }
 
     // Create sqlite-vec virtual table for vector search
-    if (this.vecEnabled) {
+    if (vecEnabled) {
       try {
         db.exec(`
           CREATE VIRTUAL TABLE IF NOT EXISTS semantic_chunks_vec USING vec0(
             chunk_id TEXT PRIMARY KEY,
-            embedding FLOAT[${this.config.vectorDimensions}]
+            embedding FLOAT[${storeConfig.vectorDimensions}]
           );
         `);
       } catch (error) {
         console.warn('[SemanticStore] Failed to create vec0 table:', (error as Error).message);
-        this.vecEnabled = false;
+        vecEnabled = false;
       }
     }
 
-    this.initialized = true;
+    dbOps.setInitialized(true);
   }
 
-  /**
-   * Check if vector search is enabled
-   */
-  isVectorEnabled(): boolean {
-    return this.vecEnabled;
+  async function close(): Promise<void> {
+    return dbOps.close();
   }
 
-  /**
-   * Get vector dimensions
-   */
-  getVectorDimensions(): number {
-    return this.config.vectorDimensions;
-  }
-
-  async clear(): Promise<void> {
-    const db = this.getDb();
+  async function clear(): Promise<void> {
+    const db = dbOps.getDb();
 
     db.exec('DELETE FROM semantic_chunks');
 
-    if (this.config.enableFtsSearch) {
+    if (storeConfig.enableFtsSearch) {
       try {
         db.exec("DELETE FROM semantic_chunks_fts WHERE semantic_chunks_fts MATCH '*'");
       } catch {
@@ -211,7 +442,7 @@ export class SemanticStore extends SQLiteStore implements ISemanticStore {
       }
     }
 
-    if (this.vecEnabled) {
+    if (vecEnabled) {
       try {
         db.exec('DELETE FROM semantic_chunks_vec');
       } catch {
@@ -220,14 +451,14 @@ export class SemanticStore extends SQLiteStore implements ISemanticStore {
     }
   }
 
-  async add(input: SemanticChunkInput): Promise<SemanticChunk> {
-    const db = this.getDb();
+  async function add(input: SemanticChunkInput): Promise<SemanticChunk> {
+    const db = dbOps.getDb();
 
     // Auto-generate embedding if embedFunction is set and no embedding provided
     let embedding = input.embedding;
-    if (!embedding && this.embedFunction && this.vecEnabled) {
+    if (!embedding && embedFunction && vecEnabled) {
       try {
-        embedding = await this.embedFunction(input.text);
+        embedding = await embedFunction(input.text);
       } catch (error) {
         // Log warning but continue without embedding
         // eslint-disable-next-line no-console
@@ -236,8 +467,8 @@ export class SemanticStore extends SQLiteStore implements ISemanticStore {
     }
 
     const chunk: SemanticChunk = {
-      id: this.generateId(),
-      timestamp: this.now(),
+      id: dbOps.generateId(),
+      timestamp: dbOps.now(),
       text: input.text,
       tags: input.tags || [],
       sourceEventId: input.sourceEventId,
@@ -274,8 +505,8 @@ export class SemanticStore extends SQLiteStore implements ISemanticStore {
       );
 
       // Insert into vector table if embedding available
-      if (this.vecEnabled && chunk.embedding) {
-        this.insertVector(chunk.id, chunk.embedding);
+      if (vecEnabled && chunk.embedding) {
+        insertVector(chunk.id, chunk.embedding);
       }
 
       return chunk;
@@ -284,46 +515,8 @@ export class SemanticStore extends SQLiteStore implements ISemanticStore {
     }
   }
 
-  /**
-   * Add or update embedding for a chunk
-   */
-  async setEmbedding(chunkId: UUID, embedding: number[]): Promise<void> {
-    if (!this.vecEnabled) {
-      throw new SemanticSearchError('Vector search is not enabled');
-    }
-
-    if (embedding.length !== this.config.vectorDimensions) {
-      throw new SemanticSearchError(
-        `Embedding dimension mismatch: expected ${this.config.vectorDimensions}, got ${embedding.length}`
-      );
-    }
-
-    this.insertVector(chunkId, embedding);
-  }
-
-  /**
-   * Insert vector into vec0 table
-   */
-  private insertVector(chunkId: string, embedding: number[]): void {
-    const db = this.getDb();
-
-    try {
-      // Delete existing if any
-      db.prepare('DELETE FROM semantic_chunks_vec WHERE chunk_id = ?').run(chunkId);
-
-      // Insert new vector as JSON array
-      const vecJson = JSON.stringify(embedding);
-      db.prepare(`
-        INSERT INTO semantic_chunks_vec (chunk_id, embedding)
-        VALUES (?, ?)
-      `).run(chunkId, vecJson);
-    } catch (error) {
-      console.warn('[SemanticStore] Failed to insert vector:', (error as Error).message);
-    }
-  }
-
-  async get(id: UUID): Promise<SemanticChunk | null> {
-    const db = this.getDb();
+  async function get(id: UUID): Promise<SemanticChunk | null> {
+    const db = dbOps.getDb();
 
     try {
       const stmt = db.prepare('SELECT * FROM semantic_chunks WHERE id = ?');
@@ -331,11 +524,11 @@ export class SemanticStore extends SQLiteStore implements ISemanticStore {
 
       if (!row) return null;
 
-      const chunk = this.rowToChunk(row);
+      const chunk = rowToChunk(row);
 
       // Load embedding from vec table if available
-      if (this.vecEnabled) {
-        chunk.embedding = this.getVector(id);
+      if (vecEnabled) {
+        chunk.embedding = getVector(id);
       }
 
       return chunk;
@@ -344,43 +537,22 @@ export class SemanticStore extends SQLiteStore implements ISemanticStore {
     }
   }
 
-  /**
-   * Get vector from vec0 table
-   */
-  private getVector(chunkId: string): number[] | undefined {
-    const db = this.getDb();
-
-    try {
-      const row = db
-        .prepare('SELECT embedding FROM semantic_chunks_vec WHERE chunk_id = ?')
-        .get(chunkId) as { embedding: string } | undefined;
-
-      if (row?.embedding) {
-        return JSON.parse(row.embedding);
-      }
-    } catch {
-      // Vector not found or error
-    }
-
-    return undefined;
-  }
-
-  async searchFts(
+  async function searchFts(
     query: string,
     options?: VectorSearchOptions
   ): Promise<SemanticSearchResult[]> {
-    if (!this.config.enableFtsSearch) {
+    if (!storeConfig.enableFtsSearch) {
       return [];
     }
 
-    const db = this.getDb();
+    const db = dbOps.getDb();
 
     if (!query.trim()) {
       return [];
     }
 
     try {
-      const ftsQuery = this.buildFtsQuery(query);
+      const ftsQuery = buildFtsQuery(query);
 
       let sql = `
         SELECT sc.*, bm25(semantic_chunks_fts) as score
@@ -412,7 +584,7 @@ export class SemanticStore extends SQLiteStore implements ISemanticStore {
       const rows = stmt.all(...params) as (ChunkRow & { score: number })[];
 
       return rows.map((row) => ({
-        chunk: this.rowToChunk(row),
+        chunk: rowToChunk(row),
         score: Math.abs(row.score), // bm25 returns negative scores
         matchType: 'fts' as const,
       }));
@@ -424,16 +596,16 @@ export class SemanticStore extends SQLiteStore implements ISemanticStore {
     }
   }
 
-  async searchVector(
+  async function searchVector(
     embedding: number[],
     options?: VectorSearchOptions
   ): Promise<SemanticSearchResult[]> {
-    if (!this.vecEnabled) {
+    if (!vecEnabled) {
       // Fallback to in-memory cosine similarity if vec not available
-      return this.searchVectorFallback(embedding, options);
+      return searchVectorFallback(embedding, options);
     }
 
-    const db = this.getDb();
+    const db = dbOps.getDb();
     const limit = options?.limit || 10;
 
     try {
@@ -487,7 +659,7 @@ export class SemanticStore extends SQLiteStore implements ISemanticStore {
           // Convert distance to similarity score (smaller distance = higher score)
           const score = 1 / (1 + distance);
           return {
-            chunk: this.rowToChunk(row),
+            chunk: rowToChunk(row),
             score,
             matchType: 'vector' as const,
           };
@@ -504,65 +676,6 @@ export class SemanticStore extends SQLiteStore implements ISemanticStore {
   }
 
   /**
-   * Fallback vector search using in-memory cosine similarity
-   */
-  private async searchVectorFallback(
-    embedding: number[],
-    options?: VectorSearchOptions
-  ): Promise<SemanticSearchResult[]> {
-    const db = this.getDb();
-
-    try {
-      // Get all chunks and compute similarity in memory
-      let sql = 'SELECT * FROM semantic_chunks';
-      const conditions: string[] = [];
-      const params: unknown[] = [];
-
-      if (options?.sessionId) {
-        conditions.push('session_id = ?');
-        params.push(options.sessionId);
-      }
-
-      if (options?.tags && options.tags.length > 0) {
-        const tagConditions = options.tags.map(() => 'tags LIKE ?');
-        conditions.push(`(${tagConditions.join(' OR ')})`);
-        params.push(...options.tags.map((tag) => `%"${tag}"%`));
-      }
-
-      if (conditions.length > 0) {
-        sql += ` WHERE ${conditions.join(' AND ')}`;
-      }
-
-      const rows = db.prepare(sql).all(...params) as ChunkRow[];
-
-      // Get embeddings from vec table and compute similarity
-      const results: SemanticSearchResult[] = [];
-
-      for (const row of rows) {
-        const storedEmbedding = this.getVector(row.id);
-        if (storedEmbedding) {
-          const score = this.cosineSimilarity(embedding, storedEmbedding);
-          results.push({
-            chunk: this.rowToChunk(row),
-            score,
-            matchType: 'vector' as const,
-          });
-        }
-      }
-
-      // Sort by score descending
-      results.sort((a, b) => b.score - a.score);
-
-      return options?.limit ? results.slice(0, options.limit) : results;
-    } catch (error) {
-      throw new SemanticSearchError(
-        `Vector search fallback failed: ${(error as Error).message}`,
-        error as Error
-      );
-    }
-  }
-
-  /**
    * Hybrid search combining FTS and vector results
    *
    * By default, this performs hybrid search when:
@@ -571,7 +684,7 @@ export class SemanticStore extends SQLiteStore implements ISemanticStore {
    *
    * The default weights favor vector search (0.7) over FTS (0.3) when both are available.
    */
-  async search(
+  async function search(
     query: string,
     options?: HybridSearchOptions
   ): Promise<SemanticSearchResult[]> {
@@ -580,20 +693,20 @@ export class SemanticStore extends SQLiteStore implements ISemanticStore {
     const weights = options?.weights || { fts: 0.3, vector: 0.7 };
 
     // Get FTS results
-    const ftsResults = this.config.enableFtsSearch
-      ? await this.searchFts(query, { ...options, limit: limit * 2 })
+    const ftsResults = storeConfig.enableFtsSearch
+      ? await searchFts(query, { ...options, limit: limit * 2 })
       : [];
 
     // Determine if we should use vector search
     let embedding = options?.embedding;
     const shouldUseVector = options?.useVector !== false &&
-      this.config.enableVectorSearch &&
-      this.vecEnabled;
+      storeConfig.enableVectorSearch &&
+      vecEnabled;
 
     // Auto-generate embedding if embedFunction is set and no embedding provided
-    if (shouldUseVector && !embedding && this.embedFunction) {
+    if (shouldUseVector && !embedding && embedFunction) {
       try {
-        embedding = await this.embedFunction(query);
+        embedding = await embedFunction(query);
       } catch (error) {
         // Log warning but continue with FTS-only
         // eslint-disable-next-line no-console
@@ -604,7 +717,7 @@ export class SemanticStore extends SQLiteStore implements ISemanticStore {
     // Get vector results if embedding available
     let vectorResults: SemanticSearchResult[] = [];
     if (shouldUseVector && embedding) {
-      vectorResults = await this.searchVector(embedding, {
+      vectorResults = await searchVector(embedding, {
         ...options,
         limit: limit * 2,
       });
@@ -621,25 +734,32 @@ export class SemanticStore extends SQLiteStore implements ISemanticStore {
     }
 
     // Combine and rerank results using weighted scoring
-    const combined = this.mergeResults(ftsResults, vectorResults, weights);
+    const combined = mergeResults(ftsResults, vectorResults, weights);
     return combined.slice(0, limit);
   }
 
-  /**
-   * Convenience method for pure FTS search (no vector)
-   */
-  async searchText(
+  async function setEmbeddingForChunk(chunkId: UUID, embedding: number[]): Promise<void> {
+    if (!vecEnabled) {
+      throw new SemanticSearchError('Vector search is not enabled');
+    }
+
+    if (embedding.length !== storeConfig.vectorDimensions) {
+      throw new SemanticSearchError(
+        `Embedding dimension mismatch: expected ${storeConfig.vectorDimensions}, got ${embedding.length}`
+      );
+    }
+
+    insertVector(chunkId, embedding);
+  }
+
+  async function searchText(
     query: string,
     options?: VectorSearchOptions
   ): Promise<SemanticSearchResult[]> {
-    return this.searchFts(query, options);
+    return searchFts(query, options);
   }
 
-  /**
-   * Convenience method for pure vector search
-   * Requires either embedding parameter or embedFunction to be set
-   */
-  async searchSimilar(
+  async function searchSimilar(
     queryOrEmbedding: string | number[],
     options?: VectorSearchOptions
   ): Promise<SemanticSearchResult[]> {
@@ -647,75 +767,23 @@ export class SemanticStore extends SQLiteStore implements ISemanticStore {
 
     if (Array.isArray(queryOrEmbedding)) {
       embedding = queryOrEmbedding;
-    } else if (this.embedFunction) {
-      embedding = await this.embedFunction(queryOrEmbedding);
+    } else if (embedFunction) {
+      embedding = await embedFunction(queryOrEmbedding);
     } else {
       throw new SemanticSearchError(
         'Vector search requires either an embedding array or embedFunction to be set'
       );
     }
 
-    return this.searchVector(embedding, options);
+    return searchVector(embedding, options);
   }
 
-  /**
-   * Merge FTS and vector results with weighted scoring
-   */
-  private mergeResults(
-    ftsResults: SemanticSearchResult[],
-    vectorResults: SemanticSearchResult[],
-    weights: { fts: number; vector: number }
-  ): SemanticSearchResult[] {
-    const scoreMap = new Map<string, { chunk: SemanticChunk; ftsScore: number; vecScore: number }>();
-
-    // Normalize FTS scores (0-1)
-    const maxFtsScore = Math.max(...ftsResults.map((r) => r.score), 1);
-    for (const result of ftsResults) {
-      scoreMap.set(result.chunk.id, {
-        chunk: result.chunk,
-        ftsScore: result.score / maxFtsScore,
-        vecScore: 0,
-      });
-    }
-
-    // Add vector scores
-    const maxVecScore = Math.max(...vectorResults.map((r) => r.score), 1);
-    for (const result of vectorResults) {
-      const existing = scoreMap.get(result.chunk.id);
-      if (existing) {
-        existing.vecScore = result.score / maxVecScore;
-      } else {
-        scoreMap.set(result.chunk.id, {
-          chunk: result.chunk,
-          ftsScore: 0,
-          vecScore: result.score / maxVecScore,
-        });
-      }
-    }
-
-    // Calculate combined scores
-    const combined: SemanticSearchResult[] = [];
-    for (const [, value] of scoreMap) {
-      const combinedScore = value.ftsScore * weights.fts + value.vecScore * weights.vector;
-      combined.push({
-        chunk: value.chunk,
-        score: combinedScore,
-        matchType: 'hybrid' as const,
-      });
-    }
-
-    // Sort by combined score
-    combined.sort((a, b) => b.score - a.score);
-
-    return combined;
-  }
-
-  async deleteBySession(sessionId: string): Promise<number> {
-    const db = this.getDb();
+  async function deleteBySession(sessionId: string): Promise<number> {
+    const db = dbOps.getDb();
 
     try {
       // Get chunk IDs to delete from vec table
-      if (this.vecEnabled) {
+      if (vecEnabled) {
         const chunks = db
           .prepare('SELECT id FROM semantic_chunks WHERE session_id = ?')
           .all(sessionId) as Array<{ id: string }>;
@@ -734,15 +802,12 @@ export class SemanticStore extends SQLiteStore implements ISemanticStore {
     }
   }
 
-  /**
-   * Delete a chunk by ID
-   */
-  async delete(id: UUID): Promise<boolean> {
-    const db = this.getDb();
+  async function deleteChunk(id: UUID): Promise<boolean> {
+    const db = dbOps.getDb();
 
     try {
       // Delete from vec table
-      if (this.vecEnabled) {
+      if (vecEnabled) {
         db.prepare('DELETE FROM semantic_chunks_vec WHERE chunk_id = ?').run(id);
       }
 
@@ -754,11 +819,8 @@ export class SemanticStore extends SQLiteStore implements ISemanticStore {
     }
   }
 
-  /**
-   * Get chunk count
-   */
-  async count(sessionId?: string): Promise<number> {
-    const db = this.getDb();
+  async function count(sessionId?: string): Promise<number> {
+    const db = dbOps.getDb();
 
     try {
       if (sessionId) {
@@ -777,72 +839,38 @@ export class SemanticStore extends SQLiteStore implements ISemanticStore {
     }
   }
 
-  /**
-   * Build FTS5 query from user input
-   */
-  private buildFtsQuery(query: string): string {
-    // Escape special characters and build phrase query
-    const escaped = query.replace(/['"]/g, '');
-    const terms = escaped.split(/\s+/).filter((t) => t.length > 0);
+  // Return the instance object
+  return {
+    // DbOperations delegation
+    setDatabase: (db: Database.Database) => dbOps.setDatabase(db),
+    isInitialized: () => dbOps.isInitialized(),
 
-    if (terms.length === 0) return '""';
-    if (terms.length === 1) return `"${terms[0]}"*`;
+    // BaseStore methods
+    initialize,
+    close,
+    clear,
 
-    // Create OR query for multiple terms
-    return terms.map((t) => `"${t}"*`).join(' OR ');
-  }
+    // ISemanticStore methods
+    add,
+    get,
+    searchFts,
+    searchVector,
+    search,
+    deleteBySession,
 
-  /**
-   * Calculate cosine similarity between two vectors
-   */
-  private cosineSimilarity(a: number[], b: number[]): number {
-    if (a.length !== b.length) return 0;
-
-    let dotProduct = 0;
-    let normA = 0;
-    let normB = 0;
-
-    for (let i = 0; i < a.length; i++) {
-      dotProduct += a[i] * b[i];
-      normA += a[i] * a[i];
-      normB += b[i] * b[i];
-    }
-
-    const magnitude = Math.sqrt(normA) * Math.sqrt(normB);
-    if (magnitude === 0) return 0;
-
-    return dotProduct / magnitude;
-  }
-
-  /**
-   * Convert database row to SemanticChunk
-   */
-  private rowToChunk(row: ChunkRow): SemanticChunk {
-    return {
-      id: row.id,
-      timestamp: row.timestamp,
-      text: row.text,
-      tags: JSON.parse(row.tags),
-      sourceEventId: row.source_event_id || undefined,
-      sourceType: row.source_type || undefined,
-      sessionId: row.session_id || undefined,
-      embedding: undefined, // Loaded separately from vec table
-      metadata: row.metadata ? JSON.parse(row.metadata) : undefined,
-    };
-  }
+    // Extended methods
+    setEmbedFunction: (fn: EmbedFunction) => {
+      embedFunction = fn;
+    },
+    getEmbedFunction: () => embedFunction,
+    hasEmbedFunction: () => !!embedFunction,
+    isVectorEnabled: () => vecEnabled,
+    getVectorDimensions: () => storeConfig.vectorDimensions,
+    setEmbedding: setEmbeddingForChunk,
+    searchText,
+    searchSimilar,
+    delete: deleteChunk,
+    count,
+  };
 }
 
-/**
- * Database row type
- */
-interface ChunkRow {
-  id: string;
-  rowid: number;
-  timestamp: number;
-  text: string;
-  tags: string;
-  source_event_id: string | null;
-  source_type: string | null;
-  session_id: string | null;
-  metadata: string | null;
-}

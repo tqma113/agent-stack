@@ -14,25 +14,48 @@
  */
 
 // Main manager
-export { MemoryManager } from './manager.js';
+export {
+  createMemoryManager,
+  type MemoryManagerInstance,
+} from './manager.js';
 
 // Components
-export { MemoryObserver, DEFAULT_ENTITY_PATTERNS } from './observer.js';
+export {
+  createMemoryObserver,
+  DEFAULT_ENTITY_PATTERNS,
+  type IMemoryObserver,
+} from './observer.js';
 export type { ObserverOptions, EntityPattern } from './observer.js';
 
-export { MemoryRetriever } from './retriever.js';
+export {
+  createMemoryRetriever,
+  type IMemoryRetriever,
+} from './retriever.js';
 export type { RetrievalOptions, RetrieverStores } from './retriever.js';
 
-export { MemoryInjector, DEFAULT_INJECTION_TEMPLATE } from './injector.js';
+export {
+  createMemoryInjector,
+  DEFAULT_INJECTION_TEMPLATE,
+  type IMemoryInjector,
+} from './injector.js';
 export type { InjectionOptions } from './injector.js';
 
-export { MemoryBudgeter } from './budgeter.js';
+export {
+  createMemoryBudgeter,
+  type IMemoryBudgeter,
+} from './budgeter.js';
 export type { BudgetAllocation, TokenEstimationOptions } from './budgeter.js';
 
-export { WritePolicyEngine } from './write-policy.js';
+export {
+  createWritePolicyEngine,
+  type IWritePolicyEngine,
+} from './write-policy.js';
 export type { WriteDecision, ConflictResolution } from './write-policy.js';
 
-export { MemorySummarizer } from './summarizer.js';
+export {
+  createMemorySummarizer,
+  type IMemorySummarizer,
+} from './summarizer.js';
 export type { SummarizerOptions, SummaryResult } from './summarizer.js';
 
 export { TaskStateReducer, TaskActions } from './state-reducer.js';
@@ -40,12 +63,24 @@ export type { TaskAction, ReducerResult } from './state-reducer.js';
 
 // Stores
 export {
-  SQLiteStore,
-  EventStore,
-  TaskStateStore,
-  SummaryStore,
-  ProfileStore,
-  SemanticStore,
+  // Database operations (composition helper)
+  createDbOperations,
+  type DbOperationsInstance,
+  // Event Store
+  createEventStore,
+  type EventStoreInstance,
+  // Task State Store
+  createTaskStateStore,
+  type TaskStateStoreInstance,
+  // Summary Store
+  createSummaryStore,
+  type SummaryStoreInstance,
+  // Profile Store
+  createProfileStore,
+  type ProfileStoreInstance,
+  // Semantic Store
+  createSemanticStore,
+  type SemanticStoreInstance,
 } from './stores/index.js';
 
 export {

@@ -3,7 +3,7 @@
  */
 
 import { describe, it, expect, beforeEach } from 'vitest';
-import { WritePolicyEngine } from '../src/write-policy.js';
+import { createWritePolicyEngine, type IWritePolicyEngine } from '../src/write-policy.js';
 import { ProfileKeyNotAllowedError } from '../src/errors.js';
 import type { MemoryEvent, ProfileItem, WritePolicyConfig } from '../src/types.js';
 
@@ -19,10 +19,10 @@ const defaultConfig: WritePolicyConfig = {
 };
 
 describe('WritePolicyEngine', () => {
-  let engine: WritePolicyEngine;
+  let engine: IWritePolicyEngine;
 
   beforeEach(() => {
-    engine = new WritePolicyEngine(defaultConfig);
+    engine = createWritePolicyEngine(defaultConfig);
   });
 
   describe('validateProfileKey', () => {
@@ -32,7 +32,7 @@ describe('WritePolicyEngine', () => {
     });
 
     it('should throw for keys not in whitelist', () => {
-      const restrictedEngine = new WritePolicyEngine({
+      const restrictedEngine = createWritePolicyEngine({
         ...defaultConfig,
         profileKeyWhitelist: ['language', 'tone'],
       });
@@ -145,7 +145,7 @@ describe('WritePolicyEngine', () => {
     });
 
     it('should use higher confidence with strategy "confidence"', () => {
-      const confidenceEngine = new WritePolicyEngine({
+      const confidenceEngine = createWritePolicyEngine({
         ...defaultConfig,
         conflictStrategy: 'confidence',
       });
@@ -164,7 +164,7 @@ describe('WritePolicyEngine', () => {
     });
 
     it('should prefer explicit with strategy "explicit"', () => {
-      const explicitEngine = new WritePolicyEngine({
+      const explicitEngine = createWritePolicyEngine({
         ...defaultConfig,
         conflictStrategy: 'explicit',
       });
@@ -184,7 +184,7 @@ describe('WritePolicyEngine', () => {
     });
 
     it('should require review with strategy "manual"', () => {
-      const manualEngine = new WritePolicyEngine({
+      const manualEngine = createWritePolicyEngine({
         ...defaultConfig,
         conflictStrategy: 'manual',
       });
@@ -246,7 +246,7 @@ describe('WritePolicyEngine', () => {
     });
 
     it('should return false when autoSummarize is disabled', () => {
-      const noAutoEngine = new WritePolicyEngine({
+      const noAutoEngine = createWritePolicyEngine({
         ...defaultConfig,
         autoSummarize: false,
       });

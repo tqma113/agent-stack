@@ -5,15 +5,19 @@
  */
 
 // Core client
-export { MCPClientManager } from './client';
+export {
+  createMCPClientManager,
+  type MCPClientManagerInstance,
+} from './client';
 
 // Tool bridge
 export {
-  MCPToolProvider,
+  createMCPToolProvider,
   createToolBridge,
   bridgeTool,
   createResourceAccessor,
   type MCPResourceAccessor,
+  type MCPToolProviderInstance,
 } from './bridge';
 
 // Configuration

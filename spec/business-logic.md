@@ -35,12 +35,16 @@ Agent Stack 的核心业务是提供一个可扩展的 AI Agent 开发框架，�
 
 ## 2. @agent-stack/provider 业务逻辑
 
-### 2.1 OpenAIClient 类
+### 2.1 createOpenAIClient() 工厂函数
 
 **职责**：封装 OpenAI API，提供类型安全的接口
 
 ```typescript
-class OpenAIClient {
+// 创建实例
+const client = createOpenAIClient(config);
+
+// 返回 OpenAIClientInstance 接口
+interface OpenAIClientInstance {
   // 核心方法
   chat(messages, options)      // 同步聊天
   chatStream(messages, options) // 流式聊天
@@ -85,14 +89,17 @@ chunkText(text, maxTokens)    // 按 token 分块
 
 ## 3. @agent-stack/index 业务逻辑
 
-### 3.1 Agent 类
+### 3.1 createAgent() 工厂函数
 
 **职责**：提供完整的 AI Agent 功能
 
 ```typescript
-class Agent {
+// 创建实例
+const agent = createAgent(config);
+
+// 返回 AgentInstance 接口
+interface AgentInstance {
   // 配置管理
-  constructor(config: AgentConfig)
   configure(config)
   getName()
 
@@ -353,12 +360,15 @@ if (signal?.aborted) {
 
 ## 6. @agent-stack/mcp 业务逻辑
 
-### 6.1 MCPClientManager 类
+### 6.1 createMCPClientManager() 工厂函数
 
 **职责**：管理多个 MCP 服务器连接
 
 ```typescript
-class MCPClientManager {
+const manager = createMCPClientManager(options);
+
+// 返回 MCPClientManagerInstance 接口
+interface MCPClientManagerInstance {
   // 生命周期
   initialize(config)     // 初始化配置
   connectAll()           // 连接所有服务器
@@ -381,14 +391,15 @@ class MCPClientManager {
 }
 ```
 
-### 6.2 MCPToolProvider 类
+### 6.2 createMCPToolProvider() 工厂函数
 
 **职责**：将 MCP 工具桥接为 Agent Tool 接口
 
 ```typescript
-class MCPToolProvider {
-  constructor(manager, options)
+const provider = createMCPToolProvider(manager, options);
 
+// 返回 MCPToolProviderInstance 接口
+interface MCPToolProviderInstance {
   getTools()                    // 获取所有桥接工具
   getToolsFromServer(server)    // 获取特定服务器工具
   refresh()                     // 刷新工具列表
@@ -480,9 +491,9 @@ Agent Tool
 ### 7.1 基础对话
 
 ```typescript
-import { Agent } from '@agent-stack/index';
+import { createAgent } from '@agent-stack/index';
 
-const agent = new Agent({
+const agent = createAgent({
   model: 'gpt-4o',
   systemPrompt: 'You are a helpful assistant.',
 });
@@ -524,23 +535,23 @@ await agent.stream('Tell me a story', {
 ### 7.4 使用 MCP 工具 (内置集成)
 
 ```typescript
-import { Agent } from '@agent-stack/index';
+import { createAgent } from '@agent-stack/index';
 
 // 方式 1: 使用配置文件，手动初始化
-const agent = new Agent({
+const agent = createAgent({
   name: 'MCP Agent',
   mcp: { configPath: './.mcp.json' }
 });
 await agent.initializeMCP();
 
 // 方式 2: 使用配置文件，自动连接
-const agent2 = new Agent({
+const agent2 = createAgent({
   mcp: { configPath: './.mcp.json', autoConnect: true }
 });
 // 首次调用 chat() 时自动初始化 MCP
 
 // 方式 3: 内联配置
-const agent3 = new Agent({
+const agent3 = createAgent({
   mcp: {
     servers: {
       'openai-docs': {
@@ -565,17 +576,17 @@ await agent.closeMCP();
 如果需要更精细的控制，可以手动集成：
 
 ```typescript
-import { Agent, MCPClientManager, MCPToolProvider } from '@agent-stack/index';
+import { createAgent, createMCPClientManager, createMCPToolProvider } from '@agent-stack/index';
 
-const mcpManager = new MCPClientManager();
+const mcpManager = createMCPClientManager();
 await mcpManager.initialize('./.mcp.json');
 await mcpManager.connectAll();
 
-const toolProvider = new MCPToolProvider(mcpManager, {
+const toolProvider = createMCPToolProvider(mcpManager, {
   nameTransformer: (server, tool) => `mcp__${server}__${tool}`,
 });
 
-const agent = new Agent({ name: 'MCP Agent' });
+const agent = createAgent({ name: 'MCP Agent' });
 agent.registerTools(toolProvider.getTools());
 
 const response = await agent.chat('搜索 OpenAI 文档');
@@ -586,12 +597,15 @@ await mcpManager.close();
 
 ## 8. @agent-stack/skill 业务逻辑
 
-### 8.1 SkillManager 类
+### 8.1 createSkillManager() 工厂函数
 
 **职责**：管理 Skill 生命周期和状态
 
 ```typescript
-class SkillManager {
+const manager = createSkillManager(options);
+
+// 返回 SkillManagerInstance 接口
+interface SkillManagerInstance {
   // 初始化
   initialize(config)     // 初始化配置
 
@@ -619,14 +633,15 @@ class SkillManager {
 }
 ```
 
-### 8.2 SkillToolProvider 类
+### 8.2 createSkillToolProvider() 工厂函数
 
 **职责**：将 Skill 工具桥接为 Agent Tool 接口
 
 ```typescript
-class SkillToolProvider {
-  constructor(manager, options)
+const provider = createSkillToolProvider(manager, options);
 
+// 返回 SkillToolProviderInstance 接口
+interface SkillToolProviderInstance {
   getTools()                    // 获取所有桥接工具
   getToolsFromSkill(skillName)  // 获取特定 skill 工具
   refresh()                     // 刷新工具列表
@@ -731,10 +746,10 @@ unloaded ──────► loading ──────► loaded ◄───
 ### 8.6 使用示例
 
 ```typescript
-import { Agent } from '@agent-stack/index';
+import { createAgent } from '@agent-stack/index';
 
 // 方式 1: 使用配置文件
-const agent = new Agent({
+const agent = createAgent({
   name: 'Skill Agent',
   skill: {
     configPath: './skills.json',
@@ -744,7 +759,7 @@ const agent = new Agent({
 await agent.initializeSkills();
 
 // 方式 2: 目录自动发现
-const agent2 = new Agent({
+const agent2 = createAgent({
   skill: {
     directories: ['./skills/', './my-skills/'],
     autoLoad: true
@@ -752,7 +767,7 @@ const agent2 = new Agent({
 });
 
 // 方式 3: 内联配置
-const agent3 = new Agent({
+const agent3 = createAgent({
   skill: {
     skills: {
       'web-search': { path: './skills/web-search' }
@@ -776,12 +791,15 @@ await agent.closeSkills();
 
 ## 9. @agent-stack/memory 业务逻辑
 
-### 9.1 MemoryManager 类
+### 9.1 createMemoryManager() 工厂函数
 
 **职责**：管理持久化记忆的完整生命周期
 
 ```typescript
-class MemoryManager {
+const manager = createMemoryManager(config);
+
+// 返回 MemoryManagerInstance 接口
+interface MemoryManagerInstance {
   // 生命周期
   initialize()             // 初始化数据库和存储
   close()                  // 关闭连接
@@ -835,10 +853,10 @@ class MemoryManager {
 ### 9.3 Agent 集成
 
 ```typescript
-import { Agent } from '@agent-stack/index';
+import { createAgent } from '@agent-stack/index';
 
 // 启用 Memory
-const agent = new Agent({
+const agent = createAgent({
   name: 'Memory Agent',
   memory: {
     enabled: true,

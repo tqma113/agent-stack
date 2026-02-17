@@ -2,7 +2,7 @@
  * OpenAI Provider Module
  */
 
-export { OpenAIClient } from './client';
+export { createOpenAIClient, type OpenAIClientInstance } from './client';
 
 export * from './types';
 

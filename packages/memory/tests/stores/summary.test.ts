@@ -4,15 +4,15 @@
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import Database from 'better-sqlite3';
-import { SummaryStore } from '../../src/stores/summary.js';
+import { createSummaryStore, type SummaryStoreInstance } from '../../src/stores/summary.js';
 
 describe('SummaryStore', () => {
   let db: Database.Database;
-  let store: SummaryStore;
+  let store: SummaryStoreInstance;
 
   beforeEach(async () => {
     db = new Database(':memory:');
-    store = new SummaryStore();
+    store = createSummaryStore();
     store.setDatabase(db);
     await store.initialize();
   });

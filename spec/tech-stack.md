@@ -250,6 +250,37 @@ export default defineConfig({
 ```
 
 **测试覆盖**：
-- 124 个测试用例
+- 134 个测试用例
 - 单元测试 (Stores, Reducer, Policy)
 - 集成测试 (长对话模拟, 性能测试)
+
+---
+
+## 9. 设计模式
+
+### 函数式编程风格
+
+项目采用函数式编程风格，使用工厂函数替代类：
+
+```typescript
+// 工厂函数模式
+export function createOpenAIClient(config = {}): OpenAIClientInstance {
+  // 闭包封装私有状态
+  const client = new OpenAI({ apiKey: config.apiKey });
+  let defaultModel: ChatModel = 'gpt-4o';
+
+  // 返回公共接口对象
+  return {
+    getClient: () => client,
+    setDefaultModel: (model) => { defaultModel = model; },
+    chat: async (messages, options) => { ... },
+    chatStream: async function* (messages, options) { ... },
+  };
+}
+```
+
+**设计原则**：
+- **工厂函数替代类**: `createXxx()` 返回 `XxxInstance` 接口
+- **闭包封装状态**: 私有状态通过闭包隐藏，返回对象只暴露方法
+- **组合替代继承**: 共享功能通过 `createDbOperations()` 等组合函数实现
+- **纯函数分离**: 业务逻辑提取为纯函数，副作用隔离到最外层

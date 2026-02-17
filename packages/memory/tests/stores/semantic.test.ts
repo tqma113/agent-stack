@@ -4,15 +4,15 @@
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import Database from 'better-sqlite3';
-import { SemanticStore } from '../../src/stores/semantic.js';
+import { createSemanticStore, type SemanticStoreInstance } from '../../src/stores/semantic.js';
 
 describe('SemanticStore', () => {
   let db: Database.Database;
-  let store: SemanticStore;
+  let store: SemanticStoreInstance;
 
   beforeEach(async () => {
     db = new Database(':memory:');
-    store = new SemanticStore();
+    store = createSemanticStore();
     store.setDatabase(db);
     await store.initialize();
   });

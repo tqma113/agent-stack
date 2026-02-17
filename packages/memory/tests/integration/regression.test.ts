@@ -13,12 +13,12 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import * as os from 'node:os';
-import { MemoryManager } from '../../src/manager.js';
-import { MemoryObserver } from '../../src/observer.js';
+import { createMemoryManager, type MemoryManagerInstance } from '../../src/manager.js';
+import type { IMemoryObserver } from '../../src/observer.js';
 
 describe('Regression Tests', () => {
-  let manager: MemoryManager;
-  let observer: MemoryObserver;
+  let manager: MemoryManagerInstance;
+  let observer: IMemoryObserver;
   let dbPath: string;
 
   beforeEach(async () => {
@@ -26,7 +26,7 @@ describe('Regression Tests', () => {
     const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'memory-test-'));
     dbPath = path.join(tempDir, 'test.db');
 
-    manager = new MemoryManager({
+    manager = createMemoryManager({
       dbPath,
       debug: false,
       writePolicy: {

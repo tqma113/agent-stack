@@ -4,6 +4,15 @@
 
 Agent Stack 是一个基于 TypeScript 的 AI Agent 开发框架，采用 Rush monorepo 架构管理多个包。项目旨在提供一个简洁、易用的 OpenAI API 封装、MCP 协议支持、Skill 系统、Memory 系统和 AI Agent 实现。
 
+### 设计理念
+
+项目采用**函数式编程风格**，使用工厂函数替代传统类：
+
+- **工厂函数**: `createXxx()` 替代 `new Xxx()`
+- **闭包封装**: 私有状态通过闭包隐藏
+- **组合优于继承**: 共享功能通过组合实现
+- **类型安全**: 返回 `XxxInstance` 接口类型
+
 ---
 
 ## 技术栈

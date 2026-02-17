@@ -11,14 +11,14 @@ import type {
   AgentTool,
   LoadedSkill,
 } from './types';
-import type { SkillManager } from './manager';
+import type { SkillManagerInstance } from './manager';
 import { generateToolName, formatErrorResult } from './helpers';
 
 /**
  * Create Agent-compatible tools from all skills
  */
 export function createSkillToolBridge(
-  manager: SkillManager,
+  manager: SkillManagerInstance,
   options?: SkillToolBridgeOptions
 ): BridgedSkillTool[] {
   const tools: BridgedSkillTool[] = [];
@@ -106,76 +106,77 @@ export function convertToolParameters(
 }
 
 /**
- * SkillToolProvider class for easier integration with Agent
+ * Skill Tool Provider instance type (returned by factory)
  */
-export class SkillToolProvider {
-  private manager: SkillManager;
-  private options: SkillToolBridgeOptions;
-  private tools: Map<string, BridgedSkillTool> = new Map();
-
-  constructor(manager: SkillManager, options: SkillToolBridgeOptions = {}) {
-    this.manager = manager;
-    this.options = options;
-    this.buildToolsMap();
-  }
-
-  /**
-   * Get all bridged tools as Agent Tool array
-   */
-  getTools(): AgentTool[] {
-    return Array.from(this.tools.values());
-  }
-
-  /**
-   * Get tools from a specific skill
-   */
-  getToolsFromSkill(skillName: string): AgentTool[] {
-    return Array.from(this.tools.values()).filter(
-      (tool) => tool.skillName === skillName
-    );
-  }
-
-  /**
-   * Refresh tools from all skills
-   */
-  async refresh(): Promise<void> {
-    this.buildToolsMap();
-  }
-
-  /**
-   * Find tool by name
-   */
-  findTool(name: string): BridgedSkillTool | undefined {
-    return this.tools.get(name);
-  }
-
-  /**
-   * Get tool count
-   */
-  get count(): number {
-    return this.tools.size;
-  }
-
-  /**
-   * Get skill names that have tools
-   */
-  getSkillsWithTools(): string[] {
-    const skills = new Set<string>();
-    for (const tool of this.tools.values()) {
-      skills.add(tool.skillName);
-    }
-    return Array.from(skills);
-  }
-
-  /**
-   * Build tools map from manager
-   */
-  private buildToolsMap(): void {
-    this.tools.clear();
-
-    const bridgedTools = createSkillToolBridge(this.manager, this.options);
-    for (const tool of bridgedTools) {
-      this.tools.set(tool.name, tool);
-    }
-  }
+export interface SkillToolProviderInstance {
+  /** Get all bridged tools as Agent Tool array */
+  getTools(): AgentTool[];
+  /** Get tools from a specific skill */
+  getToolsFromSkill(skillName: string): AgentTool[];
+  /** Refresh tools from all skills */
+  refresh(): Promise<void>;
+  /** Find tool by name */
+  findTool(name: string): BridgedSkillTool | undefined;
+  /** Get tool count */
+  readonly count: number;
+  /** Get skill names that have tools */
+  getSkillsWithTools(): string[];
 }
+
+/**
+ * Create a Skill Tool Provider instance
+ */
+export function createSkillToolProvider(
+  manager: SkillManagerInstance,
+  options: SkillToolBridgeOptions = {}
+): SkillToolProviderInstance {
+  // Private state via closure
+  const tools = new Map<string, BridgedSkillTool>();
+
+  // Helper function to build tools map
+  function buildToolsMap(): void {
+    tools.clear();
+
+    const bridgedTools = createSkillToolBridge(manager, options);
+    for (const tool of bridgedTools) {
+      tools.set(tool.name, tool);
+    }
+  }
+
+  // Initial build
+  buildToolsMap();
+
+  // Return instance object
+  return {
+    getTools(): AgentTool[] {
+      return Array.from(tools.values());
+    },
+
+    getToolsFromSkill(skillName: string): AgentTool[] {
+      return Array.from(tools.values()).filter(
+        (tool) => tool.skillName === skillName
+      );
+    },
+
+    async refresh(): Promise<void> {
+      buildToolsMap();
+    },
+
+    findTool(name: string): BridgedSkillTool | undefined {
+      return tools.get(name);
+    },
+
+    get count(): number {
+      return tools.size;
+    },
+
+    getSkillsWithTools(): string[] {
+      const skills = new Set<string>();
+      for (const tool of tools.values()) {
+        skills.add(tool.skillName);
+      }
+      return Array.from(skills);
+    },
+  };
+}
+

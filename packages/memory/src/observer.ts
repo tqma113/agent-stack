@@ -66,146 +66,58 @@ export const DEFAULT_ENTITY_PATTERNS: EntityPattern[] = [
 ];
 
 /**
- * Memory Observer - collects and processes events
+ * Memory Observer instance interface
  */
-export class MemoryObserver {
-  private callbacks: Set<ObserverCallback> = new Set();
-  private options: Required<ObserverOptions>;
+export interface IMemoryObserver {
+  /** Get current session ID */
+  getSessionId(): string;
 
-  constructor(options: ObserverOptions = {}) {
-    this.options = {
-      sessionId: options.sessionId || crypto.randomUUID(),
-      autoExtractEntities: options.autoExtractEntities ?? true,
-      entityPatterns: options.entityPatterns || DEFAULT_ENTITY_PATTERNS,
-    };
-  }
+  /** Set session ID */
+  setSessionId(sessionId: string): void;
 
-  /**
-   * Get current session ID
-   */
-  getSessionId(): string {
-    return this.options.sessionId;
-  }
+  /** Subscribe to events */
+  subscribe(callback: ObserverCallback): () => void;
 
-  /**
-   * Set session ID
-   */
-  setSessionId(sessionId: string): void {
-    this.options.sessionId = sessionId;
-  }
+  /** Notify subscribers of an event */
+  notify(event: MemoryEvent): Promise<void>;
 
-  /**
-   * Subscribe to events
-   */
-  subscribe(callback: ObserverCallback): () => void {
-    this.callbacks.add(callback);
-    return () => this.callbacks.delete(callback);
-  }
+  /** Create a user message event */
+  createUserMessageEvent(content: string, metadata?: Record<string, unknown>): EventInput;
 
-  /**
-   * Notify subscribers of an event
-   */
-  async notify(event: MemoryEvent): Promise<void> {
-    const promises = Array.from(this.callbacks).map(async (callback) => {
-      try {
-        await callback(event);
-      } catch (error) {
-        console.error('Observer callback error:', error);
-      }
-    });
-    await Promise.all(promises);
-  }
+  /** Create an assistant message event */
+  createAssistantMessageEvent(content: string, metadata?: Record<string, unknown>): EventInput;
 
-  /**
-   * Create a user message event
-   */
-  createUserMessageEvent(content: string, metadata?: Record<string, unknown>): EventInput {
-    return this.createEvent('USER_MSG', {
-      content,
-      summary: this.truncate(content, 100),
-      payload: { content, ...metadata },
-    });
-  }
-
-  /**
-   * Create an assistant message event
-   */
-  createAssistantMessageEvent(content: string, metadata?: Record<string, unknown>): EventInput {
-    return this.createEvent('ASSISTANT_MSG', {
-      content,
-      summary: this.truncate(content, 100),
-      payload: { content, ...metadata },
-    });
-  }
-
-  /**
-   * Create a tool call event
-   */
+  /** Create a tool call event */
   createToolCallEvent(
     toolName: string,
     args: Record<string, unknown>,
     metadata?: Record<string, unknown>
-  ): EventInput {
-    return this.createEvent('TOOL_CALL', {
-      content: `Tool: ${toolName}`,
-      summary: `Called ${toolName}`,
-      payload: { toolName, args, ...metadata },
-      intent: `execute_${toolName}`,
-    });
-  }
+  ): EventInput;
 
-  /**
-   * Create a tool result event
-   */
+  /** Create a tool result event */
   createToolResultEvent(
     toolName: string,
     result: string,
     parentEventId?: string,
     metadata?: Record<string, unknown>
-  ): EventInput {
-    return this.createEvent('TOOL_RESULT', {
-      content: result,
-      summary: `Result from ${toolName}: ${this.truncate(result, 80)}`,
-      payload: { toolName, result, ...metadata },
-      parentId: parentEventId,
-    });
-  }
+  ): EventInput;
 
-  /**
-   * Create a decision event
-   */
+  /** Create a decision event */
   createDecisionEvent(
     decision: string,
     reasoning?: string,
     metadata?: Record<string, unknown>
-  ): EventInput {
-    return this.createEvent('DECISION', {
-      content: decision,
-      summary: decision,
-      payload: { decision, reasoning, ...metadata },
-      intent: 'decide',
-    });
-  }
+  ): EventInput;
 
-  /**
-   * Create a state change event
-   */
+  /** Create a state change event */
   createStateChangeEvent(
     fromState: string,
     toState: string,
     reason?: string,
     metadata?: Record<string, unknown>
-  ): EventInput {
-    return this.createEvent('STATE_CHANGE', {
-      content: `${fromState} → ${toState}`,
-      summary: `State: ${fromState} → ${toState}`,
-      payload: { fromState, toState, reason, ...metadata },
-    });
-  }
+  ): EventInput;
 
-  /**
-   * Create a generic event
-   */
+  /** Create a generic event */
   createEvent(
     type: EventType,
     options: {
@@ -217,32 +129,40 @@ export class MemoryObserver {
       links?: EventLink[];
       tags?: string[];
     }
-  ): EventInput {
-    const entities = this.options.autoExtractEntities
-      ? this.extractEntities(options.content)
-      : [];
+  ): EventInput;
 
-    return {
-      type,
-      sessionId: this.options.sessionId,
-      intent: options.intent,
-      entities,
-      summary: options.summary,
-      payload: options.payload || {},
-      links: options.links || [],
-      parentId: options.parentId,
-      tags: options.tags || [],
-    };
-  }
+  /** Extract entities from content */
+  extractEntities(content: string): EventEntity[];
+}
+
+/**
+ * Truncate text to max length
+ */
+function truncate(text: string, maxLength: number): string {
+  if (text.length <= maxLength) return text;
+  return text.substring(0, maxLength - 3) + '...';
+}
+
+/**
+ * Create a Memory Observer instance
+ */
+export function createMemoryObserver(options: ObserverOptions = {}): IMemoryObserver {
+  // Private state via closure
+  const callbacks: Set<ObserverCallback> = new Set();
+  const config: Required<ObserverOptions> = {
+    sessionId: options.sessionId || crypto.randomUUID(),
+    autoExtractEntities: options.autoExtractEntities ?? true,
+    entityPatterns: options.entityPatterns || DEFAULT_ENTITY_PATTERNS,
+  };
 
   /**
    * Extract entities from content
    */
-  extractEntities(content: string): EventEntity[] {
+  function extractEntities(content: string): EventEntity[] {
     const entities: EventEntity[] = [];
     const seen = new Set<string>();
 
-    for (const pattern of this.options.entityPatterns) {
+    for (const pattern of config.entityPatterns) {
       const regex = new RegExp(pattern.pattern.source, pattern.pattern.flags);
       let match;
 
@@ -267,10 +187,135 @@ export class MemoryObserver {
   }
 
   /**
-   * Truncate text to max length
+   * Create a generic event
    */
-  private truncate(text: string, maxLength: number): string {
-    if (text.length <= maxLength) return text;
-    return text.substring(0, maxLength - 3) + '...';
+  function createEvent(
+    type: EventType,
+    eventOptions: {
+      content: string;
+      summary: string;
+      payload?: Record<string, unknown>;
+      intent?: string;
+      parentId?: string;
+      links?: EventLink[];
+      tags?: string[];
+    }
+  ): EventInput {
+    const entities = config.autoExtractEntities
+      ? extractEntities(eventOptions.content)
+      : [];
+
+    return {
+      type,
+      sessionId: config.sessionId,
+      intent: eventOptions.intent,
+      entities,
+      summary: eventOptions.summary,
+      payload: eventOptions.payload || {},
+      links: eventOptions.links || [],
+      parentId: eventOptions.parentId,
+      tags: eventOptions.tags || [],
+    };
   }
+
+  // Return the instance object
+  return {
+    getSessionId(): string {
+      return config.sessionId;
+    },
+
+    setSessionId(sessionId: string): void {
+      config.sessionId = sessionId;
+    },
+
+    subscribe(callback: ObserverCallback): () => void {
+      callbacks.add(callback);
+      return () => callbacks.delete(callback);
+    },
+
+    async notify(event: MemoryEvent): Promise<void> {
+      const promises = Array.from(callbacks).map(async (callback) => {
+        try {
+          await callback(event);
+        } catch (error) {
+          console.error('Observer callback error:', error);
+        }
+      });
+      await Promise.all(promises);
+    },
+
+    createUserMessageEvent(content: string, metadata?: Record<string, unknown>): EventInput {
+      return createEvent('USER_MSG', {
+        content,
+        summary: truncate(content, 100),
+        payload: { content, ...metadata },
+      });
+    },
+
+    createAssistantMessageEvent(content: string, metadata?: Record<string, unknown>): EventInput {
+      return createEvent('ASSISTANT_MSG', {
+        content,
+        summary: truncate(content, 100),
+        payload: { content, ...metadata },
+      });
+    },
+
+    createToolCallEvent(
+      toolName: string,
+      args: Record<string, unknown>,
+      metadata?: Record<string, unknown>
+    ): EventInput {
+      return createEvent('TOOL_CALL', {
+        content: `Tool: ${toolName}`,
+        summary: `Called ${toolName}`,
+        payload: { toolName, args, ...metadata },
+        intent: `execute_${toolName}`,
+      });
+    },
+
+    createToolResultEvent(
+      toolName: string,
+      result: string,
+      parentEventId?: string,
+      metadata?: Record<string, unknown>
+    ): EventInput {
+      return createEvent('TOOL_RESULT', {
+        content: result,
+        summary: `Result from ${toolName}: ${truncate(result, 80)}`,
+        payload: { toolName, result, ...metadata },
+        parentId: parentEventId,
+      });
+    },
+
+    createDecisionEvent(
+      decision: string,
+      reasoning?: string,
+      metadata?: Record<string, unknown>
+    ): EventInput {
+      return createEvent('DECISION', {
+        content: decision,
+        summary: decision,
+        payload: { decision, reasoning, ...metadata },
+        intent: 'decide',
+      });
+    },
+
+    createStateChangeEvent(
+      fromState: string,
+      toState: string,
+      reason?: string,
+      metadata?: Record<string, unknown>
+    ): EventInput {
+      return createEvent('STATE_CHANGE', {
+        content: `${fromState} → ${toState}`,
+        summary: `State: ${fromState} → ${toState}`,
+        payload: { fromState, toState, reason, ...metadata },
+      });
+    },
+
+    createEvent,
+
+    extractEntities,
+  };
 }
+

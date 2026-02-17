@@ -12,7 +12,7 @@ import type {
   MCPResource,
   MCPResourceContent,
 } from './types';
-import type { MCPClientManager } from './client';
+import type { MCPClientManagerInstance } from './client';
 import {
   generateToolName,
   parseToolResultContent,
@@ -23,7 +23,7 @@ import {
  * Create Agent-compatible tools from all MCP servers
  */
 export function createToolBridge(
-  manager: MCPClientManager,
+  manager: MCPClientManagerInstance,
   options?: MCPToolBridgeOptions
 ): BridgedTool[] {
   const tools: BridgedTool[] = [];
@@ -51,7 +51,7 @@ export function createToolBridge(
  * Convert a single MCP tool to Agent tool
  */
 export function bridgeTool(
-  manager: MCPClientManager,
+  manager: MCPClientManagerInstance,
   serverName: string,
   mcpTool: MCPTool,
   options?: MCPToolBridgeOptions
@@ -114,7 +114,7 @@ export interface MCPResourceAccessor {
  * Create resource accessor for the manager
  */
 export function createResourceAccessor(
-  manager: MCPClientManager
+  manager: MCPClientManagerInstance
 ): MCPResourceAccessor {
   return {
     async listResources(): Promise<
@@ -161,85 +161,85 @@ export function createResourceAccessor(
 }
 
 /**
- * MCPToolProvider class for easier integration with Agent
+ * MCP Tool Provider instance type (returned by factory)
  */
-export class MCPToolProvider {
-  private manager: MCPClientManager;
-  private options: MCPToolBridgeOptions;
-  private tools: Map<string, BridgedTool> = new Map();
-
-  constructor(manager: MCPClientManager, options: MCPToolBridgeOptions = {}) {
-    this.manager = manager;
-    this.options = options;
-    this.buildToolsMap();
-  }
-
-  /**
-   * Get all bridged tools as Agent Tool array
-   */
-  getTools(): AgentTool[] {
-    return Array.from(this.tools.values());
-  }
-
-  /**
-   * Get tools from a specific server
-   */
-  getToolsFromServer(serverName: string): AgentTool[] {
-    return Array.from(this.tools.values()).filter(
-      (tool) => tool.mcpServerName === serverName
-    );
-  }
-
-  /**
-   * Refresh tools from all servers
-   */
-  async refresh(): Promise<void> {
-    // Refresh tools from all connected servers
-    await this.manager.listAllTools();
-    this.buildToolsMap();
-  }
-
-  /**
-   * Find tool by name
-   */
-  findTool(name: string): BridgedTool | undefined {
-    return this.tools.get(name);
-  }
-
-  /**
-   * Get resource accessor
-   */
-  getResourceAccessor(): MCPResourceAccessor {
-    return createResourceAccessor(this.manager);
-  }
-
-  /**
-   * Get tool count
-   */
-  get count(): number {
-    return this.tools.size;
-  }
-
-  /**
-   * Get server names that have tools
-   */
-  getServersWithTools(): string[] {
-    const servers = new Set<string>();
-    for (const tool of this.tools.values()) {
-      servers.add(tool.mcpServerName);
-    }
-    return Array.from(servers);
-  }
-
-  /**
-   * Build tools map from manager connections
-   */
-  private buildToolsMap(): void {
-    this.tools.clear();
-
-    const bridgedTools = createToolBridge(this.manager, this.options);
-    for (const tool of bridgedTools) {
-      this.tools.set(tool.name, tool);
-    }
-  }
+export interface MCPToolProviderInstance {
+  /** Get all bridged tools as Agent Tool array */
+  getTools(): AgentTool[];
+  /** Get tools from a specific server */
+  getToolsFromServer(serverName: string): AgentTool[];
+  /** Refresh tools from all servers */
+  refresh(): Promise<void>;
+  /** Find tool by name */
+  findTool(name: string): BridgedTool | undefined;
+  /** Get resource accessor */
+  getResourceAccessor(): MCPResourceAccessor;
+  /** Get tool count */
+  readonly count: number;
+  /** Get server names that have tools */
+  getServersWithTools(): string[];
 }
+
+/**
+ * Create an MCP Tool Provider instance
+ */
+export function createMCPToolProvider(
+  manager: MCPClientManagerInstance,
+  options: MCPToolBridgeOptions = {}
+): MCPToolProviderInstance {
+  // Private state via closure
+  const tools = new Map<string, BridgedTool>();
+
+  // Helper function to build tools map
+  function buildToolsMap(): void {
+    tools.clear();
+
+    const bridgedTools = createToolBridge(manager, options);
+    for (const tool of bridgedTools) {
+      tools.set(tool.name, tool);
+    }
+  }
+
+  // Initial build
+  buildToolsMap();
+
+  // Return instance object
+  return {
+    getTools(): AgentTool[] {
+      return Array.from(tools.values());
+    },
+
+    getToolsFromServer(serverName: string): AgentTool[] {
+      return Array.from(tools.values()).filter(
+        (tool) => tool.mcpServerName === serverName
+      );
+    },
+
+    async refresh(): Promise<void> {
+      // Refresh tools from all connected servers
+      await manager.listAllTools();
+      buildToolsMap();
+    },
+
+    findTool(name: string): BridgedTool | undefined {
+      return tools.get(name);
+    },
+
+    getResourceAccessor(): MCPResourceAccessor {
+      return createResourceAccessor(manager);
+    },
+
+    get count(): number {
+      return tools.size;
+    },
+
+    getServersWithTools(): string[] {
+      const servers = new Set<string>();
+      for (const tool of tools.values()) {
+        servers.add(tool.mcpServerName);
+      }
+      return Array.from(servers);
+    },
+  };
+}
+

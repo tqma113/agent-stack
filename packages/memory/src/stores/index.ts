@@ -4,14 +4,38 @@
  * Export all store implementations.
  */
 
-export { SQLiteStore } from './base.js';
-export { EventStore } from './event.js';
-export { TaskStateStore } from './task-state.js';
-export { SummaryStore } from './summary.js';
-export { ProfileStore } from './profile.js';
+// Database operations (composition helper)
+export { createDbOperations, type DbOperationsInstance } from './db-operations.js';
+
+// Event Store
 export {
-  SemanticStore,
+  createEventStore,
+  type EventStoreInstance,
+} from './event.js';
+
+// Task State Store
+export {
+  createTaskStateStore,
+  type TaskStateStoreInstance,
+} from './task-state.js';
+
+// Summary Store
+export {
+  createSummaryStore,
+  type SummaryStoreInstance,
+} from './summary.js';
+
+// Profile Store
+export {
+  createProfileStore,
+  type ProfileStoreInstance,
+} from './profile.js';
+
+// Semantic Store
+export {
+  createSemanticStore,
   DEFAULT_SEMANTIC_CONFIG,
+  type SemanticStoreInstance,
   type SemanticStoreConfig,
   type VectorSearchOptions,
   type HybridSearchOptions,
