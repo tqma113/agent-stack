@@ -22,7 +22,7 @@
         },
         "required": ["path"]
       },
-      "handler": "./handlers.js#readFile"
+      "handler": "./handlers.cjs#readFile"
     },
     {
       "name": "write_file",
@@ -46,7 +46,7 @@
         },
         "required": ["path", "content"]
       },
-      "handler": "./handlers.js#writeFile"
+      "handler": "./handlers.cjs#writeFile"
     },
     {
       "name": "list_directory",
@@ -66,7 +66,7 @@
           }
         }
       },
-      "handler": "./handlers.js#listDirectory"
+      "handler": "./handlers.cjs#listDirectory"
     }
   ]
 }

@@ -25,7 +25,7 @@
         },
         "required": ["command"]
       },
-      "handler": "./handlers.js#executeCommand"
+      "handler": "./handlers.cjs#executeCommand"
     }
   ]
 }

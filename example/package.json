@@ -5,7 +5,11 @@
   "private": true,
   "description": "Example project for testing @agent-stack/index",
   "scripts": {
-    "start": "agent-stack chat"
+    "build": "echo 'No build needed'",
+    "start": "agent-stack chat",
+    "chat": "agent-stack chat",
+    "run": "agent-stack run",
+    "tools": "agent-stack tools list"
   },
   "dependencies": {
     "@agent-stack/index": "workspace:*"

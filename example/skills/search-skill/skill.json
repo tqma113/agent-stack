@@ -25,7 +25,7 @@
         },
         "required": ["pattern"]
       },
-      "handler": "./handlers.js#searchFiles"
+      "handler": "./handlers.cjs#searchFiles"
     },
     {
       "name": "grep_content",
@@ -59,7 +59,7 @@
         },
         "required": ["pattern"]
       },
-      "handler": "./handlers.js#grepContent"
+      "handler": "./handlers.cjs#grepContent"
     }
   ]
 }
