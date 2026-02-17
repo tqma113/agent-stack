@@ -351,6 +351,10 @@
     {
       "packageName": "@agent-stack/skill",
       "projectFolder": "packages/skill"
+    },
+    {
+      "packageName": "@agent-stack/example",
+      "projectFolder": "example"
     }
   ]
 }

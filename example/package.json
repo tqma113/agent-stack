@@ -1,0 +1,13 @@
+{
+  "name": "@agent-stack/example",
+  "version": "0.0.1",
+  "type": "module",
+  "private": true,
+  "description": "Example project for testing @agent-stack/index",
+  "scripts": {
+    "start": "node src/index.ts"
+  },
+  "dependencies": {
+    "@agent-stack/index": "workspace:*"
+  }
+}
