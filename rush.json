@@ -339,6 +339,14 @@
     {
       "packageName": "@agent-stack/provider",
       "projectFolder": "packages/provider"
+    },
+    {
+      "packageName": "@agent-stack/index",
+      "projectFolder": "packages/index"
+    },
+    {
+      "packageName": "@agent-stack/mcp",
+      "projectFolder": "packages/mcp"
     }
   ]
 }

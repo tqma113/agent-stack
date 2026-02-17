@@ -1,7 +1,7 @@
 {
-  "name": "@agent-stack/provider",
+  "name": "@agent-stack/index",
   "version": "0.0.1",
-  "description": "OpenAI API provider for agent-stack monorepo",
+  "description": "Main entry point for agent-stack AI agents",
   "main": "./dist/index.js",
   "module": "./dist/index.mjs",
   "types": "./dist/index.d.ts",
@@ -12,6 +12,9 @@
       "require": "./dist/index.js"
     }
   },
+  "bin": {
+    "agent-stack": "./dist/cli.js"
+  },
   "files": [
     "dist"
   ],
@@ -19,20 +22,21 @@
     "build": "tsup",
     "dev": "tsup --watch",
     "clean": "rimraf dist",
-    "lint": "eslint src --ext .ts,.tsx",
+    "start": "node dist/cli.js",
     "typecheck": "tsc --noEmit"
   },
   "keywords": [
     "agent",
-    "provider",
+    "ai",
     "openai",
     "llm",
-    "ai"
+    "mcp"
   ],
   "author": "",
   "license": "MIT",
   "dependencies": {
-    "openai": "^4.77.0"
+    "@agent-stack/provider": "workspace:*",
+    "@agent-stack/mcp": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "^22.10.0",

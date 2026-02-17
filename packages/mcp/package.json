@@ -1,7 +1,7 @@
 {
-  "name": "@agent-stack/provider",
+  "name": "@agent-stack/mcp",
   "version": "0.0.1",
-  "description": "OpenAI API provider for agent-stack monorepo",
+  "description": "MCP (Model Context Protocol) integration for agent-stack",
   "main": "./dist/index.js",
   "module": "./dist/index.mjs",
   "types": "./dist/index.d.ts",
@@ -19,20 +19,20 @@
     "build": "tsup",
     "dev": "tsup --watch",
     "clean": "rimraf dist",
-    "lint": "eslint src --ext .ts,.tsx",
     "typecheck": "tsc --noEmit"
   },
   "keywords": [
     "agent",
-    "provider",
-    "openai",
+    "mcp",
+    "model-context-protocol",
     "llm",
-    "ai"
+    "ai",
+    "tools"
   ],
   "author": "",
   "license": "MIT",
   "dependencies": {
-    "openai": "^4.77.0"
+    "@modelcontextprotocol/sdk": "^1.0.0"
   },
   "devDependencies": {
     "@types/node": "^22.10.0",
