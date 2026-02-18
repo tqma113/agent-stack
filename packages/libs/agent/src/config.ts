@@ -10,7 +10,7 @@ import type { AgentConfig, AgentMCPConfig, AgentSkillConfig, AgentMemoryConfig }
  * Configuration file names to search for (in order of priority)
  */
 const CONFIG_FILE_NAMES = [
-  'ai-stack.json',
+  'agent.json',
 ];
 
 /**

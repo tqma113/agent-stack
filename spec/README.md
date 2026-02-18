@@ -58,7 +58,8 @@ ai-stack/
 │   │   ├── memory-store-sqlite/# @ai-stack/memory-store-sqlite - SQLite 存储
 │   │   ├── memory-store-json/  # @ai-stack/memory-store-json - JSON 存储
 │   │   ├── knowledge/          # @ai-stack/knowledge - 代码和文档索引
-│   │   └── index/              # @ai-stack/agent - Agent 实现 + CLI
+│   │   ├── agent/              # @ai-stack/agent - Agent 实现 + CLI
+│   │   └── assistant/          # @ai-stack/assistant - 个人 AI 助手
 │   │
 │   ├── skills/                 # 自定义 Skills (@ai-stack-skill/*)
 │   │   ├── memory/             # @ai-stack-skill/memory - Memory Skill
@@ -70,13 +71,15 @@ ai-stack/
 │       ├── git/                # @ai-stack-mcp/git - Git 仓库操作
 │       └── bash/               # @ai-stack-mcp/bash - Bash 命令执行
 │
-├── example/                     # 示例项目
-│   ├── .ai-stack.json       # Agent 配置示例
-│   ├── .mcp.json               # MCP 配置示例
-│   └── skills/                 # 示例 Skills
-│       ├── file-skill/         # 文件操作
-│       ├── shell-skill/        # Shell 命令
-│       └── search-skill/       # 文件搜索
+├── packages/examples/           # 示例项目
+│   ├── agent/                  # @ai-stack-example/agent - Agent 示例
+│   │   ├── agent.json      # Agent 配置
+│   │   ├── mcp.json           # MCP 配置
+│   │   └── skills/            # 示例 Skills
+│   └── assistant/             # @ai-stack-example/assistant - Assistant 示例
+│       ├── assistant.json     # Assistant 配置
+│       ├── mcp.json           # MCP 配置
+│       └── MEMORY.md          # 记忆文件
 │
 ├── common/                      # Rush 公共配置
 ├── .github/workflows/           # CI/CD 配置
@@ -141,6 +144,17 @@ ai-stack/
         ├── @ai-stack/knowledge (workspace:*)
         └── commander (^12.1.0) - CLI 框架
 
+@ai-stack/assistant (个人 AI 助手，Markdown 记忆 + 多通道 + 调度)
+        │
+        ├── @ai-stack/agent (workspace:*)
+        ├── @ai-stack/memory (workspace:*)
+        ├── @ai-stack/memory-store-sqlite (workspace:*)
+        ├── commander (^12.1.0) - CLI 框架
+        ├── chokidar (^4.0.0) - 文件监听
+        ├── cron-parser (^4.9.0) - Cron 表达式解析
+        ├── gray-matter (^4.0.3) - Markdown frontmatter 解析
+        └── (可选) telegraf, discord.js - 消息平台适配器
+
 @ai-stack-mcp/bash  (Bash 命令执行 MCP 服务器)
         │
         ├── @modelcontextprotocol/sdk (^1.0.0)
@@ -159,6 +173,7 @@ ai-stack/
 | **Memory** | 五层记忆架构，持久化对话和任务状态 |
 | **Knowledge** | 代码库和文档索引，混合搜索 (FTS + Vector) |
 | **Permission** | 权限管控系统，工具执行前确认和审计 |
+| **Assistant** | 个人 AI 助手，Markdown 记忆 + 多通道网关 + 调度器 |
 
 ---
 

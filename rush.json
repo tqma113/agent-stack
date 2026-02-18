@@ -369,6 +369,10 @@
       "projectFolder": "packages/libs/knowledge"
     },
     {
+      "packageName": "@ai-stack/assistant",
+      "projectFolder": "packages/libs/assistant"
+    },
+    {
       "packageName": "@ai-stack-skill/memory",
       "projectFolder": "packages/skills/memory"
     },
@@ -378,7 +382,11 @@
     },
     {
       "packageName": "@ai-stack-example/agent",
-      "projectFolder": "packages/examples/agent"      
+      "projectFolder": "packages/examples/agent"
+    },
+    {
+      "packageName": "@ai-stack-example/assistant",
+      "projectFolder": "packages/examples/assistant"
     },
     {
       "packageName": "@ai-stack-mcp/fetch",

@@ -1,0 +1,26 @@
+{
+  "name": "@ai-stack-example/assistant",
+  "version": "0.0.1",
+  "type": "module",
+  "private": true,
+  "description": "Example project for @ai-stack/assistant personal AI assistant",
+  "scripts": {
+    "build": "echo 'No build needed'",
+    "start": "assistant chat",
+    "chat": "assistant chat",
+    "daemon": "assistant daemon start",
+    "daemon:stop": "assistant daemon stop",
+    "daemon:status": "assistant daemon status",
+    "daemon:logs": "assistant daemon logs",
+    "memory:sync": "assistant memory sync",
+    "memory:show": "assistant memory show",
+    "scheduler:list": "assistant scheduler list",
+    "config:show": "assistant config show"
+  },
+  "dependencies": {
+    "@ai-stack/assistant": "workspace:*",
+    "@ai-stack-mcp/fetch": "workspace:*",
+    "@ai-stack-mcp/time": "workspace:*",
+    "@ai-stack-mcp/bash": "workspace:*"
+  }
+}

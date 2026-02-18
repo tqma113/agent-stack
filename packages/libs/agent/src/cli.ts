@@ -620,7 +620,7 @@ interface InitOptions {
 
 async function initConfig(options: InitOptions) {
   const colors = getColors(!isTTY);
-  const configPath = resolve(process.cwd(), 'ai-stack.json');
+  const configPath = resolve(process.cwd(), 'agent.json');
 
   if (existsSync(configPath) && !options.force) {
     console.log(colors.yellow(`Configuration file already exists: ${configPath}`));

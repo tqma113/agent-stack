@@ -22,7 +22,7 @@ ai-stack run "List the files in this directory"
 
 ```
 example/
-├── ai-stack.json   # Agent configuration
+├── agent.json   # Agent configuration
 ├── mcp.json           # MCP server configuration
 ├── memory/       # Runtime memory data (auto-created)
 │   └── sqlite.db       # SQLite memory database
@@ -37,7 +37,7 @@ example/
 
 ## Configuration Files
 
-### .ai-stack.json
+### agent.json
 
 Main agent configuration:
 

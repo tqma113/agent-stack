@@ -528,7 +528,7 @@ class Agent {
 
 ## 配置示例
 
-### .ai-stack.json
+### agent.json
 
 ```json
 {

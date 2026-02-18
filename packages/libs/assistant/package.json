@@ -1,0 +1,61 @@
+{
+  "name": "@ai-stack/assistant",
+  "version": "0.0.1",
+  "description": "Personal AI assistant with Markdown memory, multi-channel gateway, and scheduled tasks",
+  "main": "./dist/index.js",
+  "module": "./dist/index.mjs",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.mjs",
+      "require": "./dist/index.js"
+    }
+  },
+  "bin": {
+    "assistant": "./dist/cli.js"
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "clean": "rimraf dist",
+    "start": "node dist/cli.js",
+    "typecheck": "tsc --noEmit"
+  },
+  "keywords": [
+    "assistant",
+    "agent",
+    "ai",
+    "memory",
+    "markdown",
+    "telegram",
+    "discord",
+    "scheduler"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "@ai-stack/agent": "workspace:*",
+    "@ai-stack/memory": "workspace:*",
+    "@ai-stack/memory-store-sqlite": "workspace:*",
+    "better-sqlite3": "^11.7.0",
+    "chokidar": "^4.0.0",
+    "commander": "^12.1.0",
+    "cron-parser": "^4.9.0",
+    "gray-matter": "^4.0.3"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^7.6.0",
+    "@types/node": "^22.10.0",
+    "rimraf": "^6.0.1",
+    "tsup": "^8.3.5",
+    "typescript": "~5.7.2"
+  },
+  "optionalDependencies": {
+    "telegraf": "^4.16.0",
+    "discord.js": "^14.14.0"
+  }
+}

@@ -10,6 +10,8 @@
 [ ] Agent
   [ ] AGENT.md 是什么？有什么用？最佳实践是什么？
   [ ] iteration
+  [ ] multi sub task/agent 并行提效
+  [ ] loop 的最佳实践
 
 [ ] Personal Assitant
   [ ] Calander + Task 管理

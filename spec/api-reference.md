@@ -534,7 +534,7 @@ function loadConfig(configPath?: string): LoadConfigResult
 function findConfigFile(startDir?: string): string | undefined
 ```
 
-按优先级搜索：`.ai-stack.json`、`ai-stack.config.json`
+按优先级搜索：`agent.json`、`agent.json`
 
 ---
 

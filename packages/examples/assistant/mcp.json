@@ -1,0 +1,16 @@
+{
+  "mcpServers": {
+    "fetch": {
+      "command": "node",
+      "args": ["./node_modules/@ai-stack-mcp/fetch/dist/cli.js"]
+    },
+    "time": {
+      "command": "node",
+      "args": ["./node_modules/@ai-stack-mcp/time/dist/cli.js"]
+    },
+    "bash": {
+      "command": "node",
+      "args": ["./node_modules/@ai-stack-mcp/bash/dist/cli.js", "--working-dir=."]
+    }
+  }
+}

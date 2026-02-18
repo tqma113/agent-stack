@@ -13,7 +13,8 @@ ai-stack/
 │   │   ├── memory-store-sqlite/# @ai-stack/memory-store-sqlite (SQLite 存储)
 │   │   ├── memory-store-json/  # @ai-stack/memory-store-json (JSON 存储)
 │   │   ├── knowledge/          # @ai-stack/knowledge (代码和文档索引)
-│   │   └── agent/              # @ai-stack/agent (Agent + Permission)
+│   │   ├── agent/              # @ai-stack/agent (Agent + Permission)
+│   │   └── assistant/          # @ai-stack/assistant (个人 AI 助手)
 │   ├── skills/                 # 自定义 Skills (@ai-stack-skill/*)
 │   │   ├── memory/             # @ai-stack-skill/memory
 │   │   └── knowledge/          # @ai-stack-skill/knowledge
@@ -23,7 +24,7 @@ ai-stack/
 │       ├── git/                # @ai-stack-mcp/git
 │       └── bash/               # @ai-stack-mcp/bash
 ├── example/                    # 示例项目
-│   ├── .ai-stack.json          # Agent 配置示例
+│   ├── .agent.json          # Agent 配置示例
 │   ├── .mcp.json               # MCP 配置示例
 │   └── skills/                 # 示例 Skills
 ├── common/                     # Rush 公共目录
@@ -128,7 +129,7 @@ packages/libs/agent/
 | `src/index.ts` | 统一导出入口，re-export agent、config 和 provider |
 | `src/agent.ts` | `createAgent()` 工厂函数，实现对话和工具调用 |
 | `src/types.ts` | Agent 相关类型定义 |
-| `src/config.ts` | 配置文件加载和解析 (.ai-stack.json) |
+| `src/config.ts` | 配置文件加载和解析 (agent.json) |
 | `src/cli.ts` | 命令式 CLI，支持 chat/run/tools/config 命令 |
 | `src/permission/` | 权限管控模块，实现工具执行前的权限检查和确认 |
 | `src/ui/` | 终端 UI 模块，提供现代化界面组件 |
@@ -1077,9 +1078,197 @@ Duration: 123ms
 
 ---
 
-## 10. Rush 配置目录
+## 10. @ai-stack/assistant 包 (个人 AI 助手)
 
-### 9.1 common/config/rush/
+### 10.1 目录结构
+
+```
+packages/libs/assistant/
+├── src/
+│   ├── index.ts                    # 包入口
+│   ├── cli.ts                      # CLI 入口 (assistant 命令)
+│   ├── types.ts                    # 核心类型定义
+│   ├── config.ts                   # 配置加载
+│   │
+│   ├── assistant/                  # 核心 Assistant
+│   │   ├── index.ts
+│   │   └── assistant.ts            # createAssistant() 工厂函数
+│   │
+│   ├── memory/                     # Markdown Memory 系统
+│   │   ├── index.ts
+│   │   ├── types.ts
+│   │   ├── markdown-memory.ts      # createMarkdownMemory()
+│   │   ├── markdown-parser.ts      # 解析 MEMORY.md 和日志
+│   │   ├── markdown-writer.ts      # 写入 Markdown
+│   │   ├── sqlite-index.ts         # SQLite 派生索引 (FTS5)
+│   │   └── sync-engine.ts          # Markdown <-> SQLite 同步
+│   │
+│   ├── gateway/                    # 多通道网关
+│   │   ├── index.ts
+│   │   ├── types.ts
+│   │   ├── gateway.ts              # createGateway()
+│   │   ├── router.ts               # 消息路由
+│   │   ├── session.ts              # Session 管理
+│   │   └── adapters/
+│   │       ├── index.ts
+│   │       ├── base.ts             # BaseAdapter 抽象类
+│   │       ├── cli.ts              # CLIAdapter
+│   │       ├── telegram.ts         # TelegramAdapter
+│   │       └── discord.ts          # DiscordAdapter
+│   │
+│   ├── scheduler/                  # 调度器
+│   │   ├── index.ts
+│   │   ├── types.ts
+│   │   ├── scheduler.ts            # createScheduler()
+│   │   ├── cron-job.ts             # Cron 表达式处理
+│   │   ├── reminder.ts             # 一次性提醒
+│   │   ├── watcher.ts              # 文件监听触发
+│   │   └── task-queue.ts           # 持久化任务队列
+│   │
+│   └── daemon/                     # 守护进程
+│       ├── index.ts
+│       ├── types.ts
+│       └── daemon.ts               # createDaemon()
+│
+├── dist/                           # 构建输出
+├── package.json
+├── tsconfig.json
+└── tsup.config.ts
+```
+
+### 10.2 核心功能
+
+| 模块 | 功能 | 说明 |
+|------|------|------|
+| **Markdown Memory** | 人类可编辑的记忆 | MEMORY.md 为 Source of Truth，SQLite 为派生索引 |
+| **Gateway** | 多通道消息网关 | CLI、Telegram、Discord、WhatsApp 适配器 |
+| **Scheduler** | 任务调度 | Cron 定时、提醒、间隔、文件监听触发 |
+| **Daemon** | 后台进程 | PID 管理、健康检查、日志 |
+
+### 10.3 Markdown Memory 架构
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                 Source of Truth (Markdown)                   │
+│  ┌─────────────────┐    ┌─────────────────────────────────┐ │
+│  │   MEMORY.md     │    │   memory/YYYY-MM-DD.md          │ │
+│  │   (长期记忆)     │    │   (每日日志)                     │ │
+│  └────────┬────────┘    └───────────────┬─────────────────┘ │
+└───────────┼─────────────────────────────┼───────────────────┘
+            │                             │
+            └──────────────┬──────────────┘
+                           │ Sync Engine
+                           ▼
+┌─────────────────────────────────────────────────────────────┐
+│                 Derived Index (SQLite)                       │
+│  ┌─────────────────┐    ┌─────────────────────────────────┐ │
+│  │   FTS5 索引     │    │   sqlite-vec 向量索引 (可选)     │ │
+│  └─────────────────┘    └─────────────────────────────────┘ │
+│                     可从 Markdown 重建                        │
+└─────────────────────────────────────────────────────────────┘
+```
+
+**MEMORY.md 格式**:
+```markdown
+# Assistant Memory
+
+## Profile
+- **Name**: Alice
+- **Timezone**: Asia/Shanghai
+- **Language**: Chinese
+
+## Facts
+- User prefers concise responses
+- Works on AI projects
+
+## Todos
+- [ ] Review PR #123
+
+## Notes
+User mentioned interest in Rust programming.
+```
+
+### 10.4 package.json
+
+```json
+{
+  "name": "@ai-stack/assistant",
+  "version": "0.0.1",
+  "bin": {
+    "assistant": "./dist/cli.js"
+  },
+  "dependencies": {
+    "@ai-stack/agent": "workspace:*",
+    "@ai-stack/memory": "workspace:*",
+    "@ai-stack/memory-store-sqlite": "workspace:*",
+    "chokidar": "^4.0.0",
+    "commander": "^12.1.0",
+    "cron-parser": "^4.9.0",
+    "gray-matter": "^4.0.3"
+  },
+  "optionalDependencies": {
+    "telegraf": "^4.16.0",
+    "discord.js": "^14.14.0"
+  }
+}
+```
+
+### 10.5 CLI 命令
+
+```bash
+# 交互对话
+assistant chat
+
+# 守护进程
+assistant daemon start|stop|status|logs
+
+# 内存管理
+assistant memory sync|search|show
+
+# 调度管理
+assistant scheduler list|cancel
+
+# 配置
+assistant config init|show
+```
+
+### 10.6 配置文件示例
+
+**~/.ai-assistant/assistant.json**:
+```json
+{
+  "name": "My Assistant",
+  "agent": {
+    "model": "gpt-4o",
+    "temperature": 0.7
+  },
+  "memory": {
+    "enabled": true,
+    "syncOnStartup": true,
+    "watchFiles": true
+  },
+  "gateway": {
+    "sessionStrategy": "per-peer",
+    "channels": {
+      "telegram": {
+        "enabled": true,
+        "token": "${TELEGRAM_BOT_TOKEN}"
+      },
+      "cli": { "enabled": true }
+    }
+  },
+  "scheduler": {
+    "enabled": true,
+    "allowAgentControl": true
+  }
+}
+```
+
+---
+
+## 11. Rush 配置目录
+
+### 11.1 common/config/rush/
 
 ```
 common/config/rush/
@@ -1091,7 +1280,7 @@ common/config/rush/
 └── ... (其他 Rush 配置)
 ```
 
-### 9.2 common/scripts/
+### 11.2 common/scripts/
 
 ```
 common/scripts/
@@ -1103,9 +1292,9 @@ common/scripts/
 
 ---
 
-## 11. 开发工具配置
+## 12. 开发工具配置
 
-### 10.1 .claude/ 目录
+### 12.1 .claude/ 目录
 
 ```
 .claude/
@@ -1121,7 +1310,7 @@ common/scripts/
     └── common-knowledge/    # 通用知识库
 ```
 
-### 10.2 .ttadk/ 目录
+### 12.2 .ttadk/ 目录
 
 ```
 .ttadk/
@@ -1137,9 +1326,9 @@ common/scripts/
 
 ---
 
-## 12. 构建输出
+## 13. 构建输出
 
-### 11.1 dist/ 目录结构
+### 13.1 dist/ 目录结构
 
 每个包的 `dist/` 目录输出：
 
@@ -1152,7 +1341,7 @@ dist/
 └── index.js.map       # Source Map
 ```
 
-### 11.2 构建命令
+### 13.2 构建命令
 
 ```bash
 # 单包构建

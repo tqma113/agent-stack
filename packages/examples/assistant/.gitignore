@@ -1,0 +1,20 @@
+# Environment
+.env
+
+# Database files
+*.db
+*.db-wal
+*.db-shm
+
+# Memory logs (keep MEMORY.md, ignore daily logs)
+memory/*.md
+
+# Scheduler persistence
+scheduler.json
+
+# Node modules
+node_modules/
+
+# Rush
+.rush/
+rush-logs/

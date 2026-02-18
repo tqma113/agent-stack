@@ -52,7 +52,7 @@ Agent-stack 是一个**纯框架**，提供：
 重构 `packages/index/src/cli.ts`，提供：
 
 ```bash
-# 交互式聊天（自动加载 .ai-stack.json 配置）
+# 交互式聊天（自动加载 agent.json 配置）
 ai-stack chat [--config=PATH]
 
 # 单次执行任务
@@ -71,7 +71,7 @@ ai-stack config show      # 显示当前配置
 
 ### 2. 配置文件支持
 
-支持 `.ai-stack.json` 或 `ai-stack.config.json`：
+支持 `agent.json` 或 `agent.json`：
 
 ```json
 {
@@ -136,7 +136,7 @@ examples/
   - [x] with-skills.ts - Skills 使用示例
   - [x] with-config.ts - 配置文件使用示例
   - [x] tool-agent.ts - 完整工具执行型 Agent
-- [x] 创建 .ai-stack.json 示例配置
+- [x] 创建 agent.json 示例配置
 - [x] 更新 README.md 文档
 
 ### Phase 4: 文档更新
@@ -153,7 +153,7 @@ examples/
 ai-stack chat [options]
 
 Options:
-  --config <path>    配置文件路径（默认：.ai-stack.json）
+  --config <path>    配置文件路径（默认：agent.json）
   --model <name>     LLM 模型（覆盖配置）
   --mcp <path>       MCP 配置文件路径
   --skill <dir>      Skill 目录（可多次指定）

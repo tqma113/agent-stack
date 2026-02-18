@@ -1,0 +1,39 @@
+{
+  "name": "My Personal Assistant",
+  "agent": {
+    "model": "gpt-5.2",
+    "temperature": 0.7,
+    "maxTokens": 4096,
+    "systemPrompt": "You are a helpful personal AI assistant. You can:\n- Remember facts and preferences about the user\n- Set reminders and schedule tasks\n- Answer questions and help with daily tasks\n\nAlways be concise and helpful. When the user asks to be reminded about something, use the create_reminder tool.",
+    "mcp": {
+      "configPath": "./mcp.json",
+      "autoConnect": true
+    }
+  },
+  "memory": {
+    "enabled": true,
+    "memoryFile": "./MEMORY.md",
+    "logsDir": "./memory",
+    "dbPath": "./index.db",
+    "syncOnStartup": true,
+    "watchFiles": true
+  },
+  "gateway": {
+    "sessionStrategy": "per-peer",
+    "channels": {
+      "cli": {
+        "enabled": true,
+        "prompt": "You: "
+      },
+      "telegram": {
+        "enabled": false,
+        "token": "${TELEGRAM_BOT_TOKEN}"
+      }
+    }
+  },
+  "scheduler": {
+    "enabled": true,
+    "allowAgentControl": true,
+    "persistencePath": "./scheduler.json"
+  }
+}

@@ -242,7 +242,7 @@ ai-stack config show [--config PATH]
     ▼
 ┌─────────────────────────┐
 │ 加载配置文件            │
-│ (.ai-stack.json)     │
+│ (agent.json)     │
 └─────────────────────────┘
     │
     ▼
@@ -272,7 +272,7 @@ ai-stack config show [--config PATH]
     └───────────────────────────┘
 ```
 
-**配置文件格式** (`.ai-stack.json`):
+**配置文件格式** (`agent.json`):
 
 ```json
 {
