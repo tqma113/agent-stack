@@ -510,7 +510,7 @@ export function createAgent(config: AgentConfig = {}): AgentInstance {
       }
 
       // Create SQLite stores with configured path
-      const dbPath = memoryConfig.dbPath ?? '.ai-stack/memory.db';
+      const dbPath = memoryConfig.dbPath ?? 'memory/sqlite.db';
       const stores = await createSqliteStores({ dbPath });
 
       // Build memory manager config
@@ -602,7 +602,9 @@ export function createAgent(config: AgentConfig = {}): AgentInstance {
       }
 
       // Create knowledge manager with config
+      // Knowledge now manages its own database and SemanticStore
       knowledgeManager = createKnowledgeManager({
+        dbPath: knowledgeConfig.dbPath ?? 'knowledge/sqlite.db',
         code: knowledgeConfig.code?.enabled !== false
           ? {
               rootDir: knowledgeConfig.code?.rootDir ?? '.',
@@ -637,12 +639,7 @@ export function createAgent(config: AgentConfig = {}): AgentInstance {
         },
       });
 
-      // Create SQLite stores for knowledge (shared with memory if available)
-      const dbPath = memoryConfig?.dbPath ?? '.ai-stack/memory.db';
-      const stores = await createSqliteStores({ dbPath });
-
-      // Set store and initialize
-      knowledgeManager.setStore(stores.semanticStore);
+      // Initialize (creates database, SemanticStore, and indexers)
       await knowledgeManager.initialize();
 
       // Add pre-configured document sources

@@ -59,7 +59,7 @@ export interface AgentSkillConfig {
 export interface AgentMemoryConfig {
   /** Whether to enable memory (default: true if config provided) */
   enabled?: boolean;
-  /** Database file path (default: '.ai-stack/memory.db') */
+  /** Database file path (default: 'memory/sqlite.db') */
   dbPath?: string;
   /** Token budget configuration */
   tokenBudget?: Partial<TokenBudget>;
@@ -83,6 +83,9 @@ export interface AgentMemoryConfig {
 export interface AgentKnowledgeConfig {
   /** Whether to enable knowledge (default: true if config provided) */
   enabled?: boolean;
+
+  /** Database path for knowledge persistence (default: 'knowledge/sqlite.db') */
+  dbPath?: string;
 
   /** Code indexing configuration */
   code?: Partial<CodeIndexerConfig> & {

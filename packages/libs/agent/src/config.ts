@@ -22,7 +22,7 @@ const CONFIG_FILE_NAMES = [
 export interface MemoryConfigSection {
   /** Whether to enable memory */
   enabled?: boolean;
-  /** Database file path (default: '.ai-stack/memory.db') */
+  /** Database file path (default: 'memory/sqlite.db') */
   dbPath?: string;
   /** Whether to auto-initialize on first chat (default: true) */
   autoInitialize?: boolean;
@@ -323,7 +323,7 @@ export function generateConfigTemplate(): AgentStackConfig {
     },
     memory: {
       enabled: true,
-      dbPath: '.ai-stack/memory.db',
+      dbPath: 'memory/sqlite.db',
       autoInitialize: true,
       autoInject: true,
     },

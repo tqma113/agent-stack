@@ -554,7 +554,7 @@ export interface MemoryConfig {
  * Default memory config
  */
 export const DEFAULT_MEMORY_CONFIG: MemoryConfig = {
-  dbPath: '.ai-stack/memory.db',
+  dbPath: 'memory/sqlite.db',
   tokenBudget: DEFAULT_TOKEN_BUDGET,
   writePolicy: DEFAULT_WRITE_POLICY,
   retrieval: DEFAULT_RETRIEVAL_CONFIG,

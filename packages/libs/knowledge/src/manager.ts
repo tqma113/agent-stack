@@ -2,11 +2,17 @@
  * Knowledge Manager
  *
  * Unified management of code and document indexing with integrated search.
+ * Uses its own SQLite database with SemanticStore for independent operation.
  */
 
-import type {
-  SemanticStoreInstance,
-  EmbedFunction,
+import Database from 'better-sqlite3';
+import * as fs from 'node:fs';
+import * as path from 'node:path';
+import {
+  createSemanticStore,
+  type SemanticStoreInstance,
+  type EmbedFunction,
+  type SemanticStoreConfig,
 } from '@ai-stack/memory-store-sqlite';
 
 import type {
@@ -28,6 +34,9 @@ import { createCodeIndexer, type CodeIndexerInstance } from './code/index.js';
 import { createDocIndexer, type DocIndexerInstance } from './doc/index.js';
 import { createHybridSearch, type HybridSearchInstance } from './retriever/index.js';
 
+/** Default knowledge database path */
+const DEFAULT_KNOWLEDGE_DB_PATH = 'knowledge/sqlite.db';
+
 /**
  * Knowledge manager instance interface
  */
@@ -43,6 +52,9 @@ export interface KnowledgeManagerInstance {
 
   /** Get document indexer */
   getDocIndexer(): DocIndexerInstance | undefined;
+
+  /** Get semantic store */
+  getSemanticStore(): SemanticStoreInstance | undefined;
 
   /** Unified search (code + docs + optionally memory) */
   search(query: string, options?: KnowledgeSearchOptions): Promise<KnowledgeSearchResult[]>;
@@ -71,9 +83,6 @@ export interface KnowledgeManagerInstance {
   /** Clear all data */
   clear(): Promise<void>;
 
-  /** Set semantic store (reuse Memory's store) */
-  setStore(store: SemanticStoreInstance): void;
-
   /** Set embedding function */
   setEmbedFunction(fn: EmbedFunction): void;
 
@@ -91,7 +100,8 @@ export function createKnowledgeManager(
   config: KnowledgeManagerConfig = {}
 ): KnowledgeManagerInstance {
   // Private state
-  let store: SemanticStoreInstance | null = null;
+  let semanticStore: SemanticStoreInstance | null = null;
+  let database: Database.Database | null = null;
   let codeIndexer: CodeIndexerInstance | null = null;
   let docIndexer: DocIndexerInstance | null = null;
   let hybridSearch: HybridSearchInstance | null = null;
@@ -99,6 +109,7 @@ export function createKnowledgeManager(
   let initialized = false;
 
   // Configuration
+  const dbPath = config.dbPath || DEFAULT_KNOWLEDGE_DB_PATH;
   const codeEnabled = config.code?.enabled !== false;
   const docEnabled = config.doc?.enabled !== false;
 
@@ -126,28 +137,44 @@ export function createKnowledgeManager(
   async function initialize(): Promise<void> {
     if (initialized) return;
 
+    // Create database
+    const dbDir = path.dirname(dbPath);
+    if (!fs.existsSync(dbDir)) {
+      fs.mkdirSync(dbDir, { recursive: true });
+    }
+    database = new Database(dbPath);
+    database.pragma('journal_mode = WAL');
+    database.pragma('foreign_keys = ON');
+
+    // Create SemanticStore for chunks and vector search
+    semanticStore = createSemanticStore(config.semantic);
+    semanticStore.setDatabase(database);
+    await semanticStore.initialize();
+
+    if (embedFunction) {
+      semanticStore.setEmbedFunction(embedFunction);
+    }
+
     // Create code indexer
     if (codeEnabled) {
       codeIndexer = createCodeIndexer(codeConfig);
-      await codeIndexer.initialize();
-      if (store) {
-        codeIndexer.setStore(store);
-      }
+      codeIndexer.setDatabase(database);
+      codeIndexer.setStore(semanticStore);
       if (embedFunction) {
         codeIndexer.setEmbedFunction(embedFunction);
       }
+      await codeIndexer.initialize();
     }
 
     // Create document indexer
     if (docEnabled) {
       docIndexer = createDocIndexer(docConfig);
-      await docIndexer.initialize();
-      if (store) {
-        docIndexer.setStore(store);
-      }
+      docIndexer.setDatabase(database);
+      docIndexer.setStore(semanticStore);
       if (embedFunction) {
         docIndexer.setEmbedFunction(embedFunction);
       }
+      await docIndexer.initialize();
     }
 
     // Create hybrid search
@@ -179,6 +206,15 @@ export function createKnowledgeManager(
     if (docIndexer) {
       await docIndexer.close();
     }
+    if (semanticStore) {
+      await semanticStore.close();
+      semanticStore = null;
+    }
+    if (database) {
+      database.close();
+      database = null;
+    }
+
     initialized = false;
   }
 
@@ -197,21 +233,28 @@ export function createKnowledgeManager(
   }
 
   /**
+   * Get semantic store
+   */
+  function getSemanticStore(): SemanticStoreInstance | undefined {
+    return semanticStore || undefined;
+  }
+
+  /**
    * Unified search
    */
   async function search(
     query: string,
     options?: KnowledgeSearchOptions
   ): Promise<KnowledgeSearchResult[]> {
-    if (!store) {
-      throw new KnowledgeError('Store not set');
+    if (!semanticStore) {
+      throw new KnowledgeError('Manager not initialized');
     }
 
     if (!hybridSearch) {
       throw new KnowledgeError('Manager not initialized');
     }
 
-    return hybridSearch.search(query, store, {
+    return hybridSearch.search(query, semanticStore, {
       ...options,
       limit: options?.limit || searchConfig.defaultLimit,
     });
@@ -343,31 +386,18 @@ export function createKnowledgeManager(
   }
 
   /**
-   * Set store
-   */
-  function setStore(s: SemanticStoreInstance): void {
-    store = s;
-    if (codeIndexer) {
-      codeIndexer.setStore(s);
-    }
-    if (docIndexer) {
-      docIndexer.setStore(s);
-    }
-  }
-
-  /**
    * Set embed function
    */
   function setEmbedFunction(fn: EmbedFunction): void {
     embedFunction = fn;
+    if (semanticStore) {
+      semanticStore.setEmbedFunction(fn);
+    }
     if (codeIndexer) {
       codeIndexer.setEmbedFunction(fn);
     }
     if (docIndexer) {
       docIndexer.setEmbedFunction(fn);
-    }
-    if (store) {
-      store.setEmbedFunction(fn);
     }
   }
 
@@ -394,6 +424,7 @@ export function createKnowledgeManager(
     close,
     getCodeIndexer,
     getDocIndexer,
+    getSemanticStore,
     search,
     searchCode,
     searchDocs,
@@ -403,7 +434,6 @@ export function createKnowledgeManager(
     removeDocSource,
     getStats,
     clear,
-    setStore,
     setEmbedFunction,
     startWatching,
     stopWatching,

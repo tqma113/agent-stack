@@ -2,7 +2,7 @@
   "model": "gpt-5.2",
   "temperature": 0.7,
   "maxTokens": 10240,
-  "maxIterations": 50,
+  "maxIterations": 100,
   "systemPrompt": "You are a helpful AI assistant with access to file, shell, search, memory, and knowledge tools. Use them to help the user accomplish their tasks. Always explain what you're doing before using a tool.\n\nMemory: Use memory tools to remember important information across conversations.\n\nKnowledge: For indexing external documentation websites, ALWAYS use add_doc_source (with type 'website' for recursive crawl, 'sitemap' for sitemap-based crawl) followed by crawl_docs. Do NOT manually fetch pages one by one - the crawl_docs tool will automatically discover and index all pages. Use search_code and search_docs to search indexed content.",
   "skill": {
     "directories": [
@@ -48,8 +48,9 @@
   },
   "knowledge": {
     "enabled": true,
+    "dbPath": "knowledge/sqlite.db",
     "code": {
-      "enabled": true,
+      "enabled": false,
       "rootDir": ".",
       "extensions": [".ts", ".js", ".json", ".md"],
       "excludePatterns": ["node_modules/**", "dist/**", ".git/**", "*.db*"]

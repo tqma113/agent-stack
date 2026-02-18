@@ -104,6 +104,45 @@ export interface KnowledgeSearchOptions {
 }
 
 // =============================================================================
+// User Interaction Types (for existing index handling)
+// =============================================================================
+
+/**
+ * User choice when existing index is detected
+ */
+export type IndexAction =
+  | 'reindex_all' // Clear and re-index everything
+  | 'incremental' // Only index new/changed items
+  | 'skip'; // Skip indexing entirely
+
+/**
+ * Information about existing index
+ */
+export interface ExistingIndexInfo {
+  /** Type of index */
+  type: 'code' | 'doc';
+  /** Summary statistics */
+  summary: {
+    /** Total items (files or pages) */
+    totalItems: number;
+    /** Total chunks in semantic store */
+    totalChunks: number;
+    /** Last update timestamp */
+    lastUpdatedAt?: number;
+    /** Human-readable details */
+    details: string;
+  };
+}
+
+/**
+ * Callback for handling existing index
+ * Called when an existing index is detected, allowing the user to decide the action
+ */
+export type OnExistingIndexCallback = (
+  info: ExistingIndexInfo
+) => Promise<IndexAction>;
+
+// =============================================================================
 // Code Index Types
 // =============================================================================
 
@@ -233,12 +272,16 @@ export interface CodeIndexerConfig {
   watchDebounceMs?: number;
   /** Concurrency */
   concurrency?: number;
+  /** Callback when existing index is detected */
+  onExistingIndex?: OnExistingIndexCallback;
+  /** Default action when no callback is provided */
+  defaultAction?: IndexAction;
 }
 
 /**
  * Default code indexer configuration
  */
-export const DEFAULT_CODE_INDEXER_CONFIG: Required<CodeIndexerConfig> = {
+export const DEFAULT_CODE_INDEXER_CONFIG: Required<Omit<CodeIndexerConfig, 'onExistingIndex' | 'defaultAction'>> & Pick<CodeIndexerConfig, 'onExistingIndex' | 'defaultAction'> = {
   rootDir: '.',
   include: ['**/*.{ts,tsx,js,jsx,py,java,go,rs,c,cpp,h,hpp,md,json}'],
   exclude: [
@@ -256,6 +299,8 @@ export const DEFAULT_CODE_INDEXER_CONFIG: Required<CodeIndexerConfig> = {
   watch: false,
   watchDebounceMs: 1000,
   concurrency: 4,
+  onExistingIndex: undefined,
+  defaultAction: 'incremental',
 };
 
 /**
@@ -425,12 +470,16 @@ export interface DocIndexerConfig {
   cacheDir?: string;
   /** Cache TTL (ms) */
   cacheTtl?: number;
+  /** Callback when existing index is detected */
+  onExistingIndex?: OnExistingIndexCallback;
+  /** Default action when no callback is provided */
+  defaultAction?: IndexAction;
 }
 
 /**
  * Default document indexer configuration
  */
-export const DEFAULT_DOC_INDEXER_CONFIG: Required<DocIndexerConfig> = {
+export const DEFAULT_DOC_INDEXER_CONFIG: Required<Omit<DocIndexerConfig, 'onExistingIndex' | 'defaultAction'>> & Pick<DocIndexerConfig, 'onExistingIndex' | 'defaultAction'> = {
   userAgent: 'AI-Stack-Bot/1.0',
   defaultCrawlOptions: {
     maxPages: 100,
@@ -444,6 +493,8 @@ export const DEFAULT_DOC_INDEXER_CONFIG: Required<DocIndexerConfig> = {
   concurrency: 2,
   cacheDir: '.ai-stack/doc-cache',
   cacheTtl: 7 * 24 * 60 * 60 * 1000, // 7 days
+  onExistingIndex: undefined,
+  defaultAction: 'incremental',
 };
 
 /**
@@ -459,9 +510,31 @@ export interface DocSearchOptions extends Omit<KnowledgeSearchOptions, 'sources'
 // =============================================================================
 
 /**
+ * Semantic store configuration (re-exported from memory-store-sqlite)
+ */
+export interface KnowledgeSemanticConfig {
+  /** Vector dimensions (default: 1536 for OpenAI text-embedding-3-small) */
+  vectorDimensions?: number;
+  /** Enable vector search (requires embeddings) */
+  enableVectorSearch?: boolean;
+  /** Enable FTS search */
+  enableFtsSearch?: boolean;
+  /** Embedding provider name (for cache key) */
+  embeddingProvider?: string;
+  /** Embedding model name (for cache key) */
+  embeddingModel?: string;
+}
+
+/**
  * Knowledge manager configuration
  */
 export interface KnowledgeManagerConfig {
+  /** Database path for index persistence and semantic store */
+  dbPath?: string;
+
+  /** Semantic store config (vector dimensions, FTS/vector options) */
+  semantic?: KnowledgeSemanticConfig;
+
   /** Code indexer config */
   code?: CodeIndexerConfig & { enabled?: boolean };
 

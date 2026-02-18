@@ -22,10 +22,12 @@ ai-stack run "List the files in this directory"
 
 ```
 example/
-├── .ai-stack.json   # Agent configuration
-├── .mcp.json           # MCP server configuration
-├── .ai-stack/       # Runtime data (auto-created)
-│   └── memory.db       # SQLite memory database
+├── ai-stack.json   # Agent configuration
+├── mcp.json           # MCP server configuration
+├── memory/       # Runtime memory data (auto-created)
+│   └── sqlite.db       # SQLite memory database
+├── knowledge/       # Runtime knowledge data (auto-created)
+│   └── sqlite.db       # SQLite knowledge database
 ├── skills/             # Example skills
 │   ├── file-skill/     # File operations
 │   ├── shell-skill/    # Shell commands
@@ -54,7 +56,7 @@ Main agent configuration:
   },
   "memory": {
     "enabled": true,
-    "dbPath": "./.ai-stack/memory.db",
+    "dbPath": "./memory/sqlite.db",
     "autoInitialize": true,
     "autoInject": true
   }
@@ -155,7 +157,7 @@ The agent has a persistent memory system with five layers:
 {
   "memory": {
     "enabled": true,
-    "dbPath": "./.ai-stack/memory.db",
+    "dbPath": "./memory/sqlite.db",
     "autoInitialize": true,
     "autoInject": true,
     "tokenBudget": {

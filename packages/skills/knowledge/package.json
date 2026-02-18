@@ -44,8 +44,7 @@
   "author": "",
   "license": "MIT",
   "dependencies": {
-    "@ai-stack/knowledge": "workspace:*",
-    "@ai-stack/memory-store-sqlite": "workspace:*"
+    "@ai-stack/knowledge": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "^22.10.0",

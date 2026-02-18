@@ -1187,7 +1187,7 @@ import { createKnowledgeManager } from '@ai-stack/knowledge';
 import { createSqliteStores } from '@ai-stack/memory-store-sqlite';
 
 // 创建存储
-const stores = await createSqliteStores({ dbPath: './knowledge.db' });
+const stores = await createSqliteStores({ dbPath: './knowledge/sqlite.db' });
 
 // 创建知识管理器
 const knowledge = createKnowledgeManager({

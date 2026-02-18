@@ -35,7 +35,7 @@ export interface StoreContextConfig {
  * Default configuration
  */
 const DEFAULT_CONFIG: StoreContextConfig = {
-  dbPath: '.ai-stack/memory.db',
+  dbPath: 'memory/sqlite.db',
   debug: false,
 };
 

@@ -32,6 +32,15 @@ export {
   type RegistryInstance,
 } from './doc/index.js';
 
+// Persistent stores
+export {
+  createCodeIndexStore,
+  createDocRegistryStore,
+  type CodeIndexStoreInstance,
+  type DocRegistryStoreInstance,
+  type DocRegistrySummary,
+} from './stores/index.js';
+
 // Retrieval
 export {
   createHybridSearch,
@@ -47,7 +56,13 @@ export type {
   KnowledgeSearchResult,
   KnowledgeSearchOptions,
   KnowledgeManagerConfig,
+  KnowledgeSemanticConfig,
   KnowledgeStats,
+
+  // User interaction
+  IndexAction,
+  ExistingIndexInfo,
+  OnExistingIndexCallback,
 
   // Code
   CodeSymbolType,

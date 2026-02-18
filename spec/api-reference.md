@@ -1063,7 +1063,7 @@ const manager = createMemoryManager(config?: Partial<MemoryConfig>): MemoryManag
 
 | 参数 | 类型 | 默认值 | 描述 |
 |------|------|--------|------|
-| `dbPath` | `string` | `.ai-stack/memory.db` | SQLite 数据库路径 |
+| `dbPath` | `string` | `memory/sqlite.db` | SQLite 数据库路径 |
 | `tokenBudget` | `TokenBudget` | 默认配置 | Token 预算配置 |
 | `writePolicy` | `WritePolicyConfig` | 默认配置 | 写入策略配置 |
 | `retrieval` | `RetrievalConfig` | 默认配置 | 检索配置 |
@@ -1853,11 +1853,23 @@ const manager = createKnowledgeManager(config?: KnowledgeManagerConfig): Knowled
 
 **KnowledgeManagerConfig**:
 
-| 参数 | 类型 | 描述 |
-|------|------|------|
-| `code` | `CodeIndexerConfig & { enabled?: boolean }` | 代码索引配置 |
-| `doc` | `DocIndexerConfig & { enabled?: boolean }` | 文档索引配置 |
-| `search` | `SearchConfig` | 搜索配置 |
+| 参数 | 类型 | 默认值 | 描述 |
+|------|------|--------|------|
+| `dbPath` | `string` | `knowledge/sqlite.db` | 数据库路径 (包含索引状态和 SemanticStore) |
+| `semantic` | `KnowledgeSemanticConfig` | - | SemanticStore 配置 (向量维度等) |
+| `code` | `CodeIndexerConfig & { enabled?: boolean }` | - | 代码索引配置 |
+| `doc` | `DocIndexerConfig & { enabled?: boolean }` | - | 文档索引配置 |
+| `search` | `SearchConfig` | - | 搜索配置 |
+
+**KnowledgeSemanticConfig**:
+
+| 参数 | 类型 | 默认值 | 描述 |
+|------|------|--------|------|
+| `vectorDimensions` | `number` | `1536` | 向量维度 |
+| `enableVectorSearch` | `boolean` | `true` | 启用向量搜索 |
+| `enableFtsSearch` | `boolean` | `true` | 启用全文搜索 |
+| `embeddingProvider` | `string` | `'default'` | 嵌入提供者名称 |
+| `embeddingModel` | `string` | - | 嵌入模型名称 |
 
 ---
 
@@ -1942,8 +1954,8 @@ async removeDocSource(sourceId: string): Promise<void>
 // 获取统计信息
 async getStats(): Promise<KnowledgeStats>
 
-// 设置语义存储
-setStore(store: SemanticStoreInstance): void
+// 获取 SemanticStore (用于外部访问)
+getSemanticStore(): SemanticStoreInstance | undefined
 
 // 设置 embedding 函数
 setEmbedFunction(fn: EmbedFunction): void
@@ -2065,7 +2077,111 @@ interface AgentKnowledgeConfig {
 
 ---
 
-### 6.4 从 @ai-stack/knowledge 导出
+### 6.4 用户交互类型
+
+当检测到已有索引时，通过回调函数让用户选择操作：
+
+```typescript
+/** 用户选择的操作 */
+type IndexAction =
+  | 'reindex_all'   // 清除并重新索引全部
+  | 'incremental'   // 仅索引新增/变更
+  | 'skip';         // 跳过索引
+
+/** 已存在的索引信息 */
+interface ExistingIndexInfo {
+  type: 'code' | 'doc';
+  summary: {
+    totalItems: number;
+    totalChunks: number;
+    lastUpdatedAt?: number;
+    details: string;
+  };
+}
+
+/** 用户决策回调 */
+type OnExistingIndexCallback = (info: ExistingIndexInfo) => Promise<IndexAction>;
+```
+
+**CodeIndexerConfig 扩展字段**:
+
+| 参数 | 类型 | 描述 |
+|------|------|------|
+| `onExistingIndex` | `OnExistingIndexCallback` | 检测到已有索引时的回调 |
+| `defaultAction` | `IndexAction` | 无回调时的默认行为 (默认: 'incremental') |
+
+**DocIndexerConfig 扩展字段**:
+
+| 参数 | 类型 | 描述 |
+|------|------|------|
+| `onExistingIndex` | `OnExistingIndexCallback` | 检测到已有索引时的回调 |
+| `defaultAction` | `IndexAction` | 无回调时的默认行为 (默认: 'incremental') |
+
+---
+
+### 6.5 持久化 Store
+
+#### createCodeIndexStore()
+
+代码索引状态持久化存储。
+
+```typescript
+const store = createCodeIndexStore(): CodeIndexStoreInstance
+```
+
+**CodeIndexStoreInstance 方法**:
+
+| 方法 | 返回类型 | 描述 |
+|------|----------|------|
+| `setDatabase(db)` | `void` | 设置数据库实例 |
+| `initialize()` | `Promise<void>` | 初始化表结构 |
+| `get(filePath)` | `IndexStatus \| null` | 获取文件索引状态 |
+| `set(status)` | `void` | 设置文件索引状态 |
+| `delete(filePath)` | `boolean` | 删除文件索引状态 |
+| `getByRootDir(rootDir)` | `IndexStatus[]` | 获取目录下所有状态 |
+| `getSummary(rootDir?)` | `IndexStatusSummary` | 获取统计摘要 |
+| `hasIndexedFiles(rootDir)` | `boolean` | 检查是否有已索引文件 |
+| `clearByRootDir(rootDir)` | `number` | 清除目录下所有状态 |
+| `clear()` | `Promise<void>` | 清除所有状态 |
+| `close()` | `Promise<void>` | 关闭存储 |
+
+#### createDocRegistryStore()
+
+文档源和页面持久化存储。
+
+```typescript
+const store = createDocRegistryStore(): DocRegistryStoreInstance
+```
+
+**DocRegistryStoreInstance 方法**:
+
+| 方法 | 返回类型 | 描述 |
+|------|----------|------|
+| `setDatabase(db)` | `void` | 设置数据库实例 |
+| `initialize()` | `Promise<void>` | 初始化表结构 |
+| `addSource(input)` | `DocSource` | 添加文档源 |
+| `getSource(id)` | `DocSource \| undefined` | 获取文档源 |
+| `getSourceByUrl(url)` | `DocSource \| undefined` | 按 URL 获取文档源 |
+| `updateSource(id, update)` | `DocSource \| undefined` | 更新文档源 |
+| `removeSource(id)` | `boolean` | 删除文档源 |
+| `listSources()` | `DocSource[]` | 列出所有文档源 |
+| `getEnabledSources()` | `DocSource[]` | 列出启用的文档源 |
+| `addPage(page)` | `void` | 添加页面 |
+| `getPage(id)` | `DocPage \| undefined` | 获取页面 |
+| `getPageByUrl(url)` | `DocPage \| undefined` | 按 URL 获取页面 |
+| `getPagesBySource(sourceId)` | `DocPage[]` | 获取文档源的所有页面 |
+| `updatePage(id, update)` | `DocPage \| undefined` | 更新页面 |
+| `removePage(id)` | `boolean` | 删除页面 |
+| `removePagesBySource(sourceId)` | `number` | 删除文档源的所有页面 |
+| `listPages()` | `DocPage[]` | 列出所有页面 |
+| `getSummary()` | `DocRegistrySummary` | 获取统计摘要 |
+| `hasIndexedSources()` | `boolean` | 检查是否有已索引源 |
+| `clear()` | `Promise<void>` | 清除所有数据 |
+| `close()` | `Promise<void>` | 关闭存储 |
+
+---
+
+### 6.6 从 @ai-stack/knowledge 导出
 
 ```typescript
 export {
@@ -2074,12 +2190,21 @@ export {
   createCodeIndexer,
   createDocIndexer,
   createHybridSearch,
+  createCodeIndexStore,
+  createDocRegistryStore,
 
   // Instance 类型
   type KnowledgeManagerInstance,
   type CodeIndexerInstance,
   type DocIndexerInstance,
   type HybridSearchInstance,
+  type CodeIndexStoreInstance,
+  type DocRegistryStoreInstance,
+
+  // 用户交互类型
+  type IndexAction,
+  type ExistingIndexInfo,
+  type OnExistingIndexCallback,
 
   // 错误类
   KnowledgeError,

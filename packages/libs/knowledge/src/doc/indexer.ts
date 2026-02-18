@@ -4,6 +4,7 @@
  * Indexes external documents into semantic chunks for search.
  */
 
+import type Database from 'better-sqlite3';
 import type {
   SemanticStoreInstance,
   SemanticChunkInput,
@@ -21,11 +22,13 @@ import type {
   DocSearchOptions,
   KnowledgeSearchResult,
   UUID,
+  IndexAction,
 } from '../types.js';
 import { DEFAULT_DOC_INDEXER_CONFIG } from '../types.js';
 import { CrawlError } from '../errors.js';
 import { createCrawler, type CrawlerInstance } from './crawler.js';
 import { createRegistry, type RegistryInstance } from './registry.js';
+import { createDocRegistryStore, type DocRegistryStoreInstance } from '../stores/doc-registry-store.js';
 import { createParser } from './parser.js';
 
 /**
@@ -140,6 +143,9 @@ export interface DocIndexerInstance {
 
   /** Set embed function */
   setEmbedFunction(fn: EmbedFunction): void;
+
+  /** Set database for persistent storage */
+  setDatabase(db: Database.Database): void;
 }
 
 /**
@@ -148,7 +154,7 @@ export interface DocIndexerInstance {
 export function createDocIndexer(
   config: Partial<DocIndexerConfig> = {}
 ): DocIndexerInstance {
-  const cfg: Required<DocIndexerConfig> = {
+  const cfg = {
     ...DEFAULT_DOC_INDEXER_CONFIG,
     ...config,
   };
@@ -159,6 +165,11 @@ export function createDocIndexer(
   let registry: RegistryInstance | null = null;
   let embedFunction: EmbedFunction | undefined;
   let initialized = false;
+  let skipIndexing = false;
+
+  // Persistent registry store
+  const registryStore = createDocRegistryStore();
+  let dbSet = false;
 
   /**
    * Index a page into semantic chunks
@@ -244,6 +255,39 @@ export function createDocIndexer(
   async function initialize(): Promise<void> {
     if (initialized) return;
 
+    // Initialize persistent store if database is set
+    if (dbSet) {
+      await registryStore.initialize();
+
+      // Check for existing sources and ask user what to do
+      if (registryStore.hasIndexedSources()) {
+        const summary = registryStore.getSummary();
+
+        let action: IndexAction = cfg.defaultAction ?? 'incremental';
+
+        if (cfg.onExistingIndex) {
+          action = await cfg.onExistingIndex({
+            type: 'doc',
+            summary: {
+              totalItems: summary.totalSources,
+              totalChunks: summary.totalChunks,
+              lastUpdatedAt: summary.lastCrawledAt,
+              details: `${summary.totalSources} sources, ${summary.totalPages} pages`,
+            },
+          });
+        }
+
+        if (action === 'reindex_all') {
+          // Clear existing registry data
+          await registryStore.clear();
+        } else if (action === 'skip') {
+          // Set flag to skip crawling
+          skipIndexing = true;
+        }
+        // 'incremental' is the default behavior - just continue normally
+      }
+    }
+
     // Create parser and crawler
     const parser = createParser();
     crawler = createCrawler({
@@ -251,7 +295,8 @@ export function createDocIndexer(
       parser,
     });
 
-    // Create registry
+    // Create in-memory registry as fallback (or use persistent store)
+    // The registry interface is used for in-memory operations during crawling
     registry = createRegistry();
 
     initialized = true;
@@ -264,6 +309,7 @@ export function createDocIndexer(
     if (crawler) {
       crawler.stop();
     }
+    await registryStore.close();
     initialized = false;
   }
 
@@ -273,6 +319,14 @@ export function createDocIndexer(
   async function addSource(input: DocSourceInput): Promise<DocSource> {
     if (!registry) {
       throw new CrawlError('Indexer not initialized');
+    }
+
+    // Use persistent store if available
+    if (dbSet) {
+      const source = registryStore.addSource(input);
+      // Also add to in-memory registry for consistency during crawl
+      registry.addSource({ ...input });
+      return source;
     }
 
     return registry.addSource(input);
@@ -286,6 +340,9 @@ export function createDocIndexer(
       throw new CrawlError('Indexer not initialized');
     }
 
+    if (dbSet) {
+      registryStore.removeSource(sourceId);
+    }
     registry.removeSource(sourceId);
   }
 
@@ -297,6 +354,9 @@ export function createDocIndexer(
       throw new CrawlError('Indexer not initialized');
     }
 
+    if (dbSet) {
+      return registryStore.getSource(sourceId) || null;
+    }
     return registry.getSource(sourceId) || null;
   }
 
@@ -308,6 +368,9 @@ export function createDocIndexer(
       throw new CrawlError('Indexer not initialized');
     }
 
+    if (dbSet) {
+      return registryStore.listSources();
+    }
     return registry.listSources();
   }
 
@@ -322,7 +385,24 @@ export function createDocIndexer(
       throw new CrawlError('Indexer not initialized');
     }
 
-    const source = registry.getSource(sourceId);
+    // Skip crawling if user chose to skip
+    if (skipIndexing) {
+      return {
+        sourceId,
+        pagesProcessed: 0,
+        pagesAdded: 0,
+        pagesUpdated: 0,
+        pagesFailed: 0,
+        chunksAdded: 0,
+        durationMs: 0,
+        errors: [],
+      };
+    }
+
+    // Get source from persistent store or in-memory
+    const source = dbSet
+      ? registryStore.getSource(sourceId)
+      : registry.getSource(sourceId);
     if (!source) {
       throw new CrawlError(`Source not found: ${sourceId}`);
     }
@@ -354,7 +434,9 @@ export function createDocIndexer(
         const page = await crawler.fetch(source.url, source.crawlOptions);
         page.sourceId = sourceId;
 
-        const existingPage = registry.getPageByUrl(page.url);
+        const existingPage = dbSet
+          ? registryStore.getPageByUrl(page.url)
+          : registry.getPageByUrl(page.url);
 
         if (existingPage && existingPage.contentHash === page.contentHash && !options?.force) {
           // No changes
@@ -362,9 +444,15 @@ export function createDocIndexer(
         } else {
           // New or updated
           if (existingPage) {
+            if (dbSet) {
+              registryStore.updatePage(existingPage.id, page);
+            }
             registry.updatePage(existingPage.id, page);
             result.pagesUpdated = 1;
           } else {
+            if (dbSet) {
+              registryStore.addPage(page);
+            }
             registry.addPage(page);
             result.pagesAdded = 1;
           }
@@ -386,7 +474,9 @@ export function createDocIndexer(
         result.pagesProcessed++;
 
         try {
-          const existingPage = registry.getPageByUrl(page.url);
+          const existingPage = dbSet
+            ? registryStore.getPageByUrl(page.url)
+            : registry.getPageByUrl(page.url);
 
           if (existingPage && existingPage.contentHash === page.contentHash && !options?.force) {
             // No changes, skip
@@ -394,9 +484,15 @@ export function createDocIndexer(
           }
 
           if (existingPage) {
+            if (dbSet) {
+              registryStore.updatePage(existingPage.id, page);
+            }
             registry.updatePage(existingPage.id, page);
             result.pagesUpdated++;
           } else {
+            if (dbSet) {
+              registryStore.addPage(page);
+            }
             registry.addPage(page);
             result.pagesAdded++;
           }
@@ -409,6 +505,9 @@ export function createDocIndexer(
       }
 
       // Update source last crawled time
+      if (dbSet) {
+        registryStore.updateSource(sourceId, { lastCrawledAt: Date.now() });
+      }
       registry.updateSource(sourceId, { lastCrawledAt: Date.now() });
     } catch (error) {
       result.errors.push({ url: source.url, error: (error as Error).message });
@@ -438,7 +537,15 @@ export function createDocIndexer(
       results: [],
     };
 
-    const enabledSources = registry.getEnabledSources();
+    // Skip crawling if user chose to skip
+    if (skipIndexing) {
+      summary.totalDurationMs = Date.now() - startTime;
+      return summary;
+    }
+
+    const enabledSources = dbSet
+      ? registryStore.getEnabledSources()
+      : registry.getEnabledSources();
 
     for (const source of enabledSources) {
       try {
@@ -520,6 +627,9 @@ export function createDocIndexer(
       throw new CrawlError('Indexer not initialized');
     }
 
+    if (dbSet) {
+      return registryStore.getPage(pageId) || null;
+    }
     return registry.getPage(pageId) || null;
   }
 
@@ -531,6 +641,9 @@ export function createDocIndexer(
       throw new CrawlError('Indexer not initialized');
     }
 
+    if (dbSet) {
+      registryStore.removePage(pageId);
+    }
     registry.removePage(pageId);
   }
 
@@ -538,6 +651,9 @@ export function createDocIndexer(
    * Clear all data
    */
   async function clear(): Promise<void> {
+    if (dbSet) {
+      await registryStore.clear();
+    }
     if (registry) {
       registry.clear();
     }
@@ -560,6 +676,14 @@ export function createDocIndexer(
     }
   }
 
+  /**
+   * Set database for persistent storage
+   */
+  function setDatabase(db: Database.Database): void {
+    registryStore.setDatabase(db);
+    dbSet = true;
+  }
+
   return {
     initialize,
     close,
@@ -576,5 +700,6 @@ export function createDocIndexer(
     clear,
     setStore,
     setEmbedFunction,
+    setDatabase,
   };
 }

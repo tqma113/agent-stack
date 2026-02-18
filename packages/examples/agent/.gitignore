@@ -1,6 +1,3 @@
-# Runtime data
-.ai-stack/
-
 # Environment
 .env.local
 
@@ -9,3 +6,4 @@ node_modules/
 
 # Logs
 *.log
+rush-logs

@@ -1,19 +1,21 @@
 'use strict';
 
 var knowledge = require('@ai-stack/knowledge');
-var memoryStoreSqlite = require('@ai-stack/memory-store-sqlite');
 
 // src/store-context.ts
 var knowledgeManager = null;
-var semanticStore = null;
 async function getKnowledgeContext() {
-  if (!knowledgeManager || !semanticStore) {
-    const dbPath = process.env.KNOWLEDGE_DB_PATH || process.env.MEMORY_DB_PATH || ".ai-stack/memory.db";
+  if (!knowledgeManager) {
+    const knowledgeDbPath = process.env.KNOWLEDGE_DB_PATH || "knowledge/sqlite.db";
     const rootDir = process.env.KNOWLEDGE_ROOT_DIR || ".";
-    const stores = await memoryStoreSqlite.createSqliteStores({ dbPath });
-    await stores.initialize();
-    semanticStore = stores.semanticStore;
     knowledgeManager = knowledge.createKnowledgeManager({
+      dbPath: knowledgeDbPath,
+      semantic: {
+        vectorDimensions: 1536,
+        // OpenAI text-embedding-3-small
+        enableVectorSearch: true,
+        enableFtsSearch: true
+      },
       code: {
         enabled: true,
         rootDir,
@@ -24,10 +26,13 @@ async function getKnowledgeContext() {
           "**/build/**",
           "**/.git/**",
           "**/coverage/**"
-        ]
+        ],
+        defaultAction: "incremental"
+        // Skip user interaction
       },
       doc: {
-        enabled: true
+        enabled: true,
+        defaultAction: "incremental"
       },
       search: {
         defaultWeights: { fts: 0.3, vector: 0.7 },
@@ -35,11 +40,9 @@ async function getKnowledgeContext() {
       }
     });
     await knowledgeManager.initialize();
-    knowledgeManager.setStore(semanticStore);
   }
   return {
-    manager: knowledgeManager,
-    store: semanticStore
+    manager: knowledgeManager
   };
 }
 

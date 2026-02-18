@@ -117,8 +117,8 @@ export type MemoryManagerConfig = Omit<MemoryConfig, 'dbPath'>;
  * @example
  * ```typescript
  * // Using SQLite stores (high performance)
- * import { createSqliteStores } from '@ai-stack/memory-store-sqlite';
- * const stores = await createSqliteStores({ dbPath: './memory.db' });
+ * import { createSqliteStores } from '@ai-stack/memory-store-sqlite';  
+ * const stores = await createSqliteStores({ dbPath: './memory/sqlite.db' });
  * const memory = createMemoryManager(stores);
  * await memory.initialize();
  *

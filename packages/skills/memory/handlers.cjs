@@ -42,7 +42,7 @@ var fs = __toESM(require("fs"), 1);
 var path = __toESM(require("path"), 1);
 var import_memory_store_sqlite = require("@ai-stack/memory-store-sqlite");
 var DEFAULT_CONFIG = {
-  dbPath: ".ai-stack/memory.db",
+  dbPath: "memory/sqlite.db",
   debug: false
 };
 var instance = null;

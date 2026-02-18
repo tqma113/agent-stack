@@ -534,7 +534,7 @@ class Agent {
 {
   "model": "gpt-4o",
   "memory": {
-    "dbPath": ".ai-stack/memory.db",
+    "dbPath": "memory/sqlite.db",
     "tokenBudget": {
       "profile": 200,
       "taskState": 300,

@@ -27,7 +27,7 @@ import { StoreInitializationError } from './errors.js';
 export interface SqliteStoresConfig {
   /**
    * Path to the SQLite database file
-   * @default '.ai-stack/memory.db'
+   * @default 'memory/sqlite.db'
    */
   dbPath?: string;
 
@@ -85,7 +85,7 @@ export interface SqliteMemoryStores extends MemoryStores {
  *
  * @example
  * ```typescript
- * const stores = await createSqliteStores({ dbPath: './memory.db' });
+ * const stores = await createSqliteStores({ dbPath: './memory/sqlite.db' });
  * await stores.initialize();
  *
  * // Use stores...
@@ -96,7 +96,7 @@ export interface SqliteMemoryStores extends MemoryStores {
  * ```
  */
 export async function createSqliteStores(config: SqliteStoresConfig = {}): Promise<SqliteMemoryStores> {
-  const dbPath = config.dbPath || '.ai-stack/memory.db';
+  const dbPath = config.dbPath || 'memory/sqlite.db';
 
   // Ensure directory exists
   const dbDir = path.dirname(dbPath);

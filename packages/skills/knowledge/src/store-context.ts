@@ -2,36 +2,37 @@
  * Store Context Management
  *
  * Manages the singleton knowledge manager instance for the skill.
+ * Knowledge now manages its own database and SemanticStore independently.
  */
 
 import {
   createKnowledgeManager,
   type KnowledgeManagerInstance,
 } from '@ai-stack/knowledge';
-import { createSqliteStores, type SemanticStoreInstance } from '@ai-stack/memory-store-sqlite';
 
 let knowledgeManager: KnowledgeManagerInstance | null = null;
-let semanticStore: SemanticStoreInstance | null = null;
 
 /**
  * Get or create the knowledge manager
  */
 export async function getKnowledgeContext(): Promise<{
   manager: KnowledgeManagerInstance;
-  store: SemanticStoreInstance;
 }> {
-  if (!knowledgeManager || !semanticStore) {
-    // Get database path from environment or use default
-    const dbPath = process.env.KNOWLEDGE_DB_PATH || process.env.MEMORY_DB_PATH || '.ai-stack/memory.db';
+  if (!knowledgeManager) {
+    // Get config from environment or use defaults
+    const knowledgeDbPath = process.env.KNOWLEDGE_DB_PATH || 'knowledge/sqlite.db';
     const rootDir = process.env.KNOWLEDGE_ROOT_DIR || '.';
 
-    // Create SQLite stores and initialize
-    const stores = await createSqliteStores({ dbPath });
-    await stores.initialize();
-    semanticStore = stores.semanticStore;
-
-    // Create knowledge manager
+    // Create knowledge manager with dbPath
+    // Manager will auto-create database and SemanticStore during initialize()
+    // In skill context, we use default 'incremental' action (no user interaction)
     knowledgeManager = createKnowledgeManager({
+      dbPath: knowledgeDbPath,
+      semantic: {
+        vectorDimensions: 1536, // OpenAI text-embedding-3-small
+        enableVectorSearch: true,
+        enableFtsSearch: true,
+      },
       code: {
         enabled: true,
         rootDir,
@@ -43,9 +44,11 @@ export async function getKnowledgeContext(): Promise<{
           '**/.git/**',
           '**/coverage/**',
         ],
+        defaultAction: 'incremental', // Skip user interaction
       },
       doc: {
         enabled: true,
+        defaultAction: 'incremental',
       },
       search: {
         defaultWeights: { fts: 0.3, vector: 0.7 },
@@ -53,14 +56,12 @@ export async function getKnowledgeContext(): Promise<{
       },
     });
 
-    // Initialize first (creates indexers), then set store
+    // Initialize (creates database, SemanticStore, and indexers)
     await knowledgeManager.initialize();
-    knowledgeManager.setStore(semanticStore);
   }
 
   return {
     manager: knowledgeManager,
-    store: semanticStore,
   };
 }
 
@@ -69,8 +70,8 @@ export async function getKnowledgeContext(): Promise<{
  */
 export async function closeKnowledgeContext(): Promise<void> {
   if (knowledgeManager) {
+    // Manager will close its own database and SemanticStore
     await knowledgeManager.close();
     knowledgeManager = null;
-    semanticStore = null;
   }
 }

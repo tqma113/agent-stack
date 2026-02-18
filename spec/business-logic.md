@@ -860,7 +860,7 @@ const agent = createAgent({
   name: 'Memory Agent',
   memory: {
     enabled: true,
-    dbPath: '.ai-stack/memory.db',
+    dbPath: 'memory/sqlite.db',
     autoInitialize: true,
     autoInject: true,
   }
@@ -900,7 +900,7 @@ await agent.close();  // 关闭所有资源 (MCP, Skill, Memory)
 {
   "memory": {
     "enabled": true,
-    "dbPath": ".ai-stack/memory.db",
+    "dbPath": "memory/sqlite.db",
     "autoInitialize": true,
     "autoInject": true,
     "tokenBudget": {
@@ -1312,6 +1312,7 @@ Knowledge 功能采用混合方案，参照 Memory 的设计：
 const agent = createAgent({
   knowledge: {
     enabled: true,
+    dbPath: 'knowledge/sqlite.db', // 索引数据库路径
     code: {
       enabled: true,
       rootDir: './src',
@@ -1334,7 +1335,80 @@ const agent = createAgent({
 });
 ```
 
-### 10.3 自动检索流程
+### 10.3 索引状态持久化
+
+Knowledge 使用独立的 SQLite 数据库持久化索引状态，避免每次启动重新索引：
+
+**数据库结构**：
+```
+memory/
+  └── sqlite.db           # Memory 系统数据库
+knowledge/
+  └── sqlite.db           # Knowledge 独立数据库 (完全自包含)
+      ├── code_index_status   # 代码文件索引状态
+      ├── doc_sources         # 文档源
+      ├── doc_pages           # 文档页面
+      ├── semantic_chunks     # 语义 chunks (FTS5)
+      └── vec_chunks          # 向量索引 (sqlite-vec)
+```
+
+**初始化流程**：
+```
+应用启动
+    │
+    ▼
+┌─────────────────────────────────────┐
+│ 1. 检测已有索引                       │
+│    - hasIndexedFiles(rootDir)        │
+│    - hasIndexedSources()             │
+└─────────────────────────────────────┘
+    │ 存在已有索引
+    ▼
+┌─────────────────────────────────────┐
+│ 2. 调用 onExistingIndex 回调         │
+│    - 返回已有索引摘要信息            │
+│    - 让用户选择操作                   │
+└─────────────────────────────────────┘
+    │
+    ▼
+┌─────────────────────────────────────┐
+│ 3. 根据用户选择执行                   │
+│    - reindex_all: 清除后重新索引     │
+│    - incremental: 仅索引新增/变更    │
+│    - skip: 跳过索引                  │
+└─────────────────────────────────────┘
+```
+
+**用户交互回调示例**：
+```typescript
+const manager = createKnowledgeManager({
+  code: {
+    rootDir: './src',
+    onExistingIndex: async (info) => {
+      console.log(`Found ${info.summary.totalItems} indexed files`);
+
+      // CLI 场景: 使用 inquirer
+      const { action } = await inquirer.prompt([{
+        type: 'list',
+        name: 'action',
+        message: 'Existing index found. What to do?',
+        choices: [
+          { name: 'Update incrementally', value: 'incremental' },
+          { name: 'Re-index everything', value: 'reindex_all' },
+          { name: 'Skip indexing', value: 'skip' },
+        ],
+      }]);
+
+      return action;
+    },
+    defaultAction: 'incremental', // 无回调时的默认行为
+  },
+});
+```
+
+---
+
+### 10.4 自动检索流程
 
 当 `autoSearch` 和 `autoInject` 启用时，Agent 在每次对话中自动：
 
@@ -1346,6 +1420,7 @@ const agent = createAgent({
 │ 1. 自动初始化 Knowledge (首次)       │
 │    - 创建 KnowledgeManager           │
 │    - 连接 SemanticStore              │
+│    - 设置 Knowledge 数据库           │
 └─────────────────────────────────────┘
     │
     ▼
@@ -1358,7 +1433,7 @@ const agent = createAgent({
     │
     ▼
 ┌─────────────────────────────────────┐
-│ 3. 注入上下文到 System Prompt        │
+│ 3. 注入上下文到 System Prompt       │
 │    - 代码片段 (文件路径 + 行号)      │
 │    - 文档片段 (URL + 章节)           │
 └─────────────────────────────────────┘
@@ -1370,7 +1445,7 @@ const agent = createAgent({
 └─────────────────────────────────────┘
 ```
 
-### 10.4 Knowledge Skill 工具
+### 10.5 Knowledge Skill 工具
 
 通过 `@ai-stack-skill/knowledge` 提供显式管理工具：
 
@@ -1384,7 +1459,7 @@ const agent = createAgent({
 | `crawl_docs` | 爬取文档 | `/doc crawl` |
 | `get_knowledge_stats` | 获取统计 | `/doc status` |
 
-### 10.5 使用示例
+### 10.6 使用示例
 
 ```typescript
 import { createAgent } from '@ai-stack/agent';

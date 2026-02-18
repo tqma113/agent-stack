@@ -8,6 +8,7 @@ import { glob } from 'glob';
 import { createHash } from 'crypto';
 import { readFile, stat } from 'fs/promises';
 import { resolve, relative } from 'path';
+import type Database from 'better-sqlite3';
 import type {
   SemanticStoreInstance,
   SemanticChunkInput,
@@ -23,12 +24,14 @@ import type {
   CodeSearchOptions,
   KnowledgeSearchResult,
   CodeBlock,
+  IndexAction,
 } from '../types.js';
 import { DEFAULT_CODE_INDEXER_CONFIG } from '../types.js';
 import { CodeIndexError } from '../errors.js';
 import { createChunker, type ChunkerInstance } from './chunker.js';
 import { createWatcher, createWatcherConfig, type WatcherInstance, type FileChangeEvent } from './watcher.js';
 import { detectLanguage } from './languages/index.js';
+import { createCodeIndexStore, type CodeIndexStoreInstance } from '../stores/code-index-store.js';
 
 /**
  * Code indexer instance interface
@@ -78,13 +81,9 @@ export interface CodeIndexerInstance {
 
   /** Set embed function */
   setEmbedFunction(fn: EmbedFunction): void;
-}
 
-/**
- * In-memory index status storage
- */
-interface IndexStatusStore {
-  statuses: Map<string, IndexStatus>;
+  /** Set database for persistent storage */
+  setDatabase(db: Database.Database): void;
 }
 
 /**
@@ -93,7 +92,7 @@ interface IndexStatusStore {
 export function createCodeIndexer(
   config: Partial<CodeIndexerConfig> = {}
 ): CodeIndexerInstance {
-  const cfg: Required<CodeIndexerConfig> = {
+  const cfg = {
     ...DEFAULT_CODE_INDEXER_CONFIG,
     ...config,
   };
@@ -104,11 +103,11 @@ export function createCodeIndexer(
   let watcher: WatcherInstance | null = null;
   let embedFunction: EmbedFunction | undefined;
   let initialized = false;
+  let skipIndexing = false;
 
-  // Index status storage (in-memory for now, could be persisted)
-  const statusStore: IndexStatusStore = {
-    statuses: new Map(),
-  };
+  // Persistent index status store
+  const indexStore = createCodeIndexStore();
+  let dbSet = false;
 
   /**
    * Compute content hash
@@ -186,8 +185,8 @@ export function createCodeIndexer(
       const content = await readFile(filePath, 'utf-8');
       const contentHash = computeHash(content);
 
-      // Check if already indexed with same hash
-      const existingStatus = statusStore.statuses.get(filePath);
+      // Check if already indexed with same hash (from persistent store if available)
+      const existingStatus = dbSet ? indexStore.get(filePath) : null;
       if (existingStatus && existingStatus.contentHash === contentHash) {
         return {
           filePath,
@@ -245,14 +244,17 @@ export function createCodeIndexer(
         chunksAdded++;
       }
 
-      // Update status
-      statusStore.statuses.set(filePath, {
-        filePath,
-        contentHash,
-        indexedAt: Date.now(),
-        chunkCount: chunksAdded,
-        status: 'indexed',
-      });
+      // Update status (persistent store if available)
+      if (dbSet) {
+        indexStore.set({
+          filePath,
+          contentHash,
+          indexedAt: Date.now(),
+          chunkCount: chunksAdded,
+          status: 'indexed',
+          rootDir: cfg.rootDir,
+        });
+      }
 
       return {
         filePath,
@@ -262,15 +264,18 @@ export function createCodeIndexer(
         durationMs: Date.now() - startTime,
       };
     } catch (error) {
-      // Update status with error
-      statusStore.statuses.set(filePath, {
-        filePath,
-        contentHash: '',
-        indexedAt: Date.now(),
-        chunkCount: 0,
-        status: 'error',
-        error: (error as Error).message,
-      });
+      // Update status with error (persistent store if available)
+      if (dbSet) {
+        indexStore.set({
+          filePath,
+          contentHash: '',
+          indexedAt: Date.now(),
+          chunkCount: 0,
+          status: 'error',
+          error: (error as Error).message,
+          rootDir: cfg.rootDir,
+        });
+      }
 
       return {
         filePath,
@@ -297,6 +302,12 @@ export function createCodeIndexer(
       totalDurationMs: 0,
       errors: [],
     };
+
+    // Skip indexing if user chose to skip during initialization
+    if (skipIndexing) {
+      summary.totalDurationMs = Date.now() - startTime;
+      return summary;
+    }
 
     if (!store) {
       throw new CodeIndexError('Store not set');
@@ -400,7 +411,9 @@ export function createCodeIndexer(
    * Remove file from index
    */
   async function removeFile(filePath: string): Promise<void> {
-    statusStore.statuses.delete(filePath);
+    if (dbSet) {
+      indexStore.delete(filePath);
+    }
     // Note: Chunks are not actually deleted from SemanticStore
     // as we don't have a way to delete by metadata
     // This would require extending SemanticStore interface
@@ -457,24 +470,18 @@ export function createCodeIndexer(
    * Get index status
    */
   async function getStatus(): Promise<IndexStatusSummary> {
-    const statuses = Array.from(statusStore.statuses.values());
+    if (dbSet) {
+      return indexStore.getSummary(cfg.rootDir);
+    }
 
-    const indexedFiles = statuses.filter((s) => s.status === 'indexed').length;
-    const pendingFiles = statuses.filter((s) => s.status === 'pending').length;
-    const errorFiles = statuses.filter((s) => s.status === 'error').length;
-    const totalChunks = statuses.reduce((sum, s) => sum + s.chunkCount, 0);
-
-    const lastIndexed = statuses
-      .filter((s) => s.status === 'indexed')
-      .sort((a, b) => b.indexedAt - a.indexedAt)[0];
-
+    // Fallback to empty status if no database
     return {
-      totalFiles: statuses.length,
-      indexedFiles,
-      pendingFiles,
-      errorFiles,
-      totalChunks,
-      lastIndexedAt: lastIndexed?.indexedAt,
+      totalFiles: 0,
+      indexedFiles: 0,
+      pendingFiles: 0,
+      errorFiles: 0,
+      totalChunks: 0,
+      lastIndexedAt: undefined,
     };
   }
 
@@ -482,14 +489,19 @@ export function createCodeIndexer(
    * Get file index status
    */
   async function getFileStatus(filePath: string): Promise<IndexStatus | null> {
-    return statusStore.statuses.get(filePath) || null;
+    if (dbSet) {
+      return indexStore.get(filePath);
+    }
+    return null;
   }
 
   /**
    * Clear all indexed data
    */
   async function clear(): Promise<void> {
-    statusStore.statuses.clear();
+    if (dbSet) {
+      indexStore.clearByRootDir(cfg.rootDir);
+    }
 
     if (store) {
       // Note: This clears all semantic chunks, not just code
@@ -555,6 +567,39 @@ export function createCodeIndexer(
   async function initialize(): Promise<void> {
     if (initialized) return;
 
+    // Initialize persistent store if database is set
+    if (dbSet) {
+      await indexStore.initialize();
+
+      // Check for existing index and ask user what to do
+      if (indexStore.hasIndexedFiles(cfg.rootDir)) {
+        const summary = indexStore.getSummary(cfg.rootDir);
+
+        let action: IndexAction = cfg.defaultAction ?? 'incremental';
+
+        if (cfg.onExistingIndex) {
+          action = await cfg.onExistingIndex({
+            type: 'code',
+            summary: {
+              totalItems: summary.totalFiles,
+              totalChunks: summary.totalChunks,
+              lastUpdatedAt: summary.lastIndexedAt,
+              details: `Root: ${cfg.rootDir}, ${summary.indexedFiles} indexed, ${summary.errorFiles} errors`,
+            },
+          });
+        }
+
+        if (action === 'reindex_all') {
+          // Clear existing index data
+          indexStore.clearByRootDir(cfg.rootDir);
+        } else if (action === 'skip') {
+          // Set flag to skip indexing
+          skipIndexing = true;
+        }
+        // 'incremental' is the default behavior - just continue normally
+      }
+    }
+
     // Create chunker
     chunker = createChunker({
       maxTokens: cfg.chunkTokens,
@@ -577,6 +622,7 @@ export function createCodeIndexer(
     if (watcher) {
       await watcher.stop();
     }
+    await indexStore.close();
     initialized = false;
   }
 
@@ -597,6 +643,14 @@ export function createCodeIndexer(
     }
   }
 
+  /**
+   * Set database for persistent storage
+   */
+  function setDatabase(db: Database.Database): void {
+    indexStore.setDatabase(db);
+    dbSet = true;
+  }
+
   return {
     initialize,
     close,
@@ -613,5 +667,6 @@ export function createCodeIndexer(
     isWatching,
     setStore,
     setEmbedFunction,
+    setDatabase,
   };
 }

@@ -444,7 +444,7 @@ await memory.initialize();
 // 生产环境 - SQLite store (高性能)
 import { createSqliteStores } from '@ai-stack/memory-store-sqlite';
 
-const stores = await createSqliteStores({ dbPath: './memory.db' });
+const stores = await createSqliteStores({ dbPath: './memory/sqlite.db' });
 const memory = createMemoryManager(stores);
 await memory.initialize();
 ```
@@ -465,6 +465,11 @@ packages/libs/knowledge/
 │   ├── errors.ts                   # 错误类
 │   ├── manager.ts                  # createKnowledgeManager() 统一管理
 │   │
+│   ├── stores/                     # 持久化存储模块
+│   │   ├── index.ts                # Store 导出
+│   │   ├── code-index-store.ts     # createCodeIndexStore() 代码索引状态存储
+│   │   └── doc-registry-store.ts   # createDocRegistryStore() 文档源/页面存储
+│   │
 │   ├── code/                       # 代码索引模块
 │   │   ├── index.ts                # 模块导出
 │   │   ├── indexer.ts              # createCodeIndexer() 代码索引器
@@ -480,7 +485,7 @@ packages/libs/knowledge/
 │   │   ├── indexer.ts              # createDocIndexer() 文档索引器
 │   │   ├── crawler.ts              # URL 爬取
 │   │   ├── parser.ts               # HTML → Markdown
-│   │   └── registry.ts             # 文档源管理
+│   │   └── registry.ts             # 文档源管理 (in-memory, 用于兼容)
 │   │
 │   └── retriever/                  # 统一检索
 │       ├── index.ts                # 模块导出
@@ -497,10 +502,12 @@ packages/libs/knowledge/
 
 | 模块 | 功能 | 说明 |
 |------|------|------|
+| CodeIndexStore | 代码索引状态 | 持久化文件索引状态到 SQLite |
+| DocRegistryStore | 文档注册表 | 持久化文档源和页面到 SQLite |
 | CodeIndexer | 代码索引 | AST 解析、智能切分、文件监听 |
 | DocIndexer | 文档索引 | URL 爬取、HTML 解析、章节提取 |
 | HybridSearch | 混合搜索 | FTS + Vector + 时间衰减 + MMR |
-| KnowledgeManager | 统一管理 | 协调代码和文档索引 |
+| KnowledgeManager | 统一管理 | 协调代码和文档索引、数据库管理 |
 
 ### 7.3 package.json
 
@@ -511,6 +518,8 @@ packages/libs/knowledge/
   "dependencies": {
     "@ai-stack/memory-store-sqlite": "workspace:*",
     "@ai-stack/memory": "workspace:*",
+    "better-sqlite3": "^11.7.0",
+    "sqlite-vec": "^0.1.6",
     "node-html-markdown": "^1.3.0",
     "glob": "^11.0.0",
     "chokidar": "^4.0.0"
@@ -524,24 +533,36 @@ packages/libs/knowledge/
 import { createKnowledgeManager } from '@ai-stack/knowledge';
 import { createSqliteStores } from '@ai-stack/memory-store-sqlite';
 
-// 创建存储
-const stores = await createSqliteStores({ dbPath: './knowledge.db' });
+// 创建 Memory 存储 (用于 SemanticStore)
+const stores = await createSqliteStores({ dbPath: 'memory/sqlite.db' });
 
-// 创建知识管理器
+// 创建知识管理器，配置数据库路径和用户交互回调
 const knowledge = createKnowledgeManager({
+  dbPath: 'knowledge/sqlite.db', // 索引数据库路径，会自动创建
   code: {
     enabled: true,
     rootDir: './src',
     include: ['**/*.ts', '**/*.tsx'],
     watch: true,
+    // 检测到已有索引时的回调
+    onExistingIndex: async (info) => {
+      console.log(`Found existing code index: ${info.summary.totalItems} files`);
+      // 使用 inquirer 或其他方式询问用户
+      const answer = await prompt('Re-index all / Update incrementally / Skip');
+      return answer; // 'reindex_all' | 'incremental' | 'skip'
+    },
+    defaultAction: 'incremental', // 无回调时的默认行为
   },
   doc: {
     enabled: true,
+    onExistingIndex: async (info) => {
+      console.log(`Found existing doc index: ${info.summary.totalItems} sources`);
+      return 'incremental';
+    },
   },
 });
 
-// 设置存储
-knowledge.setStore(stores.semantic);
+// 初始化 (自动创建数据库和 SemanticStore)
 await knowledge.initialize();
 
 // 索引代码
@@ -562,6 +583,10 @@ const results = await knowledge.search('useEffect cleanup', {
   sources: ['code', 'doc'],
   limit: 10,
 });
+
+// 清理
+await knowledge.close();
+knowledgeDb.close();
 ```
 
 ---
