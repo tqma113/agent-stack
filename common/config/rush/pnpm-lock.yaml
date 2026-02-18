@@ -12,6 +12,9 @@ importers:
 
   ../../packages/examples/agent:
     dependencies:
+      '@ai-stack-mcp/bash':
+        specifier: workspace:*
+        version: link:../../mcp-servers/bash
       '@ai-stack-mcp/fetch':
         specifier: workspace:*
         version: link:../../mcp-servers/fetch

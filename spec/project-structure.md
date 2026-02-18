@@ -12,27 +12,30 @@ ai-stack/
 │   │   ├── memory/             # @ai-stack/memory (策略层)
 │   │   ├── memory-store-sqlite/# @ai-stack/memory-store-sqlite (SQLite 存储)
 │   │   ├── memory-store-json/  # @ai-stack/memory-store-json (JSON 存储)
-│   │   └── index/              # @ai-stack/agent
+│   │   ├── knowledge/          # @ai-stack/knowledge (代码和文档索引)
+│   │   └── agent/              # @ai-stack/agent (Agent + Permission)
 │   ├── skills/                 # 自定义 Skills (@ai-stack-skill/*)
-│   │   └── memory/             # @ai-stack-skill/memory
+│   │   ├── memory/             # @ai-stack-skill/memory
+│   │   └── knowledge/          # @ai-stack-skill/knowledge
 │   └── mcp-servers/            # 自定义 MCP 服务器 (@ai-stack-mcp/*)
 │       ├── fetch/              # @ai-stack-mcp/fetch
 │       ├── time/               # @ai-stack-mcp/time
-│       └── git/                # @ai-stack-mcp/git
+│       ├── git/                # @ai-stack-mcp/git
+│       └── bash/               # @ai-stack-mcp/bash
 ├── example/                    # 示例项目
-│   ├── .ai-stack.json      # Agent 配置示例
-│   ├── .mcp.json              # MCP 配置示例
-│   └── skills/                # 示例 Skills
+│   ├── .ai-stack.json          # Agent 配置示例
+│   ├── .mcp.json               # MCP 配置示例
+│   └── skills/                 # 示例 Skills
 ├── common/                     # Rush 公共目录
-│   ├── config/rush/           # Rush 配置
-│   ├── scripts/               # Rush 脚本
-│   └── temp/                  # 临时文件
-├── .claude/                   # Claude Code 配置
-├── .ttadk/                    # TTADK 插件
-├── .github/                   # GitHub 配置
-├── .mcp.json                  # MCP 服务器配置
-├── spec/                      # 项目文档
-└── rush.json                  # Rush 主配置
+│   ├── config/rush/            # Rush 配置
+│   ├── scripts/                # Rush 脚本
+│   └── temp/                   # 临时文件
+├── .claude/                    # Claude Code 配置
+├── .ttadk/                     # TTADK 插件
+├── .github/                    # GitHub 配置
+├── .mcp.json                   # MCP 服务器配置
+├── spec/                       # 项目文档
+└── rush.json                   # Rush 主配置
 ```
 
 ---
@@ -94,13 +97,17 @@ packages/libs/provider/
 ### 3.1 目录结构
 
 ```
-packages/libs/index/
+packages/libs/agent/
 ├── src/
 │   ├── index.ts               # 包入口
 │   ├── agent.ts               # Agent 类实现
 │   ├── types.ts               # 类型定义
 │   ├── config.ts              # 配置文件加载
 │   ├── cli.ts                 # 命令式 CLI
+│   ├── permission/            # 权限管控模块
+│   │   ├── index.ts           # 权限模块导出
+│   │   ├── types.ts           # 权限类型定义
+│   │   └── policy.ts          # 权限策略实现
 │   └── ui/                    # 终端 UI 模块
 │       ├── index.ts           # UI 模块导出
 │       ├── types.ts           # UI 类型定义
@@ -123,6 +130,7 @@ packages/libs/index/
 | `src/types.ts` | Agent 相关类型定义 |
 | `src/config.ts` | 配置文件加载和解析 (.ai-stack.json) |
 | `src/cli.ts` | 命令式 CLI，支持 chat/run/tools/config 命令 |
+| `src/permission/` | 权限管控模块，实现工具执行前的权限检查和确认 |
 | `src/ui/` | 终端 UI 模块，提供现代化界面组件 |
 
 ### 3.3 package.json 关键配置

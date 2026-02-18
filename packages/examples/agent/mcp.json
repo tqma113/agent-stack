@@ -11,28 +11,23 @@
     },
     "fetch": {
       "command": "npx",
-      "args": [
-        "-y",
-        "@ai-stack-mcp/fetch"
-      ],
+      "args": ["mcp-fetch"],
       "env": {}
     },
     "time": {
       "command": "npx",
-      "args": [
-        "-y",
-        "@ai-stack-mcp/time"
-      ],
+      "args": ["mcp-time"],
       "env": {}
     },
     "git": {
       "command": "npx",
-      "args": [
-        "-y",
-        "@ai-stack-mcp/git"
-      ],
+      "args": ["mcp-git"],
       "env": {}
     },
+    "bash": {
+      "command": "npx",
+      "args": ["mcp-bash"]
+    }
     // "brave-search": {
     //   "command": "npx",
     //   "args": ["-y", "@brave/brave-search-mcp-server", "--transport", "http"],
@@ -45,25 +40,18 @@
     //     "@modelcontextprotocol/server-sequential-thinking"
     //   ]
     // },
-    "chrome-devtools": {
-      "command": "npx",
-      "args": [
-        "-y",
-        "chrome-devtools-mcp@latest",
-        "--no-usage-statistics",
-        "--no-performance-crux"
-      ]
-    },
+    // "chrome-devtools": {
+    //   "command": "npx",
+    //   "args": [
+    //     "-y",
+    //     "chrome-devtools-mcp@latest",
+    //     "--no-usage-statistics",
+    //     "--no-performance-crux"
+    //   ]
+    // },
     // "github": {
     //   "type": "http",
     //   "url": "https://api.githubcopilot.com/mcp"
     // }
-    "bash": {
-      "command": "npx",
-      "args": [
-        "-y",
-        "@ai-stack-mcp/bash"
-      ]
-    },
   }
 }

@@ -2120,3 +2120,252 @@ export {
   DEFAULT_DOC_INDEXER_CONFIG,
 };
 ```
+
+---
+
+## 7. 权限系统
+
+### 7.1 createPermissionPolicy() 工厂函数
+
+创建权限策略实例。
+
+#### 创建实例
+
+```typescript
+const policy = createPermissionPolicy(config?: PermissionPolicyConfig): PermissionPolicyInstance
+```
+
+**PermissionPolicyConfig**:
+
+| 参数 | 类型 | 默认值 | 描述 |
+|------|------|--------|------|
+| `defaultLevel` | `PermissionLevel` | `'confirm'` | 默认权限级别 |
+| `rules` | `PermissionRule[]` | 内置规则 | 权限规则列表 |
+| `sessionMemory` | `boolean` | `true` | 是否记住会话内批准 |
+| `categoryDefaults` | `Record<ToolCategory, PermissionLevel>` | 默认配置 | 分类默认权限 |
+| `categoryPatterns` | `Array<{pattern, category}>` | 默认模式 | 自动分类模式 |
+
+---
+
+#### checkPermission()
+
+检查工具的权限级别。
+
+```typescript
+checkPermission(toolName: string, args?: Record<string, unknown>): PermissionDecision
+```
+
+**PermissionDecision**:
+
+```typescript
+{
+  level: PermissionLevel;      // 'auto' | 'confirm' | 'deny'
+  matchedRule: PermissionRule | null;
+  toolName: string;
+  category?: ToolCategory;
+}
+```
+
+---
+
+#### requestConfirmation()
+
+请求用户确认。
+
+```typescript
+async requestConfirmation(request: ConfirmationRequest): Promise<ConfirmationResponse>
+```
+
+**ConfirmationRequest**:
+
+| 字段 | 类型 | 描述 |
+|------|------|------|
+| `toolName` | `string` | 工具名称 |
+| `args` | `Record<string, unknown>` | 工具参数 |
+| `description` | `string` | 工具描述 |
+| `rule` | `PermissionRule` | 匹配的规则 |
+| `actionDescription` | `string` | 操作描述 |
+
+**ConfirmationResponse**:
+
+| 字段 | 类型 | 描述 |
+|------|------|------|
+| `allowed` | `boolean` | 是否允许执行 |
+| `rememberForSession` | `boolean` | 记住本会话 |
+| `rememberPermanently` | `boolean` | 永久记住 (添加规则) |
+| `message` | `string` | 用户消息 |
+
+---
+
+#### 规则管理方法
+
+```typescript
+// 添加规则 (高优先级)
+addRule(rule: PermissionRule): void
+
+// 移除规则
+removeRule(toolPattern: string): boolean
+
+// 获取所有规则
+getRules(): PermissionRule[]
+```
+
+---
+
+#### 会话管理方法
+
+```typescript
+// 批准工具 (本会话)
+approveForSession(toolName: string): void
+
+// 检查是否已批准
+isApprovedForSession(toolName: string): boolean
+
+// 清除会话批准
+clearSessionApprovals(): void
+```
+
+---
+
+#### 审计日志方法
+
+```typescript
+// 获取审计日志
+getAuditLog(): PermissionAuditEntry[]
+
+// 记录审计
+logAudit(entry: Omit<PermissionAuditEntry, 'timestamp'>): void
+
+// 清除审计日志
+clearAuditLog(): void
+```
+
+**PermissionAuditEntry**:
+
+```typescript
+{
+  timestamp: number;
+  toolName: string;
+  args: Record<string, unknown>;
+  decision: PermissionDecision;
+  userResponse?: ConfirmationResponse;
+  executed: boolean;
+  result?: string;
+  error?: string;
+}
+```
+
+---
+
+#### 其他方法
+
+```typescript
+// 设置确认回调
+setConfirmationCallback(callback: PermissionCallback | null): void
+
+// 获取工具分类
+getToolCategory(toolName: string): ToolCategory
+
+// 获取当前配置
+getConfig(): PermissionPolicyConfig
+```
+
+---
+
+### 7.2 Agent 权限集成
+
+Agent 中的权限相关方法：
+
+```typescript
+// 获取权限策略实例
+getPermissionPolicy(): PermissionPolicyInstance | null
+
+// 添加权限规则
+addPermissionRule(rule: PermissionRule): void
+
+// 移除权限规则
+removePermissionRule(toolPattern: string): boolean
+
+// 设置确认回调
+setPermissionCallback(callback: PermissionCallback | null): void
+
+// 清除会话批准
+clearSessionApprovals(): void
+
+// 获取审计日志
+getPermissionAuditLog(): PermissionAuditEntry[]
+```
+
+---
+
+### 7.3 AgentPermissionConfig
+
+```typescript
+interface AgentPermissionConfig {
+  /** 是否启用权限检查 */
+  enabled?: boolean;
+  /** 默认权限级别 */
+  defaultLevel?: PermissionLevel;
+  /** 权限规则 */
+  rules?: PermissionRule[];
+  /** 会话记忆 */
+  sessionMemory?: boolean;
+  /** 分类默认权限 */
+  categoryDefaults?: Partial<Record<ToolCategory, PermissionLevel>>;
+  /** 确认回调 */
+  onConfirm?: (request: ConfirmationRequest) => Promise<ConfirmationResponse>;
+  /** 拒绝回调 */
+  onDeny?: (toolName: string, args: Record<string, unknown>, reason: string) => void;
+  /** 执行回调 (审计) */
+  onExecute?: (toolName: string, args: Record<string, unknown>, result: string, allowed: boolean) => void;
+}
+```
+
+---
+
+### 7.4 类型定义
+
+```typescript
+// 权限级别
+type PermissionLevel = 'auto' | 'confirm' | 'deny';
+
+// 工具分类
+type ToolCategory = 'read' | 'write' | 'execute' | 'network' | 'git' | 'admin' | 'other';
+
+// 权限规则
+interface PermissionRule {
+  tool: string;           // 工具名模式
+  level: PermissionLevel; // 权限级别
+  category?: ToolCategory;
+  description?: string;
+}
+
+// 确认回调
+type PermissionCallback = (request: ConfirmationRequest) => Promise<ConfirmationResponse>;
+```
+
+---
+
+### 7.5 从 @ai-stack/agent 导出
+
+```typescript
+export {
+  // 权限系统
+  createPermissionPolicy,
+  DEFAULT_RULES,
+  DEFAULT_CATEGORY_PATTERNS,
+  DEFAULT_PERMISSION_CONFIG,
+
+  // 类型
+  type PermissionLevel,
+  type ToolCategory,
+  type PermissionRule,
+  type PermissionDecision,
+  type ConfirmationRequest,
+  type ConfirmationResponse,
+  type PermissionPolicyConfig,
+  type PermissionCallback,
+  type PermissionAuditEntry,
+  type PermissionPolicyInstance,
+};
+```

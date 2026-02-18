@@ -7,6 +7,14 @@ import type { MCPToolBridgeOptions } from '@ai-stack/mcp';
 import type { SkillToolBridgeOptions, SkillEntry } from '@ai-stack/skill';
 import type { MemoryConfig, TokenBudget, WritePolicyConfig, RetrievalConfig } from '@ai-stack/memory';
 import type { CodeIndexerConfig, DocIndexerConfig, DocSourceInput } from '@ai-stack/knowledge';
+import type {
+  PermissionLevel,
+  ToolCategory,
+  PermissionRule,
+  PermissionPolicyConfig,
+  ConfirmationRequest,
+  ConfirmationResponse,
+} from './permission/types.js';
 
 /**
  * MCP configuration for Agent
@@ -134,6 +142,31 @@ export interface AgentConfig {
   memory?: AgentMemoryConfig | boolean;
   /** Knowledge configuration for code and document indexing */
   knowledge?: AgentKnowledgeConfig | boolean;
+
+  /** Permission configuration for tool execution control */
+  permission?: AgentPermissionConfig | boolean;
+}
+
+/**
+ * Permission configuration for Agent
+ */
+export interface AgentPermissionConfig {
+  /** Whether to enable permission checking (default: true if config provided) */
+  enabled?: boolean;
+  /** Default permission level for unmatched tools (default: 'confirm') */
+  defaultLevel?: PermissionLevel;
+  /** Permission rules (evaluated in order, first match wins) */
+  rules?: PermissionRule[];
+  /** Whether to remember approved tools for the session (default: true) */
+  sessionMemory?: boolean;
+  /** Category-level defaults */
+  categoryDefaults?: Partial<Record<ToolCategory, PermissionLevel>>;
+  /** Confirmation callback (required for 'confirm' level tools) */
+  onConfirm?: (request: ConfirmationRequest) => Promise<ConfirmationResponse>;
+  /** Callback when a tool is denied */
+  onDeny?: (toolName: string, args: Record<string, unknown>, reason: string) => void;
+  /** Callback after tool execution (for audit logging) */
+  onExecute?: (toolName: string, args: Record<string, unknown>, result: string, allowed: boolean) => void;
 }
 
 export interface Tool {

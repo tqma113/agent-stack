@@ -59,12 +59,21 @@ import type {
   AgentSkillConfig,
   AgentMemoryConfig,
   AgentKnowledgeConfig,
+  AgentPermissionConfig,
   Tool,
   AgentResponse,
   ToolCallResult,
   StreamCallbacks,
   ConversationOptions,
-} from './types';
+} from './types.js';
+import {
+  createPermissionPolicy,
+  type PermissionPolicyInstance,
+  type ConfirmationRequest,
+  type ConfirmationResponse,
+  type PermissionRule,
+  type PermissionAuditEntry,
+} from './permission/index.js';
 
 const DEFAULT_SYSTEM_PROMPT = `You are a helpful AI assistant. Be concise and helpful in your responses.`;
 
@@ -128,6 +137,14 @@ export interface AgentInstance {
   setProfile(key: string, value: unknown, options?: { confidence?: number; explicit?: boolean; expiresAt?: number }): Promise<unknown | null>;
   getProfile(key: string): Promise<unknown | null>;
   getAllProfiles(): Promise<Record<string, unknown>>;
+
+  // Permission Management
+  getPermissionPolicy(): PermissionPolicyInstance | null;
+  addPermissionRule(rule: PermissionRule): void;
+  removePermissionRule(toolPattern: string): boolean;
+  setPermissionCallback(callback: ((request: ConfirmationRequest) => Promise<ConfirmationResponse>) | null): void;
+  clearSessionApprovals(): void;
+  getPermissionAuditLog(): PermissionAuditEntry[];
 
   // Resource Management
   close(): Promise<void>;
@@ -200,6 +217,110 @@ export function createAgent(config: AgentConfig = {}): AgentInstance {
       ? { enabled: true }
       : { enabled: true, ...config.knowledge }
     : null;
+
+  // Permission integration
+  let permissionPolicy: PermissionPolicyInstance | null = null;
+  const permissionConfig: AgentPermissionConfig | null = config.permission
+    ? config.permission === true
+      ? { enabled: true }
+      : { enabled: true, ...config.permission }
+    : null;
+
+  // Initialize permission policy if configured
+  if (permissionConfig?.enabled) {
+    permissionPolicy = createPermissionPolicy({
+      defaultLevel: permissionConfig.defaultLevel,
+      rules: permissionConfig.rules,
+      sessionMemory: permissionConfig.sessionMemory,
+      categoryDefaults: permissionConfig.categoryDefaults,
+    });
+
+    // Set confirmation callback if provided
+    if (permissionConfig.onConfirm) {
+      permissionPolicy.setConfirmationCallback(permissionConfig.onConfirm);
+    }
+  }
+
+  // Helper function to check permission and execute tool
+  async function executeToolWithPermission(
+    tool: Tool,
+    args: Record<string, unknown>,
+    toolName: string
+  ): Promise<{ result: string; executed: boolean; denied?: boolean }> {
+    // If no permission policy, execute directly
+    if (!permissionPolicy) {
+      const result = await tool.execute(args);
+      return { result, executed: true };
+    }
+
+    // Check permission
+    const decision = permissionPolicy.checkPermission(toolName, args);
+
+    // Handle deny
+    if (decision.level === 'deny') {
+      const denyReason = `Tool "${toolName}" is denied by permission policy`;
+      permissionConfig?.onDeny?.(toolName, args, denyReason);
+      permissionPolicy.logAudit({
+        toolName,
+        args,
+        decision,
+        executed: false,
+        error: denyReason,
+      });
+      return { result: `Error: ${denyReason}`, executed: false, denied: true };
+    }
+
+    // Handle confirm
+    if (decision.level === 'confirm') {
+      const request: ConfirmationRequest = {
+        toolName,
+        args,
+        description: tool.description,
+        rule: decision.matchedRule ?? undefined,
+        actionDescription: `Execute tool "${toolName}"`,
+      };
+
+      const response = await permissionPolicy.requestConfirmation(request);
+
+      if (!response.allowed) {
+        const denyReason = response.message || 'User denied tool execution';
+        permissionConfig?.onDeny?.(toolName, args, denyReason);
+        permissionPolicy.logAudit({
+          toolName,
+          args,
+          decision,
+          userResponse: response,
+          executed: false,
+          error: denyReason,
+        });
+        return { result: `Error: Tool execution denied - ${denyReason}`, executed: false, denied: true };
+      }
+    }
+
+    // Execute tool
+    try {
+      const result = await tool.execute(args);
+      permissionConfig?.onExecute?.(toolName, args, result, true);
+      permissionPolicy.logAudit({
+        toolName,
+        args,
+        decision,
+        executed: true,
+        result,
+      });
+      return { result, executed: true };
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      permissionPolicy.logAudit({
+        toolName,
+        args,
+        decision,
+        executed: true,
+        error: errorMessage,
+      });
+      throw error;
+    }
+  }
 
   // Return the instance object
   const instance: AgentInstance = {
@@ -854,6 +975,48 @@ export function createAgent(config: AgentConfig = {}): AgentInstance {
     },
 
     // ============================================
+    // Permission Management
+    // ============================================
+
+    getPermissionPolicy(): PermissionPolicyInstance | null {
+      return permissionPolicy;
+    },
+
+    addPermissionRule(rule: PermissionRule): void {
+      if (permissionPolicy) {
+        permissionPolicy.addRule(rule);
+      }
+    },
+
+    removePermissionRule(toolPattern: string): boolean {
+      if (permissionPolicy) {
+        return permissionPolicy.removeRule(toolPattern);
+      }
+      return false;
+    },
+
+    setPermissionCallback(
+      callback: ((request: ConfirmationRequest) => Promise<ConfirmationResponse>) | null
+    ): void {
+      if (permissionPolicy) {
+        permissionPolicy.setConfirmationCallback(callback);
+      }
+    },
+
+    clearSessionApprovals(): void {
+      if (permissionPolicy) {
+        permissionPolicy.clearSessionApprovals();
+      }
+    },
+
+    getPermissionAuditLog(): PermissionAuditEntry[] {
+      if (permissionPolicy) {
+        return permissionPolicy.getAuditLog();
+      }
+      return [];
+    },
+
+    // ============================================
     // Resource Management
     // ============================================
 
@@ -1061,7 +1224,12 @@ export function createAgent(config: AgentConfig = {}): AgentInstance {
               toolCallEventId = event.id;
             }
 
-            const result = await tool.execute(args);
+            // Execute with permission check
+            const { result, denied } = await executeToolWithPermission(
+              tool,
+              args,
+              toolCall.function.name
+            );
 
             // Record tool result to memory
             if (memoryManager) {
@@ -1262,7 +1430,12 @@ export function createAgent(config: AgentConfig = {}): AgentInstance {
             }
 
             try {
-              const result = await tool.execute(args);
+              // Execute with permission check
+              const { result, denied } = await executeToolWithPermission(
+                tool,
+                args,
+                toolCall.function.name
+              );
 
               // Record tool result to memory
               if (memoryManager) {

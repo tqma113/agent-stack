@@ -5,9 +5,27 @@
  */
 
 // Agent - main export
-export { createAgent, type AgentInstance } from './agent';
-export * from './types';
-export * from './config';
+export { createAgent, type AgentInstance } from './agent.js';
+export * from './types.js';
+export * from './config.js';
+
+// Permission system
+export {
+  createPermissionPolicy,
+  DEFAULT_RULES,
+  DEFAULT_CATEGORY_PATTERNS,
+  DEFAULT_PERMISSION_CONFIG,
+  type PermissionLevel,
+  type ToolCategory,
+  type PermissionRule,
+  type PermissionDecision,
+  type ConfirmationRequest,
+  type ConfirmationResponse,
+  type PermissionPolicyConfig,
+  type PermissionCallback,
+  type PermissionAuditEntry,
+  type PermissionPolicyInstance,
+} from './permission/index.js';
 
 // Re-export useful types and factory functions from provider
 export {

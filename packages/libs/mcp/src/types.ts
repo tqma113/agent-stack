@@ -23,6 +23,8 @@ export interface MCPStdioServerConfig {
   args?: string[];
   /** Environment variables to pass to the server */
   env?: Record<string, string>;
+  /** Working directory for the process */
+  cwd?: string;
   /** Connection timeout in milliseconds */
   timeout?: number;
 }

@@ -66,11 +66,13 @@ export function createStdioTransport(
   const command = resolveCommand(config.command);
   const args = config.args ?? [];
   const env = buildEnvironment(config.env);
+  const cwd = config.cwd;
 
   return new StdioClientTransport({
     command,
     args,
     env,
+    cwd,
   });
 }
 

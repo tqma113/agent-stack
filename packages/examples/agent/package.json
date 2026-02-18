@@ -16,6 +16,7 @@
     "@ai-stack-mcp/fetch": "workspace:*",
     "@ai-stack-mcp/time": "workspace:*",
     "@ai-stack-mcp/git": "workspace:*",
+    "@ai-stack-mcp/bash": "workspace:*",
     "@ai-stack-skill/memory": "workspace:*",
     "@ai-stack-skill/knowledge": "workspace:*"
   }

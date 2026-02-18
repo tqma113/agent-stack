@@ -2,7 +2,7 @@
 
 ## 项目概述
 
-AI Stack 是一个基于 TypeScript 的 AI Agent 开发框架，采用 Rush monorepo 架构管理多个包。项目旨在提供一个简洁、易用的 OpenAI API 封装、MCP 协议支持、Skill 系统、Memory 系统、Knowledge 知识库系统和 AI Agent 实现。
+AI Stack 是一个基于 TypeScript 的 AI Agent 开发框架，采用 Rush monorepo 架构管理多个包。项目旨在提供一个简洁、易用的 OpenAI API 封装、MCP 协议支持、Skill 系统、Memory 系统、Knowledge 知识库系统、权限管控系统和 AI Agent 实现。
 
 ### 设计理念
 
@@ -132,7 +132,7 @@ ai-stack/
         ├── @ai-stack/knowledge (workspace:*)
         └── @ai-stack/memory-store-sqlite (workspace:*)
 
-@ai-stack/agent     (Agent 实现 + CLI，内置 MCP、Skill、Memory 和 Knowledge 支持)
+@ai-stack/agent     (Agent 实现 + CLI，内置 MCP、Skill、Memory、Knowledge 和 Permission 支持)
         │
         ├── @ai-stack/provider (workspace:*)
         ├── @ai-stack/mcp (workspace:*)
@@ -140,7 +140,25 @@ ai-stack/
         ├── @ai-stack/memory (workspace:*)
         ├── @ai-stack/knowledge (workspace:*)
         └── commander (^12.1.0) - CLI 框架
+
+@ai-stack-mcp/bash  (Bash 命令执行 MCP 服务器)
+        │
+        ├── @modelcontextprotocol/sdk (^1.0.0)
+        └── zod (^3.24.0)
 ```
+
+---
+
+## 核心功能
+
+| 功能 | 描述 |
+|------|------|
+| **Provider** | OpenAI API 封装，支持 Chat/Embedding/Image/TTS/STT |
+| **MCP** | Model Context Protocol 支持，连接外部工具服务器 |
+| **Skill** | 本地技能系统，动态加载和执行工具 |
+| **Memory** | 五层记忆架构，持久化对话和任务状态 |
+| **Knowledge** | 代码库和文档索引，混合搜索 (FTS + Vector) |
+| **Permission** | 权限管控系统，工具执行前确认和审计 |
 
 ---
 

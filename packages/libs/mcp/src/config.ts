@@ -21,6 +21,7 @@ export const CONFIG_FILE_NAMES = ['mcp.json'];
 
 /**
  * Load MCP configuration from a file path
+ * Automatically sets cwd for stdio servers to the config file's directory
  */
 export async function loadConfig(configPath: string): Promise<MCPConfig> {
   const absolutePath = resolve(configPath);
@@ -32,7 +33,17 @@ export async function loadConfig(configPath: string): Promise<MCPConfig> {
   }
 
   const content = await readFile(absolutePath, 'utf-8');
-  return parseConfig(content);
+  const config = parseConfig(content);
+
+  // Set cwd for stdio servers to config file's directory
+  const configDir = dirname(absolutePath);
+  for (const [, serverConfig] of Object.entries(config.mcpServers)) {
+    if (isStdioConfig(serverConfig) && !serverConfig.cwd) {
+      serverConfig.cwd = configDir;
+    }
+  }
+
+  return config;
 }
 
 /**

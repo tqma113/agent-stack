@@ -1427,3 +1427,193 @@ console.log(stats);
 //   doc: { enabled: true, totalSources: 1, totalPages: 10, totalChunks: 50 }
 // }
 ```
+
+---
+
+## 11. 权限管控系统
+
+### 11.1 权限级别
+
+| 级别 | 说明 | 行为 |
+|------|------|------|
+| `auto` | 自动批准 | 直接执行，无需确认 |
+| `confirm` | 需要确认 | 执行前请求用户确认 |
+| `deny` | 拒绝执行 | 直接拒绝，返回错误 |
+
+### 11.2 工具分类
+
+| 分类 | 说明 | 默认级别 |
+|------|------|---------|
+| `read` | 只读操作 (搜索、查询) | `auto` |
+| `write` | 写入操作 (创建、修改) | `confirm` |
+| `execute` | 命令执行 (bash) | `confirm` |
+| `network` | 网络操作 (fetch) | `confirm` |
+| `git` | Git 操作 | 读: `auto`, 写: `confirm` |
+| `admin` | 管理操作 (删除) | `confirm` |
+
+### 11.3 权限检查流程
+
+```
+工具调用请求
+    │
+    ▼
+┌─────────────────────────────┐
+│ 1. 检查 Session 记忆        │
+│    (是否本会话已批准)       │
+└─────────────────────────────┘
+    │ 未批准
+    ▼
+┌─────────────────────────────┐
+│ 2. 匹配权限规则             │
+│    (按顺序，首个匹配生效)   │
+└─────────────────────────────┘
+    │ 未匹配
+    ▼
+┌─────────────────────────────┐
+│ 3. 检查分类默认权限         │
+└─────────────────────────────┘
+    │ 未配置
+    ▼
+┌─────────────────────────────┐
+│ 4. 使用全局默认权限         │
+│    (默认: confirm)          │
+└─────────────────────────────┘
+    │
+    ▼
+┌─────────────────────────────┐
+│ 权限决策                    │
+│ - auto: 直接执行            │
+│ - confirm: 请求确认         │
+│ - deny: 拒绝执行            │
+└─────────────────────────────┘
+```
+
+### 11.4 使用示例
+
+```typescript
+import { createAgent } from '@ai-stack/agent';
+
+// 基础用法 - 启用权限检查
+const agent = createAgent({
+  permission: {
+    enabled: true,
+    defaultLevel: 'confirm',
+    onConfirm: async (request) => {
+      // 在 CLI 中显示确认提示
+      console.log(`\nTool: ${request.toolName}`);
+      console.log(`Args: ${JSON.stringify(request.args, null, 2)}`);
+      const answer = await readline.question('Allow? (y/n/a): ');
+
+      return {
+        allowed: answer.toLowerCase() !== 'n',
+        rememberForSession: answer.toLowerCase() === 'a', // 'a' = always
+      };
+    },
+  },
+});
+
+// 高级用法 - 自定义规则
+const agent2 = createAgent({
+  permission: {
+    enabled: true,
+    rules: [
+      // 自动批准所有读取操作
+      { tool: '*_read*', level: 'auto', category: 'read' },
+      { tool: '*_get*', level: 'auto', category: 'read' },
+      { tool: '*_list*', level: 'auto', category: 'read' },
+
+      // Git 读操作自动批准
+      { tool: 'mcp__git__git_status', level: 'auto' },
+      { tool: 'mcp__git__git_log', level: 'auto' },
+      { tool: 'mcp__git__git_diff*', level: 'auto' },
+
+      // Git 写操作需要确认
+      { tool: 'mcp__git__git_commit', level: 'confirm' },
+      { tool: 'mcp__git__git_add', level: 'confirm' },
+
+      // 禁止删除操作
+      { tool: '*_delete*', level: 'deny' },
+      { tool: '*_remove*', level: 'deny' },
+
+      // Bash 执行需要确认
+      { tool: 'bash_*', level: 'confirm', category: 'execute' },
+    ],
+    categoryDefaults: {
+      read: 'auto',
+      write: 'confirm',
+      execute: 'confirm',
+      admin: 'deny',
+    },
+    onConfirm: async (request) => {
+      // 自定义确认逻辑
+      return { allowed: true, rememberForSession: true };
+    },
+    onDeny: (toolName, args, reason) => {
+      console.log(`Denied: ${toolName} - ${reason}`);
+    },
+    onExecute: (toolName, args, result, allowed) => {
+      // 审计日志
+      console.log(`[AUDIT] ${toolName}: ${allowed ? 'executed' : 'denied'}`);
+    },
+  },
+});
+
+// 动态管理规则
+agent.addPermissionRule({ tool: 'new_tool', level: 'auto' });
+agent.removePermissionRule('old_tool');
+
+// 清除会话批准记录
+agent.clearSessionApprovals();
+
+// 获取审计日志
+const auditLog = agent.getPermissionAuditLog();
+```
+
+### 11.5 规则匹配语法
+
+| 模式 | 说明 | 示例 |
+|------|------|------|
+| 精确匹配 | 完全相同 | `bash_execute` |
+| Glob 模式 | `*` 匹配任意字符 | `mcp__git__*`, `*_read*` |
+| 正则表达式 | 以 `^` 开头 | `^mcp__.*__list.*$` |
+
+### 11.6 内置默认规则
+
+框架内置了合理的默认规则：
+
+**自动批准 (auto)**:
+- `*_read*`, `*_get*`, `*_list*`, `*_search*`, `*_query*`
+- `bash_pwd`, `bash_which`, `bash_env`
+- Git 读操作: `git_status`, `git_log`, `git_diff*`, `git_branch`, `git_show`
+
+**需要确认 (confirm)**:
+- `*_write*`, `*_create*`, `*_update*`, `*_edit*`
+- `*_delete*`, `*_remove*`
+- `bash_execute`, `bash_script`, `bash_background`, `bash_kill`, `bash_cd`
+- Git 写操作: `git_commit`, `git_add`, `git_reset`, `git_checkout`
+- 网络操作: `mcp__fetch__*`
+
+### 11.7 配置文件格式
+
+```json
+{
+  "permission": {
+    "enabled": true,
+    "defaultLevel": "confirm",
+    "sessionMemory": true,
+    "rules": [
+      { "tool": "*_read*", "level": "auto", "category": "read" },
+      { "tool": "bash_execute", "level": "confirm", "category": "execute" },
+      { "tool": "*_delete*", "level": "deny", "category": "admin" }
+    ],
+    "categoryDefaults": {
+      "read": "auto",
+      "write": "confirm",
+      "execute": "confirm",
+      "network": "confirm",
+      "git": "confirm",
+      "admin": "confirm"
+    }
+  }
+}
+```
