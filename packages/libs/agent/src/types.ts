@@ -220,9 +220,33 @@ export interface StreamCallbacks {
 
 export type Message = ChatCompletionMessageParam;
 
+/**
+ * Information passed to the onMaxIterations callback
+ */
+export interface MaxIterationsInfo {
+  /** Current iteration count */
+  currentIterations: number;
+  /** Maximum iterations limit */
+  maxIterations: number;
+  /** Number of tool calls executed so far */
+  toolCallCount: number;
+}
+
+/**
+ * Callback when max iterations is reached.
+ * Return true to continue execution, false to stop gracefully.
+ */
+export type OnMaxIterationsCallback = (info: MaxIterationsInfo) => Promise<boolean>;
+
 export interface ConversationOptions {
   /** Maximum number of tool call iterations */
   maxIterations?: number;
   /** Abort signal for cancellation */
   signal?: AbortSignal;
+  /**
+   * Callback when max iterations is reached.
+   * Return true to continue (resets iteration counter), false to stop gracefully.
+   * If not provided, an error will be thrown when max iterations is reached.
+   */
+  onMaxIterations?: OnMaxIterationsCallback;
 }

@@ -1,4 +1,4 @@
-[ ] knowledge 支持去重，默认情况下 indexing 过的内容不再 indexing
+[x] knowledge 支持去重，默认情况下 indexing 过的内容不再 indexing
 
 [ ] multiagent 支持多个 agent 组合
 
@@ -21,4 +21,4 @@
   [ ] BM25 + Vector 的特点和优势
 
 [ ] multi agent X model provider X MCP/Skill
-[ ] 我们支持了 maxIterations，目前达到限制之后任务会自动停止，我希望当达到限制之后中止然后询问用户是否继续，而不是直接终止
+[x] 我们支持了 maxIterations，目前达到限制之后任务会自动停止，我希望当达到限制之后中止然后询问用户是否继续，而不是直接终止

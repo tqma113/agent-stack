@@ -413,6 +413,36 @@ async chat(
 |------|------|--------|------|
 | `maxIterations` | `number` | `10` | 最大工具调用迭代 |
 | `signal` | `AbortSignal` | - | 取消信号 |
+| `onMaxIterations` | `OnMaxIterationsCallback` | - | 达到最大迭代时的回调 |
+
+**OnMaxIterationsCallback**:
+
+当达到 `maxIterations` 限制时触发的回调。返回 `true` 继续执行（重置计数器），返回 `false` 优雅停止。
+
+```typescript
+type OnMaxIterationsCallback = (info: MaxIterationsInfo) => Promise<boolean>;
+
+interface MaxIterationsInfo {
+  currentIterations: number;  // 当前迭代次数
+  maxIterations: number;      // 最大迭代限制
+  toolCallCount: number;      // 已执行的工具调用次数
+}
+```
+
+**使用示例**:
+
+```typescript
+const response = await agent.chat('复杂任务', {
+  maxIterations: 10,
+  onMaxIterations: async (info) => {
+    console.log(`已执行 ${info.currentIterations} 次迭代`);
+    const answer = await readline.question('是否继续? (y/n): ');
+    return answer.toLowerCase() === 'y';
+  },
+});
+```
+
+**注意**: 如果不提供 `onMaxIterations` 回调，达到限制时将抛出 `Error: Max iterations (N) reached`（保持向后兼容）。
 
 **AgentResponse**:
 

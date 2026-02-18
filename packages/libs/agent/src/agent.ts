@@ -1156,9 +1156,36 @@ export function createAgent(config: AgentConfig = {}): AgentInstance {
       const toolCallResults: ToolCallResult[] = [];
       let iterations = 0;
 
-      while (iterations < maxIterations) {
+      while (true) {
         if (signal?.aborted) {
           throw new Error('Request aborted');
+        }
+
+        // Check if max iterations reached
+        if (iterations >= maxIterations) {
+          if (options.onMaxIterations) {
+            const shouldContinue = await options.onMaxIterations({
+              currentIterations: iterations,
+              maxIterations,
+              toolCallCount: toolCallResults.length,
+            });
+
+            if (shouldContinue) {
+              // Reset counter, user gets another maxIterations rounds
+              iterations = 0;
+            } else {
+              // User chose to stop, return gracefully instead of throwing
+              const content = 'Task stopped: max iterations reached and user chose not to continue.';
+              conversationHistory.push(assistantMessage(content));
+              return {
+                content,
+                toolCalls: toolCallResults.length > 0 ? toolCallResults : undefined,
+              };
+            }
+          } else {
+            // No callback provided, throw error (backward compatible)
+            throw new Error(`Max iterations (${maxIterations}) reached`);
+          }
         }
 
         iterations++;
@@ -1336,9 +1363,40 @@ export function createAgent(config: AgentConfig = {}): AgentInstance {
         let iterations = 0;
         let fullContent = '';
 
-        while (iterations < maxIterations) {
+        while (true) {
           if (signal?.aborted) {
             throw new Error('Request aborted');
+          }
+
+          // Check if max iterations reached
+          if (iterations >= maxIterations) {
+            if (options.onMaxIterations) {
+              const shouldContinue = await options.onMaxIterations({
+                currentIterations: iterations,
+                maxIterations,
+                toolCallCount: toolCallResults.length,
+              });
+
+              if (shouldContinue) {
+                // Reset counter, user gets another maxIterations rounds
+                iterations = 0;
+              } else {
+                // User chose to stop, return gracefully instead of throwing
+                const content = 'Task stopped: max iterations reached and user chose not to continue.';
+                conversationHistory.push(assistantMessage(content));
+
+                const response: AgentResponse = {
+                  content,
+                  toolCalls: toolCallResults.length > 0 ? toolCallResults : undefined,
+                };
+
+                onComplete?.(response);
+                return response;
+              }
+            } else {
+              // No callback provided, throw error (backward compatible)
+              throw new Error(`Max iterations (${maxIterations}) reached`);
+            }
           }
 
           iterations++;
