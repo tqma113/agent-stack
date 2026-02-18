@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * CLI entry point for @agent-stack-mcp/time
+ * CLI entry point for @ai-stack-mcp/time
  */
 
 import { runServer } from './server.js';
@@ -10,7 +10,7 @@ import type { ServerConfig } from './types.js';
 function parseArgs(): ServerConfig {
   const args = process.argv.slice(2);
   const config: ServerConfig = {
-    name: process.env.MCP_TIME_NAME || 'agent-stack-mcp-time',
+    name: process.env.MCP_TIME_NAME || 'ai-stack-mcp-time',
     version: process.env.MCP_TIME_VERSION || '0.0.1',
   };
 

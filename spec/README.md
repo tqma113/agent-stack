@@ -1,8 +1,8 @@
-# Agent Stack 项目文档
+# AI Stack 项目文档
 
 ## 项目概述
 
-Agent Stack 是一个基于 TypeScript 的 AI Agent 开发框架，采用 Rush monorepo 架构管理多个包。项目旨在提供一个简洁、易用的 OpenAI API 封装、MCP 协议支持、Skill 系统、Memory 系统和 AI Agent 实现。
+AI Stack 是一个基于 TypeScript 的 AI Agent 开发框架，采用 Rush monorepo 架构管理多个包。项目旨在提供一个简洁、易用的 OpenAI API 封装、MCP 协议支持、Skill 系统、Memory 系统和 AI Agent 实现。
 
 ### 设计理念
 
@@ -48,27 +48,27 @@ Agent Stack 是一个基于 TypeScript 的 AI Agent 开发框架，采用 Rush m
 ## 项目结构
 
 ```
-agent-stack/
+ai-stack/
 ├── packages/                    # 所有包目录
-│   ├── libs/                   # 核心业务库 (@agent-stack/*)
-│   │   ├── provider/           # @agent-stack/provider - OpenAI API 封装
-│   │   ├── mcp/                # @agent-stack/mcp - MCP 协议支持
-│   │   ├── skill/              # @agent-stack/skill - Skill 系统
-│   │   ├── memory/             # @agent-stack/memory - Memory 策略层
-│   │   ├── memory-store-sqlite/# @agent-stack/memory-store-sqlite - SQLite 存储
-│   │   ├── memory-store-json/  # @agent-stack/memory-store-json - JSON 存储
-│   │   └── index/              # @agent-stack/index - Agent 实现 + CLI
+│   ├── libs/                   # 核心业务库 (@ai-stack/*)
+│   │   ├── provider/           # @ai-stack/provider - OpenAI API 封装
+│   │   ├── mcp/                # @ai-stack/mcp - MCP 协议支持
+│   │   ├── skill/              # @ai-stack/skill - Skill 系统
+│   │   ├── memory/             # @ai-stack/memory - Memory 策略层
+│   │   ├── memory-store-sqlite/# @ai-stack/memory-store-sqlite - SQLite 存储
+│   │   ├── memory-store-json/  # @ai-stack/memory-store-json - JSON 存储
+│   │   └── index/              # @ai-stack/agent - Agent 实现 + CLI
 │   │
-│   ├── skills/                 # 自定义 Skills (@agent-stack-skill/*)
-│   │   └── memory/             # @agent-stack-skill/memory - Memory Skill
+│   ├── skills/                 # 自定义 Skills (@ai-stack-skill/*)
+│   │   └── memory/             # @ai-stack-skill/memory - Memory Skill
 │   │
-│   └── mcp-servers/            # 自定义 MCP 服务器 (@agent-stack-mcp/*)
-│       ├── fetch/              # @agent-stack-mcp/fetch - Web 内容获取
-│       ├── time/               # @agent-stack-mcp/time - 时间和时区转换
-│       └── git/                # @agent-stack-mcp/git - Git 仓库操作
+│   └── mcp-servers/            # 自定义 MCP 服务器 (@ai-stack-mcp/*)
+│       ├── fetch/              # @ai-stack-mcp/fetch - Web 内容获取
+│       ├── time/               # @ai-stack-mcp/time - 时间和时区转换
+│       └── git/                # @ai-stack-mcp/git - Git 仓库操作
 │
 ├── example/                     # 示例项目
-│   ├── .agent-stack.json       # Agent 配置示例
+│   ├── .ai-stack.json       # Agent 配置示例
 │   ├── .mcp.json               # MCP 配置示例
 │   └── skills/                 # 示例 Skills
 │       ├── file-skill/         # 文件操作
@@ -87,41 +87,41 @@ agent-stack/
 ## 包依赖关系
 
 ```
-@agent-stack/provider  (OpenAI API 封装)
+@ai-stack/provider  (OpenAI API 封装)
         │
         └── openai (^4.77.0)
 
-@agent-stack/mcp       (MCP 协议支持)
+@ai-stack/mcp       (MCP 协议支持)
         │
         └── @modelcontextprotocol/sdk (^1.0.0)
 
-@agent-stack/skill     (Skill 系统)
+@ai-stack/skill     (Skill 系统)
         │
         └── (无外部依赖)
 
-@agent-stack/memory-store-sqlite (SQLite 存储层)
+@ai-stack/memory-store-sqlite (SQLite 存储层)
         │
         ├── better-sqlite3 (^11.7.0)
         └── sqlite-vec (^0.1.6)
 
-@agent-stack/memory-store-json (JSON 存储层)
+@ai-stack/memory-store-json (JSON 存储层)
         │
-        └── @agent-stack/memory-store-sqlite (workspace:*) - 类型定义
+        └── @ai-stack/memory-store-sqlite (workspace:*) - 类型定义
 
-@agent-stack/memory    (策略层 - 接受注入的 stores)
+@ai-stack/memory    (策略层 - 接受注入的 stores)
         │
-        └── @agent-stack/memory-store-sqlite (workspace:*) - 类型定义
+        └── @ai-stack/memory-store-sqlite (workspace:*) - 类型定义
 
-@agent-stack-skill/memory (Memory Skill)
+@ai-stack-skill/memory (Memory Skill)
         │
-        └── @agent-stack/memory-store-sqlite (workspace:*)
+        └── @ai-stack/memory-store-sqlite (workspace:*)
 
-@agent-stack/index     (Agent 实现 + CLI，内置 MCP、Skill 和 Memory 支持)
+@ai-stack/agent     (Agent 实现 + CLI，内置 MCP、Skill 和 Memory 支持)
         │
-        ├── @agent-stack/provider (workspace:*)
-        ├── @agent-stack/mcp (workspace:*)
-        ├── @agent-stack/skill (workspace:*)
-        ├── @agent-stack/memory (workspace:*)
+        ├── @ai-stack/provider (workspace:*)
+        ├── @ai-stack/mcp (workspace:*)
+        ├── @ai-stack/skill (workspace:*)
+        ├── @ai-stack/memory (workspace:*)
         └── commander (^12.1.0) - CLI 框架
 ```
 

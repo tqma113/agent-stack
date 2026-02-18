@@ -1,5 +1,5 @@
 {
-  "name": "@agent-stack-mcp/git",
+  "name": "@ai-stack-mcp/git",
   "version": "0.0.1",
   "description": "MCP server providing Git repository interaction and automation tools",
   "main": "./dist/index.js",

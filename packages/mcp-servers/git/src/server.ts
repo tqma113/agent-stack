@@ -59,7 +59,7 @@ const TOOLS = {
  * Create and configure the MCP server
  */
 export function createServer(config: ServerConfig = {}) {
-  const serverName = config.name || 'agent-stack-mcp-git';
+  const serverName = config.name || 'ai-stack-mcp-git';
   const serverVersion = config.version || '0.0.1';
 
   const server = new Server(

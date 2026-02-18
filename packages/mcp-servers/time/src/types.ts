@@ -1,5 +1,5 @@
 /**
- * Types for @agent-stack-mcp/time
+ * Types for @ai-stack-mcp/time
  */
 
 import { z } from 'zod';

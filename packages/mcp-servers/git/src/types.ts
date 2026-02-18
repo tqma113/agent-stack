@@ -1,5 +1,5 @@
 /**
- * Types for @agent-stack-mcp/git
+ * Types for @ai-stack-mcp/git
  */
 
 import { z } from 'zod';

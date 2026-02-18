@@ -1,5 +1,5 @@
 /**
- * @agent-stack/mcp - Type Definitions
+ * @ai-stack/mcp - Type Definitions
  */
 
 // ============================================
@@ -206,7 +206,7 @@ export interface MCPToolCallOptions {
 // ============================================
 
 /**
- * Agent Tool interface (from @agent-stack/index)
+ * Agent Tool interface (from @ai-stack/agent)
  * Duplicated here to avoid circular dependency
  */
 export interface AgentTool {

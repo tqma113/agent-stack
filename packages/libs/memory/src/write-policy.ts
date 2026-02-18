@@ -1,5 +1,5 @@
 /**
- * @agent-stack/memory - Write Policy
+ * @ai-stack/memory - Write Policy
  *
  * Rules and policies for memory write operations.
  */
@@ -9,7 +9,7 @@ import type {
   ProfileItem,
   Confidence,
   ProfileKey,
-} from '@agent-stack/memory-store-sqlite';
+} from '@ai-stack/memory-store-sqlite';
 import type { WritePolicyConfig } from './types.js';
 import { ProfileKeyNotAllowedError } from './errors.js';
 

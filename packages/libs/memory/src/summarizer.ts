@@ -1,5 +1,5 @@
 /**
- * @agent-stack/memory - Summarizer
+ * @ai-stack/memory - Summarizer
  *
  * Conversation and event summarization for context compression.
  */
@@ -11,7 +11,7 @@ import type {
   SummaryDecision,
   SummaryTodo,
   UUID,
-} from '@agent-stack/memory-store-sqlite';
+} from '@ai-stack/memory-store-sqlite';
 
 /**
  * Summarizer options

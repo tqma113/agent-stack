@@ -1,5 +1,5 @@
 /**
- * @agent-stack/skill - Configuration Loading
+ * @ai-stack/skill - Configuration Loading
  */
 
 import { readFile, readdir, stat } from 'fs/promises';

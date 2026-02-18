@@ -15,7 +15,7 @@ import * as path from 'node:path';
 import * as os from 'node:os';
 import { createMemoryManager, type MemoryManagerInstance } from '../../src/manager.js';
 import type { IMemoryObserver } from '../../src/observer.js';
-import { createSqliteStores } from '@agent-stack/memory-store-sqlite';
+import { createSqliteStores } from '@ai-stack/memory-store-sqlite';
 
 describe('Regression Tests', () => {
   let manager: MemoryManagerInstance;

@@ -14,7 +14,7 @@ import type {
   IProfileStore,
   SemanticChunk,
   SemanticSearchResult,
-} from '@agent-stack/memory-store-sqlite';
+} from '@ai-stack/memory-store-sqlite';
 
 // Mock stores
 function createMockStores() {

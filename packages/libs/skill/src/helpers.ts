@@ -1,5 +1,5 @@
 /**
- * @agent-stack/skill - Helper Functions
+ * @ai-stack/skill - Helper Functions
  */
 
 /**

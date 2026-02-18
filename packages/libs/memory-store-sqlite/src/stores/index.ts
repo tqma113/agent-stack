@@ -1,5 +1,5 @@
 /**
- * @agent-stack/memory-store-sqlite - Stores
+ * @ai-stack/memory-store-sqlite - Stores
  *
  * Export all store implementations.
  */

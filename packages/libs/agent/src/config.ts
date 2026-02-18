@@ -10,7 +10,7 @@ import type { AgentConfig, AgentMCPConfig, AgentSkillConfig, AgentMemoryConfig }
  * Configuration file names to search for (in order of priority)
  */
 const CONFIG_FILE_NAMES = [
-  'agent-stack.json',
+  'ai-stack.json',
 ];
 
 /**
@@ -22,7 +22,7 @@ const CONFIG_FILE_NAMES = [
 export interface MemoryConfigSection {
   /** Whether to enable memory */
   enabled?: boolean;
-  /** Database file path (default: '.agent-stack/memory.db') */
+  /** Database file path (default: '.ai-stack/memory.db') */
   dbPath?: string;
   /** Whether to auto-initialize on first chat (default: true) */
   autoInitialize?: boolean;
@@ -315,7 +315,7 @@ export function generateConfigTemplate(): AgentStackConfig {
     },
     memory: {
       enabled: true,
-      dbPath: '.agent-stack/memory.db',
+      dbPath: '.ai-stack/memory.db',
       autoInitialize: true,
       autoInject: true,
     },

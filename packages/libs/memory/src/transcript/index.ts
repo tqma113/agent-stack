@@ -1,5 +1,5 @@
 /**
- * @agent-stack/memory - Transcript Module
+ * @ai-stack/memory - Transcript Module
  *
  * Session transcript storage and indexing.
  */

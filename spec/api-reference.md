@@ -1,6 +1,6 @@
 # API 参考
 
-## 1. @agent-stack/provider
+## 1. @ai-stack/provider
 
 ### 1.1 createOpenAIClient() 工厂函数
 
@@ -253,7 +253,7 @@ chunkText(text: string, maxTokensPerChunk: number): string[]
 
 ---
 
-## 2. @agent-stack/index
+## 2. @ai-stack/agent
 
 ### 2.1 createAgent() 工厂函数
 
@@ -504,7 +504,7 @@ function loadConfig(configPath?: string): LoadConfigResult
 function findConfigFile(startDir?: string): string | undefined
 ```
 
-按优先级搜索：`.agent-stack.json`、`agent-stack.config.json`
+按优先级搜索：`.ai-stack.json`、`ai-stack.config.json`
 
 ---
 
@@ -575,7 +575,7 @@ interface MCPConfigSection {
 
 ---
 
-## 3. @agent-stack/mcp
+## 3. @ai-stack/mcp
 
 ### 3.1 createMCPClientManager() 工厂函数
 
@@ -818,7 +818,7 @@ class MCPTimeoutError extends MCPError {}
 
 ---
 
-## 4. @agent-stack/skill
+## 4. @ai-stack/skill
 
 ### 4.1 createSkillManager() 工厂函数
 
@@ -1047,7 +1047,7 @@ class SkillNotFoundError extends SkillError {}
 
 ---
 
-## 5. @agent-stack/memory
+## 5. @ai-stack/memory
 
 ### 5.1 createMemoryManager() 工厂函数
 
@@ -1063,7 +1063,7 @@ const manager = createMemoryManager(config?: Partial<MemoryConfig>): MemoryManag
 
 | 参数 | 类型 | 默认值 | 描述 |
 |------|------|--------|------|
-| `dbPath` | `string` | `.agent-stack/memory.db` | SQLite 数据库路径 |
+| `dbPath` | `string` | `.ai-stack/memory.db` | SQLite 数据库路径 |
 | `tokenBudget` | `TokenBudget` | 默认配置 | Token 预算配置 |
 | `writePolicy` | `WritePolicyConfig` | 默认配置 | 写入策略配置 |
 | `retrieval` | `RetrievalConfig` | 默认配置 | 检索配置 |
@@ -1263,7 +1263,7 @@ type EmbedFunction = (text: string) => Promise<number[]>;
 **使用示例**:
 
 ```typescript
-// 使用 @agent-stack/provider
+// 使用 @ai-stack/provider
 const client = createOpenAIClient();
 memory.setEmbedFunction(async (text) => {
   const result = await client.embed(text);
@@ -1464,7 +1464,7 @@ class RetrievalError extends MemoryError {}
 
 ## 6. 类型导出
 
-### 从 @agent-stack/provider 导出
+### 从 @ai-stack/provider 导出
 
 ```typescript
 export {
@@ -1510,7 +1510,7 @@ export {
 };
 ```
 
-### 从 @agent-stack/index 导出
+### 从 @ai-stack/agent 导出
 
 ```typescript
 export {
@@ -1552,7 +1552,7 @@ export {
 };
 ```
 
-### 从 @agent-stack/mcp 导出
+### 从 @ai-stack/mcp 导出
 
 ```typescript
 export {
@@ -1603,7 +1603,7 @@ export {
 };
 ```
 
-### 从 @agent-stack/skill 导出
+### 从 @ai-stack/skill 导出
 
 ```typescript
 export {
@@ -1665,7 +1665,7 @@ export {
 };
 ```
 
-### 从 @agent-stack/memory 导出
+### 从 @ai-stack/memory 导出
 
 ```typescript
 export {

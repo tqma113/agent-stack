@@ -1,5 +1,5 @@
 /**
- * @agent-stack/memory-store-sqlite - Database Operations
+ * @ai-stack/memory-store-sqlite - Database Operations
  *
  * Shared database operations for all stores.
  */

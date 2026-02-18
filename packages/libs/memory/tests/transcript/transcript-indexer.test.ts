@@ -9,7 +9,7 @@ import {
   type ITranscriptIndexer,
 } from '../../src/transcript/transcript-indexer.js';
 import { createSessionTranscript, type ISessionTranscript } from '../../src/transcript/session-transcript.js';
-import type { ISemanticStore, SemanticChunk, SemanticSearchResult } from '@agent-stack/memory-store-sqlite';
+import type { ISemanticStore, SemanticChunk, SemanticSearchResult } from '@ai-stack/memory-store-sqlite';
 
 // Mock semantic store
 function createMockSemanticStore(): ISemanticStore & { _chunks: SemanticChunk[] } {

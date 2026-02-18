@@ -1,5 +1,5 @@
 /**
- * @agent-stack/memory-store-json - Event Store
+ * @ai-stack/memory-store-json - Event Store
  *
  * JSON-based event storage for episodic memory.
  */
@@ -12,7 +12,7 @@ import type {
   EventType,
   UUID,
   Timestamp,
-} from '@agent-stack/memory-store-sqlite';
+} from '@ai-stack/memory-store-sqlite';
 import {
   readJsonFile,
   writeJsonFile,

@@ -1,5 +1,5 @@
 /**
- * @agent-stack/mcp - Tool Bridge
+ * @ai-stack/mcp - Tool Bridge
  *
  * Converts MCP tools to Agent-compatible Tool interface
  */

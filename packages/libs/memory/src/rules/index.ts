@@ -1,5 +1,5 @@
 /**
- * @agent-stack/memory - Rules Layer
+ * @ai-stack/memory - Rules Layer
  *
  * Export all rule components.
  */

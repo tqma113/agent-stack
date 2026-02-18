@@ -1,5 +1,5 @@
 /**
- * @agent-stack/memory-store-sqlite - Type Definitions
+ * @ai-stack/memory-store-sqlite - Type Definitions
  *
  * Core schema definitions for the memory storage layer.
  */

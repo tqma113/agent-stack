@@ -1,11 +1,11 @@
 /**
- * @agent-stack/memory - Temporal Decay
+ * @ai-stack/memory - Temporal Decay
  *
  * Applies time-based decay to search results, favoring recent content.
  * Uses exponential decay with configurable half-life.
  */
 
-import type { SemanticSearchResult, SemanticChunk } from '@agent-stack/memory-store-sqlite';
+import type { SemanticSearchResult, SemanticChunk } from '@ai-stack/memory-store-sqlite';
 
 /**
  * Temporal decay configuration

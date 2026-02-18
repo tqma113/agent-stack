@@ -1,4 +1,4 @@
-# @agent-stack-mcp/fetch
+# @ai-stack-mcp/fetch
 
 MCP (Model Context Protocol) server for web fetching with automatic HTML to Markdown conversion.
 
@@ -14,7 +14,7 @@ MCP (Model Context Protocol) server for web fetching with automatic HTML to Mark
 ## Installation
 
 ```bash
-npm install @agent-stack-mcp/fetch
+npm install @ai-stack-mcp/fetch
 ```
 
 ## Usage
@@ -23,7 +23,7 @@ npm install @agent-stack-mcp/fetch
 
 ```bash
 # Run directly
-npx @agent-stack-mcp/fetch
+npx @ai-stack-mcp/fetch
 
 # Or via mcp-fetch command
 mcp-fetch
@@ -38,7 +38,7 @@ Add to your `.mcp.json`:
   "mcpServers": {
     "fetch": {
       "command": "npx",
-      "args": ["-y", "@agent-stack-mcp/fetch"]
+      "args": ["-y", "@ai-stack-mcp/fetch"]
     }
   }
 }
@@ -48,7 +48,7 @@ Add to your `.mcp.json`:
 
 | Variable | Description | Default |
 |----------|-------------|---------|
-| `MCP_FETCH_NAME` | Server name | `agent-stack-mcp-fetch` |
+| `MCP_FETCH_NAME` | Server name | `ai-stack-mcp-fetch` |
 | `MCP_FETCH_USER_AGENT` | Default User-Agent | Mozilla compatible |
 | `MCP_FETCH_TIMEOUT` | Default timeout (ms) | `30000` |
 | `MCP_FETCH_MAX_LENGTH` | Default max length (chars) | `50000` |
@@ -58,7 +58,7 @@ Add to your `.mcp.json`:
 ### Programmatic Usage
 
 ```typescript
-import { fetchUrl, createServer } from '@agent-stack-mcp/fetch';
+import { fetchUrl, createServer } from '@ai-stack-mcp/fetch';
 
 // Direct fetch
 const result = await fetchUrl({

@@ -1,5 +1,5 @@
 /**
- * @agent-stack/memory - Memory Pipeline
+ * @ai-stack/memory - Memory Pipeline
  *
  * Complete read/write pipeline for memory operations.
  *
@@ -21,7 +21,7 @@ import type {
   ISummaryStore,
   IProfileStore,
   EmbedFunction,
-} from '@agent-stack/memory-store-sqlite';
+} from '@ai-stack/memory-store-sqlite';
 import {
   applyTemporalDecay,
   type TemporalDecayConfig,

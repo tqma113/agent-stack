@@ -1,5 +1,5 @@
 /**
- * @agent-stack/memory - Type Definitions
+ * @ai-stack/memory - Type Definitions
  *
  * Core schema definitions for the memory system.
  * All memory layers share these fundamental types.
@@ -554,7 +554,7 @@ export interface MemoryConfig {
  * Default memory config
  */
 export const DEFAULT_MEMORY_CONFIG: MemoryConfig = {
-  dbPath: '.agent-stack/memory.db',
+  dbPath: '.ai-stack/memory.db',
   tokenBudget: DEFAULT_TOKEN_BUDGET,
   writePolicy: DEFAULT_WRITE_POLICY,
   retrieval: DEFAULT_RETRIEVAL_CONFIG,

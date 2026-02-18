@@ -1,10 +1,10 @@
 /**
- * @agent-stack/memory - Memory Policy
+ * @ai-stack/memory - Memory Policy
  *
  * Main orchestrator that combines retrieval, write, and budget policies.
  */
 
-import type { ProfileItem, MemoryEvent } from '@agent-stack/memory-store-sqlite';
+import type { ProfileItem, MemoryEvent } from '@ai-stack/memory-store-sqlite';
 import type {
   IMemoryPolicy,
   RetrievalContext,

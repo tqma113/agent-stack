@@ -1,5 +1,5 @@
 /**
- * @agent-stack/memory - Pipeline Module
+ * @ai-stack/memory - Pipeline Module
  *
  * Complete read/write pipeline for memory operations.
  */

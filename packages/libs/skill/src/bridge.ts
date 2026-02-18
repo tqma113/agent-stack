@@ -1,5 +1,5 @@
 /**
- * @agent-stack/skill - Tool Bridge
+ * @ai-stack/skill - Tool Bridge
  *
  * Converts Skill tools to Agent-compatible Tool interface
  */

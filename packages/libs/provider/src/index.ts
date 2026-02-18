@@ -1,7 +1,7 @@
 /**
- * @agent-stack/provider
+ * @ai-stack/provider
  *
- * OpenAI API provider for agent-stack monorepo
+ * OpenAI API provider for ai-stack monorepo
  */
 
 export * from './openai';

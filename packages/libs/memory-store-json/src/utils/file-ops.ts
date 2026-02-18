@@ -1,5 +1,5 @@
 /**
- * @agent-stack/memory-store-json - File Operations
+ * @ai-stack/memory-store-json - File Operations
  *
  * Utilities for reading and writing JSON/Markdown files.
  */

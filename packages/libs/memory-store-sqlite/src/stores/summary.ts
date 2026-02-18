@@ -1,5 +1,5 @@
 /**
- * @agent-stack/memory-store-sqlite - Summary Store
+ * @ai-stack/memory-store-sqlite - Summary Store
  *
  * Stores rolling summaries for conversation compression.
  */

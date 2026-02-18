@@ -11,7 +11,7 @@ import {
   getTemporalDecayStats,
   createTemporalDecayProcessor,
 } from '../../src/ranking/temporal-decay.js';
-import type { SemanticSearchResult } from '@agent-stack/memory-store-sqlite';
+import type { SemanticSearchResult } from '@ai-stack/memory-store-sqlite';
 
 // Helper to create mock results
 function createMockResult(

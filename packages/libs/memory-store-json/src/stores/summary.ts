@@ -1,5 +1,5 @@
 /**
- * @agent-stack/memory-store-json - Summary Store
+ * @ai-stack/memory-store-json - Summary Store
  *
  * JSON/Markdown-based summary storage for compressed memory.
  */
@@ -11,7 +11,7 @@ import type {
   SummaryInput,
   UUID,
   Timestamp,
-} from '@agent-stack/memory-store-sqlite';
+} from '@ai-stack/memory-store-sqlite';
 import {
   readJsonFile,
   writeJsonFile,

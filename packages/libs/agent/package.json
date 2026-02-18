@@ -1,7 +1,7 @@
 {
-  "name": "@agent-stack/index",
+  "name": "@ai-stack/agent",
   "version": "0.0.1",
-  "description": "Main entry point for agent-stack AI agents",
+  "description": "Main entry point for ai-stack AI agents",
   "main": "./dist/index.js",
   "module": "./dist/index.mjs",
   "types": "./dist/index.d.ts",
@@ -13,7 +13,7 @@
     }
   },
   "bin": {
-    "agent-stack": "./dist/cli.js"
+    "ai-stack": "./dist/cli.js"
   },
   "files": [
     "dist"
@@ -35,11 +35,11 @@
   "author": "",
   "license": "MIT",
   "dependencies": {
-    "@agent-stack/provider": "workspace:*",
-    "@agent-stack/mcp": "workspace:*",
-    "@agent-stack/skill": "workspace:*",
-    "@agent-stack/memory": "workspace:*",
-    "@agent-stack/memory-store-sqlite": "workspace:*",
+    "@ai-stack/provider": "workspace:*",
+    "@ai-stack/mcp": "workspace:*",
+    "@ai-stack/skill": "workspace:*",
+    "@ai-stack/memory": "workspace:*",
+    "@ai-stack/memory-store-sqlite": "workspace:*",
     "boxen": "^8.0.1",
     "chalk": "^5.4.0",
     "cli-truncate": "^4.0.0",

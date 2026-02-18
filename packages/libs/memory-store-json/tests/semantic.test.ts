@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { createJsonSemanticStore } from '../src/stores/semantic.js';
-import type { SemanticChunkInput } from '@agent-stack/memory-store-sqlite';
+import type { SemanticChunkInput } from '@ai-stack/memory-store-sqlite';
 
 const TEST_BASE_PATH = path.join(process.cwd(), '.test-memory-semantic');
 

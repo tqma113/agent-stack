@@ -1,5 +1,5 @@
 /**
- * @agent-stack/memory - Ranking Module
+ * @ai-stack/memory - Ranking Module
  *
  * Post-processing pipeline for search result ranking:
  * - Temporal Decay: Favor recent content

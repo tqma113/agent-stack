@@ -1,5 +1,5 @@
 /**
- * @agent-stack/memory - Stores Interface
+ * @ai-stack/memory - Stores Interface
  *
  * Defines the aggregated stores interface for dependency injection.
  */
@@ -10,7 +10,7 @@ import type {
   ISummaryStore,
   IProfileStore,
   ISemanticStore,
-} from '@agent-stack/memory-store-sqlite';
+} from '@ai-stack/memory-store-sqlite';
 
 /**
  * Memory stores collection interface

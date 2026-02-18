@@ -1,5 +1,5 @@
 /**
- * @agent-stack/memory-store-sqlite - Error Classes
+ * @ai-stack/memory-store-sqlite - Error Classes
  *
  * Custom error types for the memory storage layer.
  */

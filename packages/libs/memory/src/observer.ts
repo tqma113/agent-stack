@@ -1,5 +1,5 @@
 /**
- * @agent-stack/memory - Observer
+ * @ai-stack/memory - Observer
  *
  * Event observation and collection from agent interactions.
  */
@@ -10,7 +10,7 @@ import type {
   EventType,
   EventEntity,
   EventLink,
-} from '@agent-stack/memory-store-sqlite';
+} from '@ai-stack/memory-store-sqlite';
 import type { ObserverCallback } from './types.js';
 
 /**

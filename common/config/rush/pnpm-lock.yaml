@@ -10,39 +10,39 @@ importers:
 
   .: {}
 
-  ../../example:
+  ../../packages/examples/agent:
     dependencies:
-      '@agent-stack-mcp/fetch':
+      '@ai-stack-mcp/fetch':
         specifier: workspace:*
-        version: link:../packages/mcp-servers/fetch
-      '@agent-stack-mcp/git':
+        version: link:../../mcp-servers/fetch
+      '@ai-stack-mcp/git':
         specifier: workspace:*
-        version: link:../packages/mcp-servers/git
-      '@agent-stack-mcp/time':
+        version: link:../../mcp-servers/git
+      '@ai-stack-mcp/time':
         specifier: workspace:*
-        version: link:../packages/mcp-servers/time
-      '@agent-stack-skill/memory':
+        version: link:../../mcp-servers/time
+      '@ai-stack-skill/memory':
         specifier: workspace:*
-        version: link:../packages/skills/memory
-      '@agent-stack/index':
+        version: link:../../skills/memory
+      '@ai-stack/agent':
         specifier: workspace:*
-        version: link:../packages/libs/index
+        version: link:../../libs/agent
 
-  ../../packages/libs/index:
+  ../../packages/libs/agent:
     dependencies:
-      '@agent-stack/mcp':
+      '@ai-stack/mcp':
         specifier: workspace:*
         version: link:../mcp
-      '@agent-stack/memory':
+      '@ai-stack/memory':
         specifier: workspace:*
         version: link:../memory
-      '@agent-stack/memory-store-sqlite':
+      '@ai-stack/memory-store-sqlite':
         specifier: workspace:*
         version: link:../memory-store-sqlite
-      '@agent-stack/provider':
+      '@ai-stack/provider':
         specifier: workspace:*
         version: link:../provider
-      '@agent-stack/skill':
+      '@ai-stack/skill':
         specifier: workspace:*
         version: link:../skill
       boxen:
@@ -85,6 +85,9 @@ importers:
       '@modelcontextprotocol/sdk':
         specifier: ^1.0.0
         version: 1.26.0
+      json5:
+        specifier: ^2.2.3
+        version: 2.2.3
     devDependencies:
       '@types/node':
         specifier: ^22.10.0
@@ -101,7 +104,7 @@ importers:
 
   ../../packages/libs/memory:
     dependencies:
-      '@agent-stack/memory-store-sqlite':
+      '@ai-stack/memory-store-sqlite':
         specifier: workspace:*
         version: link:../memory-store-sqlite
     devDependencies:
@@ -123,7 +126,7 @@ importers:
 
   ../../packages/libs/memory-store-json:
     dependencies:
-      '@agent-stack/memory-store-sqlite':
+      '@ai-stack/memory-store-sqlite':
         specifier: workspace:*
         version: link:../memory-store-sqlite
     devDependencies:
@@ -276,7 +279,7 @@ importers:
 
   ../../packages/skills/memory:
     dependencies:
-      '@agent-stack/memory-store-sqlite':
+      '@ai-stack/memory-store-sqlite':
         specifier: workspace:*
         version: link:../../libs/memory-store-sqlite
       better-sqlite3:
@@ -1299,6 +1302,11 @@ packages:
 
   json-schema-typed@8.0.2:
     resolution: {integrity: sha512-fQhoXdcvc3V28x7C7BMs4P5+kNlgUURe2jmUT1T//oBRMDrqy1QPelJimwZGo7Hg9VPV3EQV5Bnq4hbFy2vetA==}
+
+  json5@2.2.3:
+    resolution: {integrity: sha512-XmOWe7eyHYH14cLdVPoyg+GOH3rYX++KpzrylJwSW98t3Nk+U8XOl8FWKOgwtzdb8lXGf6zYwDUzeHMWfxasyg==}
+    engines: {node: '>=6'}
+    hasBin: true
 
   lilconfig@3.1.3:
     resolution: {integrity: sha512-/vlFKAoH5Cgt3Ie+JLhRbwOsCQePABiU3tJ1egGvyQ+33R/vcwM2Zl2QR/LzjsBeItPt3oSVXapn+m4nQDvpzw==}
@@ -2785,6 +2793,8 @@ snapshots:
   json-schema-traverse@1.0.0: {}
 
   json-schema-typed@8.0.2: {}
+
+  json5@2.2.3: {}
 
   lilconfig@3.1.3: {}
 

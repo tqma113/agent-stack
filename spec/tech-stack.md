@@ -44,9 +44,9 @@ Rush 是微软开源的 Monorepo 管理工具，主要特点：
 **关键配置** (`rush.json`):
 
 项目分为三类，统一放在 `packages/` 目录下：
-- **核心库** (`packages/libs/`): `@agent-stack/*`
-- **自定义 Skills** (`packages/skills/`): `@agent-stack-skill/*`
-- **自定义 MCP 服务器** (`packages/mcp-servers/`): `@agent-stack-mcp/*`
+- **核心库** (`packages/libs/`): `@ai-stack/*`
+- **自定义 Skills** (`packages/skills/`): `@ai-stack-skill/*`
+- **自定义 MCP 服务器** (`packages/mcp-servers/`): `@ai-stack-mcp/*`
 
 ```json
 {
@@ -56,17 +56,17 @@ Rush 是微软开源的 Monorepo 管理工具，主要特点：
   "projectFolderMinDepth": 1,
   "projectFolderMaxDepth": 3,
   "projects": [
-    { "packageName": "@agent-stack/provider", "projectFolder": "packages/libs/provider" },
-    { "packageName": "@agent-stack/mcp", "projectFolder": "packages/libs/mcp" },
-    { "packageName": "@agent-stack/skill", "projectFolder": "packages/libs/skill" },
-    { "packageName": "@agent-stack/memory", "projectFolder": "packages/libs/memory" },
-    { "packageName": "@agent-stack/memory-store-sqlite", "projectFolder": "packages/libs/memory-store-sqlite" },
-    { "packageName": "@agent-stack/memory-store-json", "projectFolder": "packages/libs/memory-store-json" },
-    { "packageName": "@agent-stack/index", "projectFolder": "packages/libs/index" },
-    { "packageName": "@agent-stack-skill/memory", "projectFolder": "packages/skills/memory" },
-    { "packageName": "@agent-stack-mcp/fetch", "projectFolder": "packages/mcp-servers/fetch" },
-    { "packageName": "@agent-stack-mcp/time", "projectFolder": "packages/mcp-servers/time" },
-    { "packageName": "@agent-stack-mcp/git", "projectFolder": "packages/mcp-servers/git" }
+    { "packageName": "@ai-stack/provider", "projectFolder": "packages/libs/provider" },
+    { "packageName": "@ai-stack/mcp", "projectFolder": "packages/libs/mcp" },
+    { "packageName": "@ai-stack/skill", "projectFolder": "packages/libs/skill" },
+    { "packageName": "@ai-stack/memory", "projectFolder": "packages/libs/memory" },
+    { "packageName": "@ai-stack/memory-store-sqlite", "projectFolder": "packages/libs/memory-store-sqlite" },
+    { "packageName": "@ai-stack/memory-store-json", "projectFolder": "packages/libs/memory-store-json" },
+    { "packageName": "@ai-stack/agent", "projectFolder": "packages/libs/index" },
+    { "packageName": "@ai-stack-skill/memory", "projectFolder": "packages/skills/memory" },
+    { "packageName": "@ai-stack-mcp/fetch", "projectFolder": "packages/mcp-servers/fetch" },
+    { "packageName": "@ai-stack-mcp/time", "projectFolder": "packages/mcp-servers/time" },
+    { "packageName": "@ai-stack-mcp/git", "projectFolder": "packages/mcp-servers/git" }
   ]
 }
 ```
@@ -133,10 +133,10 @@ Node.js 命令行框架，用于 CLI 实现：
 
 ```bash
 # CLI 命令结构
-agent-stack chat       # 交互式聊天
-agent-stack run        # 单次执行任务
-agent-stack tools      # 工具管理
-agent-stack config     # 配置管理
+ai-stack chat       # 交互式聊天
+ai-stack run        # 单次执行任务
+ai-stack tools      # 工具管理
+ai-stack config     # 配置管理
 ```
 
 ### 终端 UI 库
@@ -240,7 +240,7 @@ TikTok Agent Development Kit 插件系统，提供：
 
 ### better-sqlite3 (^11.7.0)
 
-同步的 SQLite3 绑定库，用于 `@agent-stack/memory-store-sqlite` 包：
+同步的 SQLite3 绑定库，用于 `@ai-stack/memory-store-sqlite` 包：
 
 - **同步 API**: 简化异步处理
 - **预编译语句**: 提高性能
@@ -334,10 +334,10 @@ export default defineConfig({
 ```
 
 **测试覆盖**：
-- `@agent-stack/memory`: 220 个测试用例 (11 个测试文件)
-- `@agent-stack/memory-store-sqlite`: 87 个测试用例 (6 个测试文件)
-- `@agent-stack/memory-store-json`: 通过
-- `@agent-stack-skill/memory`: 28 个测试用例 (1 个测试文件)
+- `@ai-stack/memory`: 220 个测试用例 (11 个测试文件)
+- `@ai-stack/memory-store-sqlite`: 87 个测试用例 (6 个测试文件)
+- `@ai-stack/memory-store-json`: 通过
+- `@ai-stack-skill/memory`: 28 个测试用例 (1 个测试文件)
 - **总计**: 335+ 测试用例
 
 **测试模块**：

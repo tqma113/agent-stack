@@ -1,0 +1,21 @@
+{
+  "name": "@ai-stack-example/agent",
+  "version": "0.0.1",
+  "type": "module",
+  "private": true,
+  "description": "Example project for testing @ai-stack/index",
+  "scripts": {
+    "build": "echo 'No build needed'",
+    "start": "ai-stack chat",
+    "chat": "ai-stack chat",
+    "run": "ai-stack run",
+    "tools": "ai-stack tools list"
+  },
+  "dependencies": {
+    "@ai-stack/agent": "workspace:*",
+    "@ai-stack-mcp/fetch": "workspace:*",
+    "@ai-stack-mcp/time": "workspace:*",
+    "@ai-stack-mcp/git": "workspace:*",
+    "@ai-stack-skill/memory": "workspace:*"
+  }
+}

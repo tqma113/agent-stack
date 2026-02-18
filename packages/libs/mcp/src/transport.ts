@@ -1,5 +1,5 @@
 /**
- * @agent-stack/mcp - Transport Factory
+ * @ai-stack/mcp - Transport Factory
  */
 
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
@@ -121,7 +121,7 @@ export async function createClient(
 
   const client = new Client(
     {
-      name: `agent-stack-mcp-${name}`,
+      name: `ai-stack-mcp-${name}`,
       version: '1.0.0',
     },
     {

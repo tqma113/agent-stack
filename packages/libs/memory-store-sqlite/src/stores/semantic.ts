@@ -1,5 +1,5 @@
 /**
- * @agent-stack/memory-store-sqlite - Semantic Store
+ * @ai-stack/memory-store-sqlite - Semantic Store
  *
  * Stores searchable content chunks with FTS5 and sqlite-vec vector support.
  */

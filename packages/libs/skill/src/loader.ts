@@ -1,5 +1,5 @@
 /**
- * @agent-stack/skill - Skill Loader
+ * @ai-stack/skill - Skill Loader
  *
  * Handles loading skills from directories and npm packages
  */

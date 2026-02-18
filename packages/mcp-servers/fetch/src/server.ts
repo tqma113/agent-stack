@@ -18,7 +18,7 @@ const TOOL_NAME = 'fetch';
  * Create and configure the MCP server
  */
 export function createServer(config: ServerConfig = {}) {
-  const serverName = config.name || 'agent-stack-mcp-fetch';
+  const serverName = config.name || 'ai-stack-mcp-fetch';
   const serverVersion = config.version || '0.0.1';
 
   const server = new Server(

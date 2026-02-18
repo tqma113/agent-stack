@@ -1,17 +1,17 @@
 {
-  "model": "gpt-4o",
+  "model": "gpt-5.2",
   "temperature": 0.7,
   "maxTokens": 4096,
   "systemPrompt": "You are a helpful AI assistant with access to file, shell, search, and memory tools. Use them to help the user accomplish their tasks. Always explain what you're doing before using a tool. Use memory tools to remember important information across conversations.",
   "skill": {
     "directories": [
       "./skills",
-      "./node_modules/@agent-stack-skill"
+      "./node_modules/@ai-stack-skill"
     ],
     "autoLoad": true
   },
   "mcp": {
-    "configPath": "./.mcp.json",
+    "configPath": "./mcp.json",
     "autoConnect": true
   },
   "memory": {

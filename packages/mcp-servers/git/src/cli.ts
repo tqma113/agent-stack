@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * CLI entry point for @agent-stack-mcp/git
+ * CLI entry point for @ai-stack-mcp/git
  */
 
 import { runServer } from './server.js';
@@ -10,7 +10,7 @@ import type { ServerConfig } from './types.js';
 function parseArgs(): ServerConfig {
   const args = process.argv.slice(2);
   const config: ServerConfig = {
-    name: process.env.MCP_GIT_NAME || 'agent-stack-mcp-git',
+    name: process.env.MCP_GIT_NAME || 'ai-stack-mcp-git',
     version: process.env.MCP_GIT_VERSION || '0.0.1',
   };
 

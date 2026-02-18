@@ -1,5 +1,5 @@
 /**
- * @agent-stack/skill-memory - Schema Definitions
+ * @ai-stack/skill-memory - Schema Definitions
  *
  * JSON Schema definitions for the memory skill tools.
  */

@@ -1,11 +1,11 @@
 /**
- * @agent-stack/memory - Ranking Pipeline
+ * @ai-stack/memory - Ranking Pipeline
  *
  * Composable pipeline for post-processing search results.
  * Combines temporal decay, MMR, and custom processors.
  */
 
-import type { SemanticSearchResult } from '@agent-stack/memory-store-sqlite';
+import type { SemanticSearchResult } from '@ai-stack/memory-store-sqlite';
 import {
   applyTemporalDecay,
   type TemporalDecayConfig,

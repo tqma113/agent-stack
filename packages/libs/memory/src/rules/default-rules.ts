@@ -1,5 +1,5 @@
 /**
- * @agent-stack/memory - Default Rules
+ * @ai-stack/memory - Default Rules
  *
  * Pre-configured rules for common memory operations.
  */

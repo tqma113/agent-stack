@@ -1,5 +1,5 @@
 /**
- * Timezone utilities for @agent-stack-mcp/time
+ * Timezone utilities for @ai-stack-mcp/time
  */
 
 import type { TimeInfo } from './types.js';

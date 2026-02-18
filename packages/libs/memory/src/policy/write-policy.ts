@@ -1,10 +1,10 @@
 /**
- * @agent-stack/memory - Write Policy
+ * @ai-stack/memory - Write Policy
  *
  * Decisions about when and what to write to memory.
  */
 
-import type { MemoryEvent, ProfileKey, ProfileItem, Confidence } from '@agent-stack/memory-store-sqlite';
+import type { MemoryEvent, ProfileKey, ProfileItem, Confidence } from '@ai-stack/memory-store-sqlite';
 import type {
   WriteContext,
   WriteDecision,

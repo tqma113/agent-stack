@@ -1,8 +1,8 @@
-# @agent-stack/memory 实现计划
+# @ai-stack/memory 实现计划
 
 ## 概述
 
-本文档详细描述了 `@agent-stack/memory` 包的完整实现计划，从 M0 (骨架) 到 M7 (完整功能) 的里程碑拆解。
+本文档详细描述了 `@ai-stack/memory` 包的完整实现计划，从 M0 (骨架) 到 M7 (完整功能) 的里程碑拆解。
 
 ---
 
@@ -97,7 +97,7 @@ packages/memory/
    - [x] 订阅/通知机制
 
 3. **Agent 集成** (`packages/index/src/agent.ts`)
-   - [x] 添加 `@agent-stack/memory` 依赖
+   - [x] 添加 `@ai-stack/memory` 依赖
    - [x] `AgentMemoryConfig` 配置类型
    - [x] `initializeMemory()` / `closeMemory()` / `close()` 方法
    - [x] `chat()` 方法自动记录 USER_MSG / ASSISTANT_MSG
@@ -414,7 +414,7 @@ expect(injected).toContain('User Preferences');
 ```typescript
 // packages/index/src/agent.ts
 
-import { MemoryManager, type MemoryConfig } from '@agent-stack/memory';
+import { MemoryManager, type MemoryConfig } from '@ai-stack/memory';
 
 interface AgentConfig {
   // ... existing config
@@ -528,13 +528,13 @@ class Agent {
 
 ## 配置示例
 
-### .agent-stack.json
+### .ai-stack.json
 
 ```json
 {
   "model": "gpt-4o",
   "memory": {
-    "dbPath": ".agent-stack/memory.db",
+    "dbPath": ".ai-stack/memory.db",
     "tokenBudget": {
       "profile": 200,
       "taskState": 300,

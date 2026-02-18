@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * CLI entry point for agent-stack
+ * CLI entry point for ai-stack
  */
 
 import { Command } from 'commander';
@@ -102,7 +102,7 @@ function getSpinner(text: string, classic: boolean) {
 const program = new Command();
 
 program
-  .name('agent-stack')
+  .name('ai-stack')
   .description('AI Agent framework with MCP and Skill support')
   .version(VERSION);
 
@@ -610,7 +610,7 @@ interface InitOptions {
 
 async function initConfig(options: InitOptions) {
   const colors = getColors(!isTTY);
-  const configPath = resolve(process.cwd(), 'agent-stack.json');
+  const configPath = resolve(process.cwd(), 'ai-stack.json');
 
   if (existsSync(configPath) && !options.force) {
     console.log(colors.yellow(`Configuration file already exists: ${configPath}`));
@@ -635,7 +635,7 @@ async function showConfig(options: ShowConfigOptions) {
 
   if (!configPath) {
     console.log(colors.yellow('No configuration file found.'));
-    console.log(colors.gray('Run `agent-stack config init` to create one.'));
+    console.log(colors.gray('Run `ai-stack config init` to create one.'));
     return;
   }
 

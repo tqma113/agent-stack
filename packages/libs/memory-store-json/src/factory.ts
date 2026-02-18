@@ -1,5 +1,5 @@
 /**
- * @agent-stack/memory-store-json - Factory
+ * @ai-stack/memory-store-json - Factory
  *
  * Convenient factory function to create all JSON stores.
  */
@@ -11,7 +11,7 @@ import type {
   ISummaryStore,
   IProfileStore,
   ISemanticStore,
-} from '@agent-stack/memory-store-sqlite';
+} from '@ai-stack/memory-store-sqlite';
 import { createJsonEventStore } from './stores/event.js';
 import { createJsonTaskStateStore } from './stores/task-state.js';
 import { createJsonSummaryStore } from './stores/summary.js';
@@ -25,7 +25,7 @@ import { ensureDir } from './utils/file-ops.js';
 export interface JsonStoresConfig {
   /**
    * Base path for all JSON storage files
-   * @default '.agent-stack/memory'
+   * @default '.ai-stack/memory'
    */
   basePath?: string;
 }
@@ -66,7 +66,7 @@ export interface MemoryStores {
  * ```
  */
 export async function createJsonStores(config: JsonStoresConfig = {}): Promise<MemoryStores> {
-  const basePath = config.basePath || '.agent-stack/memory';
+  const basePath = config.basePath || '.ai-stack/memory';
 
   // Ensure base directory exists
   ensureDir(basePath);

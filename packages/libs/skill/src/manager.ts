@@ -1,5 +1,5 @@
 /**
- * @agent-stack/skill - Skill Manager
+ * @ai-stack/skill - Skill Manager
  *
  * Manages skill lifecycle, loading, and state
  */

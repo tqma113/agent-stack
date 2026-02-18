@@ -1,5 +1,5 @@
 /**
- * @agent-stack/memory - Maximal Marginal Relevance (MMR)
+ * @ai-stack/memory - Maximal Marginal Relevance (MMR)
  *
  * Implements MMR reranking to balance relevance and diversity in search results.
  * Prevents returning multiple similar chunks that provide redundant information.
@@ -10,7 +10,7 @@
  * "The Use of MMR, Diversity-Based Reranking for Reordering Documents and Producing Summaries"
  */
 
-import type { SemanticSearchResult, SemanticChunk } from '@agent-stack/memory-store-sqlite';
+import type { SemanticSearchResult, SemanticChunk } from '@ai-stack/memory-store-sqlite';
 
 /**
  * MMR configuration

@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { createJsonEventStore } from '../src/stores/event.js';
-import type { EventInput } from '@agent-stack/memory-store-sqlite';
+import type { EventInput } from '@ai-stack/memory-store-sqlite';
 
 const TEST_BASE_PATH = path.join(process.cwd(), '.test-memory-event');
 

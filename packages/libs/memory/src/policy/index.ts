@@ -1,5 +1,5 @@
 /**
- * @agent-stack/memory - Policy Layer
+ * @ai-stack/memory - Policy Layer
  *
  * Export all policy components.
  */

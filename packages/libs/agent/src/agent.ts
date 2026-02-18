@@ -11,21 +11,21 @@ import {
   defineTool,
   type ChatCompletionMessageParam,
   type OpenAIClientInstance,
-} from '@agent-stack/provider';
+} from '@ai-stack/provider';
 import {
   createMCPClientManager,
   createMCPToolProvider,
   type MCPConfig,
   type MCPClientManagerInstance,
   type MCPToolProviderInstance,
-} from '@agent-stack/mcp';
+} from '@ai-stack/mcp';
 import {
   createSkillManager,
   createSkillToolProvider,
   type SkillConfig,
   type SkillManagerInstance,
   type SkillToolProviderInstance,
-} from '@agent-stack/skill';
+} from '@ai-stack/skill';
 import {
   createMemoryManager,
   TaskStateReducer,
@@ -39,10 +39,10 @@ import {
   type IMemoryObserver,
   type IMemoryBudgeter,
   type MemoryStores,
-} from '@agent-stack/memory';
+} from '@ai-stack/memory';
 import {
   createSqliteStores,
-} from '@agent-stack/memory-store-sqlite';
+} from '@ai-stack/memory-store-sqlite';
 import type {
   AgentConfig,
   AgentMCPConfig,
@@ -185,7 +185,7 @@ export function createAgent(config: AgentConfig = {}): AgentInstance {
       let mcpServerConfig: MCPConfig;
       if (mcpConfig.configPath) {
         // Load from file
-        const { loadConfig } = await import('@agent-stack/mcp');
+        const { loadConfig } = await import('@ai-stack/mcp');
         mcpServerConfig = await loadConfig(mcpConfig.configPath);
       } else if (mcpConfig.servers) {
         // Use inline config
@@ -264,7 +264,7 @@ export function createAgent(config: AgentConfig = {}): AgentInstance {
       let skillServerConfig: SkillConfig;
       if (skillConfig.configPath) {
         // Load from file
-        const { loadConfig } = await import('@agent-stack/skill');
+        const { loadConfig } = await import('@ai-stack/skill');
         skillServerConfig = await loadConfig(skillConfig.configPath);
       } else if (skillConfig.skills) {
         // Use inline config
@@ -356,7 +356,7 @@ export function createAgent(config: AgentConfig = {}): AgentInstance {
       }
 
       // Create SQLite stores with configured path
-      const dbPath = memoryConfig.dbPath ?? '.agent-stack/memory.db';
+      const dbPath = memoryConfig.dbPath ?? '.ai-stack/memory.db';
       const stores = await createSqliteStores({ dbPath });
 
       // Build memory manager config

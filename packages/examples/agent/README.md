@@ -1,30 +1,30 @@
 # Agent Stack Examples
 
-This directory contains example configurations and skills for agent-stack.
+This directory contains example configurations and skills for ai-stack.
 
 ## Quick Start
 
 ```bash
-# Install agent-stack globally (or use npx)
-npm install -g @agent-stack/index
+# Install ai-stack globally (or use npx)
+npm install -g @ai-stack/agent
 
 # Go to examples directory
 cd example
 
 # Start interactive chat
-agent-stack chat
+ai-stack chat
 
 # Or run a single task
-agent-stack run "List the files in this directory"
+ai-stack run "List the files in this directory"
 ```
 
 ## Directory Structure
 
 ```
 example/
-├── .agent-stack.json   # Agent configuration
+├── .ai-stack.json   # Agent configuration
 ├── .mcp.json           # MCP server configuration
-├── .agent-stack/       # Runtime data (auto-created)
+├── .ai-stack/       # Runtime data (auto-created)
 │   └── memory.db       # SQLite memory database
 ├── skills/             # Example skills
 │   ├── file-skill/     # File operations
@@ -35,7 +35,7 @@ example/
 
 ## Configuration Files
 
-### .agent-stack.json
+### .ai-stack.json
 
 Main agent configuration:
 
@@ -54,7 +54,7 @@ Main agent configuration:
   },
   "memory": {
     "enabled": true,
-    "dbPath": "./.agent-stack/memory.db",
+    "dbPath": "./.ai-stack/memory.db",
     "autoInitialize": true,
     "autoInject": true
   }
@@ -74,15 +74,15 @@ MCP server configuration (compatible with Claude Code format):
     },
     "fetch": {
       "command": "npx",
-      "args": ["-y", "@agent-stack-mcp/fetch"]
+      "args": ["-y", "@ai-stack-mcp/fetch"]
     },
     "time": {
       "command": "npx",
-      "args": ["-y", "@agent-stack-mcp/time"]
+      "args": ["-y", "@ai-stack-mcp/time"]
     },
     "git": {
       "command": "npx",
-      "args": ["-y", "@agent-stack-mcp/git"]
+      "args": ["-y", "@ai-stack-mcp/git"]
     }
   }
 }
@@ -114,7 +114,7 @@ Search for files and content.
 - `search_files` - Find files by glob pattern
 - `grep_content` - Search text in files
 
-### memory-skill (@agent-stack-skill/memory)
+### memory-skill (@ai-stack-skill/memory)
 
 Persistent memory across conversations.
 
@@ -141,7 +141,7 @@ The agent has a persistent memory system with five layers:
 {
   "memory": {
     "enabled": true,
-    "dbPath": "./.agent-stack/memory.db",
+    "dbPath": "./.ai-stack/memory.db",
     "autoInitialize": true,
     "autoInject": true,
     "tokenBudget": {
@@ -170,20 +170,20 @@ The agent has a persistent memory system with five layers:
 
 ```bash
 # Interactive chat (loads config automatically)
-agent-stack chat
+ai-stack chat
 
 # Single task execution
-agent-stack run "<task>"
+ai-stack run "<task>"
 
 # List available tools
-agent-stack tools list
+ai-stack tools list
 
 # Show tool details
-agent-stack tools info <name>
+ai-stack tools info <name>
 
 # Configuration management
-agent-stack config init    # Create config template
-agent-stack config show    # Show current config
+ai-stack config init    # Create config template
+ai-stack config show    # Show current config
 ```
 
 ## Creating Your Own Skills
@@ -196,7 +196,7 @@ See `skills/` directory for examples.
 
 ## Example Prompts
 
-Try these with `agent-stack chat`:
+Try these with `ai-stack chat`:
 
 ### Basic Operations
 - "List the files in this directory"

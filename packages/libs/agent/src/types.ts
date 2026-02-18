@@ -2,10 +2,10 @@
  * Agent Types
  */
 
-import type { ChatCompletionMessageParam } from '@agent-stack/provider';
-import type { MCPToolBridgeOptions } from '@agent-stack/mcp';
-import type { SkillToolBridgeOptions, SkillEntry } from '@agent-stack/skill';
-import type { MemoryConfig, TokenBudget, WritePolicyConfig, RetrievalConfig } from '@agent-stack/memory';
+import type { ChatCompletionMessageParam } from '@ai-stack/provider';
+import type { MCPToolBridgeOptions } from '@ai-stack/mcp';
+import type { SkillToolBridgeOptions, SkillEntry } from '@ai-stack/skill';
+import type { MemoryConfig, TokenBudget, WritePolicyConfig, RetrievalConfig } from '@ai-stack/memory';
 
 /**
  * MCP configuration for Agent
@@ -50,7 +50,7 @@ export interface AgentSkillConfig {
 export interface AgentMemoryConfig {
   /** Whether to enable memory (default: true if config provided) */
   enabled?: boolean;
-  /** Database file path (default: '.agent-stack/memory.db') */
+  /** Database file path (default: '.ai-stack/memory.db') */
   dbPath?: string;
   /** Token budget configuration */
   tokenBudget?: Partial<TokenBudget>;

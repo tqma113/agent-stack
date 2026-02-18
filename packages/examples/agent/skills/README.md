@@ -1,6 +1,6 @@
 # Example Skills
 
-This directory contains example skills for use with agent-stack.
+This directory contains example skills for use with ai-stack.
 
 ## Available Skills
 
@@ -62,7 +62,7 @@ module.exports = { functionName };
 1. Create a new directory in `skills/`
 2. Add `skill.json` with tool definitions
 3. Add `handlers.js` with implementations
-4. The skill will be auto-loaded when using `agent-stack chat`
+4. The skill will be auto-loaded when using `ai-stack chat`
 
 ## Security Notes
 

@@ -9,7 +9,7 @@ import {
   type ISessionTranscript,
   type TranscriptEntry,
 } from '../../src/transcript/session-transcript.js';
-import type { MemoryEvent } from '@agent-stack/memory-store-sqlite';
+import type { MemoryEvent } from '@ai-stack/memory-store-sqlite';
 
 describe('createSessionTranscript', () => {
   let transcript: ISessionTranscript;

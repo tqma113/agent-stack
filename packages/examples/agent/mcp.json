@@ -1,0 +1,39 @@
+{
+  "mcpServers": {
+    "filesystem": {
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-filesystem", "."],
+      "env": {}
+    },
+    "fetch": {
+      "command": "npx",
+      "args": ["-y", "@ai-stack-mcp/fetch"],
+      "env": {}
+    },
+    "time": {
+      "command": "npx",
+      "args": ["-y", "@ai-stack-mcp/time"],
+      "env": {}
+    },
+    "git": {
+      "command": "npx",
+      "args": ["-y", "@ai-stack-mcp/git"],
+      "env": {}
+    },
+    "sequential-thinking": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@modelcontextprotocol/server-sequential-thinking"
+      ]
+    },
+    // "chrome-devtools": {
+    //   "command": "npx",
+    //   "args": ["-y", "chrome-devtools-mcp@latest"]
+    // },
+    // "github": {
+    //   "type": "http",
+    //   "url": "https://api.githubcopilot.com/mcp"
+    // }
+  }
+}

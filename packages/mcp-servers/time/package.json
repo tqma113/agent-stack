@@ -1,5 +1,5 @@
 {
-  "name": "@agent-stack-mcp/time",
+  "name": "@ai-stack-mcp/time",
   "version": "0.0.1",
   "description": "MCP server providing time and timezone conversion capabilities",
   "main": "./dist/index.js",

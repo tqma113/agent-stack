@@ -21,10 +21,10 @@ Agent-stack 是一个**纯框架**，提供：
 ┌─────────────────────────────────────────────────────────────┐
 │                    Agent Stack Framework                     │
 ├─────────────────────────────────────────────────────────────┤
-│  @agent-stack/provider   - OpenAI API 封装                   │
-│  @agent-stack/mcp        - MCP 协议集成                      │
-│  @agent-stack/skill      - Skill 加载系统                    │
-│  @agent-stack/index      - Agent 核心 + CLI                  │
+│  @ai-stack/provider   - OpenAI API 封装                   │
+│  @ai-stack/mcp        - MCP 协议集成                      │
+│  @ai-stack/skill      - Skill 加载系统                    │
+│  @ai-stack/agent      - Agent 核心 + CLI                  │
 └─────────────────────────────────────────────────────────────┘
                               │
               ┌───────────────┴───────────────┐
@@ -52,26 +52,26 @@ Agent-stack 是一个**纯框架**，提供：
 重构 `packages/index/src/cli.ts`，提供：
 
 ```bash
-# 交互式聊天（自动加载 .agent-stack.json 配置）
-agent-stack chat [--config=PATH]
+# 交互式聊天（自动加载 .ai-stack.json 配置）
+ai-stack chat [--config=PATH]
 
 # 单次执行任务
-agent-stack run "<task>" [--config=PATH]
+ai-stack run "<task>" [--config=PATH]
 
 # 列出已加载的工具
-agent-stack tools list
+ai-stack tools list
 
 # 查看工具详情
-agent-stack tools info <name>
+ai-stack tools info <name>
 
 # 配置管理
-agent-stack config init      # 生成配置模板
-agent-stack config show      # 显示当前配置
+ai-stack config init      # 生成配置模板
+ai-stack config show      # 显示当前配置
 ```
 
 ### 2. 配置文件支持
 
-支持 `.agent-stack.json` 或 `agent-stack.config.json`：
+支持 `.ai-stack.json` 或 `ai-stack.config.json`：
 
 ```json
 {
@@ -136,7 +136,7 @@ examples/
   - [x] with-skills.ts - Skills 使用示例
   - [x] with-config.ts - 配置文件使用示例
   - [x] tool-agent.ts - 完整工具执行型 Agent
-- [x] 创建 .agent-stack.json 示例配置
+- [x] 创建 .ai-stack.json 示例配置
 - [x] 更新 README.md 文档
 
 ### Phase 4: 文档更新
@@ -150,10 +150,10 @@ examples/
 ### chat 命令
 
 ```bash
-agent-stack chat [options]
+ai-stack chat [options]
 
 Options:
-  --config <path>    配置文件路径（默认：.agent-stack.json）
+  --config <path>    配置文件路径（默认：.ai-stack.json）
   --model <name>     LLM 模型（覆盖配置）
   --mcp <path>       MCP 配置文件路径
   --skill <dir>      Skill 目录（可多次指定）
@@ -163,7 +163,7 @@ Options:
 ### run 命令
 
 ```bash
-agent-stack run "<task>" [options]
+ai-stack run "<task>" [options]
 
 Options:
   --config <path>    配置文件路径
@@ -175,15 +175,15 @@ Options:
 ### tools 命令
 
 ```bash
-agent-stack tools list           # 列出所有工具
-agent-stack tools info <name>    # 显示工具详情
+ai-stack tools list           # 列出所有工具
+ai-stack tools info <name>    # 显示工具详情
 ```
 
 ### config 命令
 
 ```bash
-agent-stack config init          # 生成配置模板
-agent-stack config show          # 显示当前配置
+ai-stack config init          # 生成配置模板
+ai-stack config show          # 显示当前配置
 ```
 
 ---
@@ -192,14 +192,14 @@ agent-stack config show          # 显示当前配置
 
 ```json
 {
-  "$schema": "https://agent-stack.dev/schema/config.json",
+  "$schema": "https://ai-stack.dev/schema/config.json",
   "model": "gpt-4o",
   "temperature": 0.7,
   "maxTokens": 4096,
   "systemPrompt": "You are a helpful assistant...",
 
   "skill": {
-    "directories": ["./skills", "~/.agent-stack/skills"],
+    "directories": ["./skills", "~/.ai-stack/skills"],
     "skills": {
       "my-skill": {
         "path": "./my-custom-skill",
@@ -241,10 +241,10 @@ agent-stack config show          # 显示当前配置
 1. `rush build` 构建成功
 2. CLI 命令正常工作：
    ```bash
-   agent-stack config init
-   agent-stack chat
-   agent-stack run "hello"
-   agent-stack tools list
+   ai-stack config init
+   ai-stack chat
+   ai-stack run "hello"
+   ai-stack tools list
    ```
 3. 配置文件正确加载
 4. 示例 Skills 可被加载和使用

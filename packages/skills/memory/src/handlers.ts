@@ -1,5 +1,5 @@
 /**
- * @agent-stack/skill-memory - Handler Implementations
+ * @ai-stack/skill-memory - Handler Implementations
  *
  * Implements the search, upsert, and delete handlers for the memory skill.
  */
@@ -23,7 +23,7 @@ import type {
   SummaryInput,
   TaskState,
   TaskStateUpdate,
-} from '@agent-stack/memory-store-sqlite';
+} from '@ai-stack/memory-store-sqlite';
 
 /**
  * Search memory across multiple layers

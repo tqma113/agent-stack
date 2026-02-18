@@ -1,7 +1,7 @@
 {
-  "name": "@agent-stack/skill",
+  "name": "@ai-stack/skill",
   "version": "0.0.1",
-  "description": "Skill system for agent-stack - dynamic skill loading and management",
+  "description": "Skill system for ai-stack - dynamic skill loading and management",
   "main": "./dist/index.js",
   "module": "./dist/index.mjs",
   "types": "./dist/index.d.ts",

@@ -1,7 +1,7 @@
 {
-  "name": "@agent-stack/memory-store-json",
+  "name": "@ai-stack/memory-store-json",
   "version": "0.0.1",
-  "description": "JSON/Markdown storage layer for agent-stack memory system - zero native dependencies",
+  "description": "JSON/Markdown storage layer for ai-stack memory system - zero native dependencies",
   "main": "./dist/index.js",
   "module": "./dist/index.mjs",
   "types": "./dist/index.d.ts",
@@ -36,7 +36,7 @@
   "author": "",
   "license": "MIT",
   "dependencies": {
-    "@agent-stack/memory-store-sqlite": "workspace:*"
+    "@ai-stack/memory-store-sqlite": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "^22.10.0",

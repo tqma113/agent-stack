@@ -1,5 +1,5 @@
 /**
- * @agent-stack/memory-store-json - Stores
+ * @ai-stack/memory-store-json - Stores
  *
  * Export all JSON store implementations.
  */

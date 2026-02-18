@@ -1,15 +1,15 @@
 /**
- * @agent-stack/memory
+ * @ai-stack/memory
  *
  * Memory system for AI agents with multi-layer storage.
  *
  * This package provides:
  * - **Policy Layer**: Decision logic for memory operations
  * - **Components**: Observer, injector, summarizer helpers
- * - **Store Re-exports**: Convenience re-exports from @agent-stack/memory-store-sqlite
+ * - **Store Re-exports**: Convenience re-exports from @ai-stack/memory-store-sqlite
  *
- * For direct storage operations, use @agent-stack/memory-store-sqlite.
- * For tool-based access, use @agent-stack/skill-memory.
+ * For direct storage operations, use @ai-stack/memory-store-sqlite.
+ * For tool-based access, use @ai-stack/skill-memory.
  *
  * @packageDocumentation
  */
@@ -230,7 +230,7 @@ export {
 export type { MemoryStores } from './stores-interface.js';
 
 // =============================================================================
-// Re-exports from @agent-stack/memory-store-sqlite
+// Re-exports from @ai-stack/memory-store-sqlite
 // =============================================================================
 
 // Stores
@@ -258,7 +258,7 @@ export {
   type EmbeddingCacheInstance,
   type EmbeddingCacheConfig,
   type EmbeddingCacheEntry,
-} from '@agent-stack/memory-store-sqlite';
+} from '@ai-stack/memory-store-sqlite';
 
 // Errors
 export {
@@ -270,7 +270,7 @@ export {
   ProfileError,
   SemanticSearchError,
   DatabaseError,
-} from '@agent-stack/memory-store-sqlite';
+} from '@ai-stack/memory-store-sqlite';
 
 // Types
 export type {
@@ -308,10 +308,10 @@ export type {
   ISummaryStore,
   IProfileStore,
   ISemanticStore,
-} from '@agent-stack/memory-store-sqlite';
+} from '@ai-stack/memory-store-sqlite';
 
 // Constants
-export { PROFILE_KEYS } from '@agent-stack/memory-store-sqlite';
+export { PROFILE_KEYS } from '@ai-stack/memory-store-sqlite';
 
 // =============================================================================
 // Legacy Errors (aliases for backward compatibility)
@@ -319,12 +319,12 @@ export { PROFILE_KEYS } from '@agent-stack/memory-store-sqlite';
 
 export {
   MemoryStoreError as MemoryError,
-} from '@agent-stack/memory-store-sqlite';
+} from '@ai-stack/memory-store-sqlite';
 
 // Legacy error re-exports
 export {
   ProfileError as ProfileKeyNotAllowedError,
-} from '@agent-stack/memory-store-sqlite';
+} from '@ai-stack/memory-store-sqlite';
 
 // =============================================================================
 // Legacy Types (aliases for backward compatibility)

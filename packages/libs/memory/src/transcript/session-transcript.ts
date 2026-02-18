@@ -1,11 +1,11 @@
 /**
- * @agent-stack/memory - Session Transcript
+ * @ai-stack/memory - Session Transcript
  *
  * Stores and indexes session transcripts for searchability.
  * Sessions are stored as JSONL files and indexed into semantic memory.
  */
 
-import type { MemoryEvent, EventType } from '@agent-stack/memory-store-sqlite';
+import type { MemoryEvent, EventType } from '@ai-stack/memory-store-sqlite';
 
 /**
  * Transcript entry (single line in JSONL)

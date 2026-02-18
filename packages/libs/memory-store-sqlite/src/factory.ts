@@ -1,5 +1,5 @@
 /**
- * @agent-stack/memory-store-sqlite - Factory
+ * @ai-stack/memory-store-sqlite - Factory
  *
  * Convenient factory function to create all SQLite stores.
  */
@@ -27,7 +27,7 @@ import { StoreInitializationError } from './errors.js';
 export interface SqliteStoresConfig {
   /**
    * Path to the SQLite database file
-   * @default '.agent-stack/memory.db'
+   * @default '.ai-stack/memory.db'
    */
   dbPath?: string;
 
@@ -96,7 +96,7 @@ export interface SqliteMemoryStores extends MemoryStores {
  * ```
  */
 export async function createSqliteStores(config: SqliteStoresConfig = {}): Promise<SqliteMemoryStores> {
-  const dbPath = config.dbPath || '.agent-stack/memory.db';
+  const dbPath = config.dbPath || '.ai-stack/memory.db';
 
   // Ensure directory exists
   const dbDir = path.dirname(dbPath);

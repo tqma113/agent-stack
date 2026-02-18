@@ -1,5 +1,5 @@
 /**
- * @agent-stack/memory - Memory Manager
+ * @ai-stack/memory - Memory Manager
  *
  * Main entry point for the memory system.
  * Accepts externally injected stores for flexibility.
@@ -19,7 +19,7 @@ import type {
   SemanticChunkInput,
   SemanticSearchResult,
   UUID,
-} from '@agent-stack/memory-store-sqlite';
+} from '@ai-stack/memory-store-sqlite';
 import type {
   IMemoryManager,
   MemoryConfig,
@@ -33,7 +33,7 @@ import { createMemoryInjector, type IMemoryInjector } from './injector.js';
 import { createMemoryBudgeter, type IMemoryBudgeter } from './budgeter.js';
 import { createWritePolicyEngine, type IWritePolicyEngine } from './write-policy.js';
 import { createMemorySummarizer, type IMemorySummarizer } from './summarizer.js';
-import { MemoryStoreError } from '@agent-stack/memory-store-sqlite';
+import { MemoryStoreError } from '@ai-stack/memory-store-sqlite';
 import type { MemoryStores } from './stores-interface.js';
 
 /**
@@ -117,13 +117,13 @@ export type MemoryManagerConfig = Omit<MemoryConfig, 'dbPath'>;
  * @example
  * ```typescript
  * // Using SQLite stores (high performance)
- * import { createSqliteStores } from '@agent-stack/memory-store-sqlite';
+ * import { createSqliteStores } from '@ai-stack/memory-store-sqlite';
  * const stores = await createSqliteStores({ dbPath: './memory.db' });
  * const memory = createMemoryManager(stores);
  * await memory.initialize();
  *
  * // Using JSON stores (zero native deps)
- * import { createJsonStores } from '@agent-stack/memory-store-json';
+ * import { createJsonStores } from '@ai-stack/memory-store-json';
  * const stores = await createJsonStores({ basePath: './.agent-memory' });
  * const memory = createMemoryManager(stores);
  * await memory.initialize();

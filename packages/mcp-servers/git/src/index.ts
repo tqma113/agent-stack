@@ -1,5 +1,5 @@
 /**
- * @agent-stack-mcp/git
+ * @ai-stack-mcp/git
  *
  * MCP server providing Git repository interaction and automation tools
  */

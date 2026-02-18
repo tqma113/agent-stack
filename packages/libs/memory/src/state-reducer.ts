@@ -1,5 +1,5 @@
 /**
- * @agent-stack/memory - Task State Reducer
+ * @ai-stack/memory - Task State Reducer
  *
  * Immutable state updates for task management using reducer pattern.
  */

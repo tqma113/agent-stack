@@ -1,5 +1,5 @@
 /**
- * @agent-stack-mcp/time
+ * @ai-stack-mcp/time
  *
  * MCP server providing time and timezone conversion capabilities
  */

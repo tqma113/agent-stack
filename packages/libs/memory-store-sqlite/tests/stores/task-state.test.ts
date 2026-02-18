@@ -7,7 +7,7 @@ import Database from 'better-sqlite3';
 import { createTaskStateStore, type TaskStateStoreInstance } from '../../src/stores/task-state.js';
 import { TaskStateConflictError } from '../../src/errors.js';
 import type { TaskState } from '../../src/types.js';
-// Note: This file was moved from @agent-stack/memory to @agent-stack/memory-store-sqlite
+// Note: This file was moved from @ai-stack/memory to @ai-stack/memory-store-sqlite
 
 describe('TaskStateStore', () => {
   let db: Database.Database;

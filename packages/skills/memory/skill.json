@@ -2,7 +2,7 @@
   "name": "memory",
   "version": "1.0.0",
   "description": "Memory management tools for AI agents - search, store, and delete memory entries",
-  "author": "@agent-stack",
+  "author": "@ai-stack",
   "tools": [
     {
       "name": "search",

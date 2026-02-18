@@ -337,51 +337,51 @@
    */
   "projects": [
     {
-      "packageName": "@agent-stack/provider",
+      "packageName": "@ai-stack/provider",
       "projectFolder": "packages/libs/provider"
     },
     {
-      "packageName": "@agent-stack/index",
-      "projectFolder": "packages/libs/index"
+      "packageName": "@ai-stack/agent",
+      "projectFolder": "packages/libs/agent"
     },
     {
-      "packageName": "@agent-stack/mcp",
+      "packageName": "@ai-stack/mcp",
       "projectFolder": "packages/libs/mcp"
     },
     {
-      "packageName": "@agent-stack/skill",
+      "packageName": "@ai-stack/skill",
       "projectFolder": "packages/libs/skill"
     },
     {
-      "packageName": "@agent-stack/memory",
+      "packageName": "@ai-stack/memory",
       "projectFolder": "packages/libs/memory"
     },
     {
-      "packageName": "@agent-stack/memory-store-sqlite",
+      "packageName": "@ai-stack/memory-store-sqlite",
       "projectFolder": "packages/libs/memory-store-sqlite"
     },
     {
-      "packageName": "@agent-stack/memory-store-json",
+      "packageName": "@ai-stack/memory-store-json",
       "projectFolder": "packages/libs/memory-store-json"
     },
     {
-      "packageName": "@agent-stack-skill/memory",
+      "packageName": "@ai-stack-skill/memory",
       "projectFolder": "packages/skills/memory"
     },
     {
-      "packageName": "@agent-stack/example",
-      "projectFolder": "example"
+      "packageName": "@ai-stack-example/agent",
+      "projectFolder": "packages/examples/agent"      
     },
     {
-      "packageName": "@agent-stack-mcp/fetch",
+      "packageName": "@ai-stack-mcp/fetch",
       "projectFolder": "packages/mcp-servers/fetch"
     },
     {
-      "packageName": "@agent-stack-mcp/time",
+      "packageName": "@ai-stack-mcp/time",
       "projectFolder": "packages/mcp-servers/time"
     },
     {
-      "packageName": "@agent-stack-mcp/git",
+      "packageName": "@ai-stack-mcp/git",
       "projectFolder": "packages/mcp-servers/git"
     }
   ]

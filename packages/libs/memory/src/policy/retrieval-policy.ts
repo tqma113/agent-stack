@@ -1,5 +1,5 @@
 /**
- * @agent-stack/memory - Retrieval Policy
+ * @ai-stack/memory - Retrieval Policy
  *
  * Decisions about when and what to retrieve from memory.
  */

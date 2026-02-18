@@ -1,7 +1,7 @@
 {
-  "name": "@agent-stack/provider",
+  "name": "@ai-stack/provider",
   "version": "0.0.1",
-  "description": "OpenAI API provider for agent-stack monorepo",
+  "description": "OpenAI API provider for ai-stack monorepo",
   "main": "./dist/index.js",
   "module": "./dist/index.mjs",
   "types": "./dist/index.d.ts",

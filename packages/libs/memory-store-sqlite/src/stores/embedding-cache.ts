@@ -1,5 +1,5 @@
 /**
- * @agent-stack/memory-store-sqlite - Embedding Cache
+ * @ai-stack/memory-store-sqlite - Embedding Cache
  *
  * Caches embeddings to avoid redundant API calls.
  * Uses text hash as key for deduplication.

@@ -1,5 +1,5 @@
 /**
- * @agent-stack/memory-store-json - Semantic Store
+ * @ai-stack/memory-store-json - Semantic Store
  *
  * JSON-based semantic storage with simple full-text search using inverted index.
  */
@@ -11,7 +11,7 @@ import type {
   SemanticChunkInput,
   SemanticSearchResult,
   UUID,
-} from '@agent-stack/memory-store-sqlite';
+} from '@ai-stack/memory-store-sqlite';
 import {
   readJsonFile,
   writeJsonFile,

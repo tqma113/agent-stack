@@ -1,5 +1,5 @@
 /**
- * @agent-stack/memory-store-sqlite - Profile Store
+ * @ai-stack/memory-store-sqlite - Profile Store
  *
  * Stores user preferences and profile data.
  */

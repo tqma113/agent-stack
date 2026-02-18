@@ -1,7 +1,7 @@
 {
-  "name": "@agent-stack-skill/memory",
+  "name": "@ai-stack-skill/memory",
   "version": "0.0.1",
-  "description": "Memory Skill for agent-stack - exposes memory operations as tools",
+  "description": "Memory Skill for ai-stack - exposes memory operations as tools",
   "type": "module",
   "main": "./dist/handlers.js",
   "types": "./dist/handlers.d.ts",
@@ -42,7 +42,7 @@
   "author": "",
   "license": "MIT",
   "dependencies": {
-    "@agent-stack/memory-store-sqlite": "workspace:*",
+    "@ai-stack/memory-store-sqlite": "workspace:*",
     "better-sqlite3": "^11.7.0"
   },
   "devDependencies": {

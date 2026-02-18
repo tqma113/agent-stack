@@ -1,5 +1,5 @@
 /**
- * @agent-stack/memory - Injector
+ * @ai-stack/memory - Injector
  *
  * Template-based memory injection into prompts.
  */
@@ -10,7 +10,7 @@ import type {
   MemoryEvent,
   Summary,
   SemanticSearchResult,
-} from '@agent-stack/memory-store-sqlite';
+} from '@ai-stack/memory-store-sqlite';
 import type { MemoryBundle, TokenBudget } from './types.js';
 
 /**

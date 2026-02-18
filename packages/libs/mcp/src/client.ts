@@ -1,5 +1,5 @@
 /**
- * @agent-stack/mcp - MCP Client Manager
+ * @ai-stack/mcp - MCP Client Manager
  *
  * Manages multiple MCP server connections with lifecycle management
  */
@@ -234,7 +234,7 @@ export function createMCPClientManager(
         // Create client
         const client = new Client(
           {
-            name: `agent-stack-mcp-${serverName}`,
+            name: `ai-stack-mcp-${serverName}`,
             version: '1.0.0',
           },
           {

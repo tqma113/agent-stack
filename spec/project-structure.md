@@ -3,24 +3,24 @@
 ## 1. 目录结构总览
 
 ```
-agent-stack/
+ai-stack/
 ├── packages/                    # 所有包目录
-│   ├── libs/                   # 核心业务库 (@agent-stack/*)
-│   │   ├── provider/           # @agent-stack/provider
-│   │   ├── mcp/                # @agent-stack/mcp
-│   │   ├── skill/              # @agent-stack/skill
-│   │   ├── memory/             # @agent-stack/memory (策略层)
-│   │   ├── memory-store-sqlite/# @agent-stack/memory-store-sqlite (SQLite 存储)
-│   │   ├── memory-store-json/  # @agent-stack/memory-store-json (JSON 存储)
-│   │   └── index/              # @agent-stack/index
-│   ├── skills/                 # 自定义 Skills (@agent-stack-skill/*)
-│   │   └── memory/             # @agent-stack-skill/memory
-│   └── mcp-servers/            # 自定义 MCP 服务器 (@agent-stack-mcp/*)
-│       ├── fetch/              # @agent-stack-mcp/fetch
-│       ├── time/               # @agent-stack-mcp/time
-│       └── git/                # @agent-stack-mcp/git
+│   ├── libs/                   # 核心业务库 (@ai-stack/*)
+│   │   ├── provider/           # @ai-stack/provider
+│   │   ├── mcp/                # @ai-stack/mcp
+│   │   ├── skill/              # @ai-stack/skill
+│   │   ├── memory/             # @ai-stack/memory (策略层)
+│   │   ├── memory-store-sqlite/# @ai-stack/memory-store-sqlite (SQLite 存储)
+│   │   ├── memory-store-json/  # @ai-stack/memory-store-json (JSON 存储)
+│   │   └── index/              # @ai-stack/agent
+│   ├── skills/                 # 自定义 Skills (@ai-stack-skill/*)
+│   │   └── memory/             # @ai-stack-skill/memory
+│   └── mcp-servers/            # 自定义 MCP 服务器 (@ai-stack-mcp/*)
+│       ├── fetch/              # @ai-stack-mcp/fetch
+│       ├── time/               # @ai-stack-mcp/time
+│       └── git/                # @ai-stack-mcp/git
 ├── example/                    # 示例项目
-│   ├── .agent-stack.json      # Agent 配置示例
+│   ├── .ai-stack.json      # Agent 配置示例
 │   ├── .mcp.json              # MCP 配置示例
 │   └── skills/                # 示例 Skills
 ├── common/                     # Rush 公共目录
@@ -37,7 +37,7 @@ agent-stack/
 
 ---
 
-## 2. @agent-stack/provider 包
+## 2. @ai-stack/provider 包
 
 ### 2.1 目录结构
 
@@ -69,7 +69,7 @@ packages/libs/provider/
 
 ```json
 {
-  "name": "@agent-stack/provider",
+  "name": "@ai-stack/provider",
   "version": "0.0.1",
   "main": "./dist/index.js",
   "module": "./dist/index.mjs",
@@ -89,7 +89,7 @@ packages/libs/provider/
 
 ---
 
-## 3. @agent-stack/index 包
+## 3. @ai-stack/agent 包
 
 ### 3.1 目录结构
 
@@ -121,7 +121,7 @@ packages/libs/index/
 | `src/index.ts` | 统一导出入口，re-export agent、config 和 provider |
 | `src/agent.ts` | `createAgent()` 工厂函数，实现对话和工具调用 |
 | `src/types.ts` | Agent 相关类型定义 |
-| `src/config.ts` | 配置文件加载和解析 (.agent-stack.json) |
+| `src/config.ts` | 配置文件加载和解析 (.ai-stack.json) |
 | `src/cli.ts` | 命令式 CLI，支持 chat/run/tools/config 命令 |
 | `src/ui/` | 终端 UI 模块，提供现代化界面组件 |
 
@@ -129,16 +129,16 @@ packages/libs/index/
 
 ```json
 {
-  "name": "@agent-stack/index",
+  "name": "@ai-stack/agent",
   "version": "0.0.1",
   "bin": {
-    "agent-stack": "./dist/cli.js"
+    "ai-stack": "./dist/cli.js"
   },
   "dependencies": {
-    "@agent-stack/provider": "workspace:*",
-    "@agent-stack/mcp": "workspace:*",
-    "@agent-stack/skill": "workspace:*",
-    "@agent-stack/memory": "workspace:*",
+    "@ai-stack/provider": "workspace:*",
+    "@ai-stack/mcp": "workspace:*",
+    "@ai-stack/skill": "workspace:*",
+    "@ai-stack/memory": "workspace:*",
     "boxen": "^8.0.1",
     "chalk": "^5.4.0",
     "cli-truncate": "^4.0.0",
@@ -152,7 +152,7 @@ packages/libs/index/
 
 ---
 
-## 4. @agent-stack/mcp 包
+## 4. @ai-stack/mcp 包
 
 ### 4.1 目录结构
 
@@ -188,7 +188,7 @@ packages/libs/mcp/
 
 ```json
 {
-  "name": "@agent-stack/mcp",
+  "name": "@ai-stack/mcp",
   "version": "0.0.1",
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.0.0"
@@ -198,7 +198,7 @@ packages/libs/mcp/
 
 ---
 
-## 5. @agent-stack/skill 包
+## 5. @ai-stack/skill 包
 
 ### 5.1 目录结构
 
@@ -234,7 +234,7 @@ packages/libs/skill/
 
 ```json
 {
-  "name": "@agent-stack/skill",
+  "name": "@ai-stack/skill",
   "version": "0.0.1",
   "dependencies": {}
 }
@@ -248,12 +248,12 @@ packages/libs/skill/
 
 Memory 系统采用三层架构，分离关注点：
 
-- **@agent-stack/memory-store-sqlite**: SQLite 高性能存储层
-- **@agent-stack/memory-store-json**: JSON 轻量级存储层 (零 native 依赖)
-- **@agent-stack/memory**: 策略层 (何时读写、写什么)
-- **@agent-stack-skill/memory**: Skill 工具层 (Agent 可调用的工具)
+- **@ai-stack/memory-store-sqlite**: SQLite 高性能存储层
+- **@ai-stack/memory-store-json**: JSON 轻量级存储层 (零 native 依赖)
+- **@ai-stack/memory**: 策略层 (何时读写、写什么)
+- **@ai-stack-skill/memory**: Skill 工具层 (Agent 可调用的工具)
 
-### 6.1 @agent-stack/memory-store-sqlite 包 (SQLite 存储层)
+### 6.1 @ai-stack/memory-store-sqlite 包 (SQLite 存储层)
 
 ```
 packages/libs/memory-store-sqlite/
@@ -287,7 +287,7 @@ packages/libs/memory-store-sqlite/
 **package.json**:
 ```json
 {
-  "name": "@agent-stack/memory-store-sqlite",
+  "name": "@ai-stack/memory-store-sqlite",
   "version": "0.0.1",
   "dependencies": {
     "better-sqlite3": "^11.7.0",
@@ -296,7 +296,7 @@ packages/libs/memory-store-sqlite/
 }
 ```
 
-### 6.2 @agent-stack/memory-store-json 包 (JSON 存储层)
+### 6.2 @ai-stack/memory-store-json 包 (JSON 存储层)
 
 轻量级 JSON/Markdown 存储实现，零 native 依赖，适用于开发环境和轻量部署。
 
@@ -321,7 +321,7 @@ packages/libs/memory-store-json/
 
 **存储格式**:
 ```
-.agent-stack/memory/
+.ai-stack/memory/
 ├── events/{sessionId}/events.json
 ├── tasks/{taskId}.json
 ├── profiles/profiles.json
@@ -336,15 +336,15 @@ packages/libs/memory-store-json/
 **package.json**:
 ```json
 {
-  "name": "@agent-stack/memory-store-json",
+  "name": "@ai-stack/memory-store-json",
   "version": "0.0.1",
   "dependencies": {
-    "@agent-stack/memory-store-sqlite": "workspace:*"
+    "@ai-stack/memory-store-sqlite": "workspace:*"
   }
 }
 ```
 
-### 6.3 @agent-stack/memory 包 (策略层)
+### 6.3 @ai-stack/memory 包 (策略层)
 
 策略层不直接依赖任何存储实现，而是接受外部注入的 stores。
 
@@ -415,10 +415,10 @@ packages/libs/memory/
 **package.json**:
 ```json
 {
-  "name": "@agent-stack/memory",
+  "name": "@ai-stack/memory",
   "version": "0.0.1",
   "dependencies": {
-    "@agent-stack/memory-store-sqlite": "workspace:*"
+    "@ai-stack/memory-store-sqlite": "workspace:*"
   }
 }
 ```
@@ -426,15 +426,15 @@ packages/libs/memory/
 **使用示例**:
 ```typescript
 // 开发环境 - JSON store (零 native 依赖)
-import { createMemoryManager } from '@agent-stack/memory';
-import { createJsonStores } from '@agent-stack/memory-store-json';
+import { createMemoryManager } from '@ai-stack/memory';
+import { createJsonStores } from '@ai-stack/memory-store-json';
 
 const stores = await createJsonStores({ basePath: './.agent-memory' });
 const memory = createMemoryManager(stores);
 await memory.initialize();
 
 // 生产环境 - SQLite store (高性能)
-import { createSqliteStores } from '@agent-stack/memory-store-sqlite';
+import { createSqliteStores } from '@ai-stack/memory-store-sqlite';
 
 const stores = await createSqliteStores({ dbPath: './memory.db' });
 const memory = createMemoryManager(stores);
@@ -443,11 +443,11 @@ await memory.initialize();
 
 ---
 
-## 7. Skills 目录 (@agent-stack-skill/*)
+## 7. Skills 目录 (@ai-stack-skill/*)
 
-自定义 Skills 使用独立的包前缀 `@agent-stack-skill/*`。
+自定义 Skills 使用独立的包前缀 `@ai-stack-skill/*`。
 
-### 7.1 @agent-stack-skill/memory (Memory Skill)
+### 7.1 @ai-stack-skill/memory (Memory Skill)
 
 ```
 packages/skills/memory/
@@ -479,10 +479,10 @@ packages/skills/memory/
 **package.json**:
 ```json
 {
-  "name": "@agent-stack-skill/memory",
+  "name": "@ai-stack-skill/memory",
   "version": "0.0.1",
   "dependencies": {
-    "@agent-stack/memory-store-sqlite": "workspace:*",
+    "@ai-stack/memory-store-sqlite": "workspace:*",
     "better-sqlite3": "^11.7.0"
   }
 }
@@ -530,9 +530,9 @@ if (writeDecision.shouldWrite) {
 
 ## 8. MCP 服务器 (packages/mcp-servers/)
 
-自定义 MCP 服务器使用独立的包前缀 `@agent-stack-mcp/*`。
+自定义 MCP 服务器使用独立的包前缀 `@ai-stack-mcp/*`。
 
-### 8.1 @agent-stack-mcp/fetch
+### 8.1 @ai-stack-mcp/fetch
 
 Web 内容获取 MCP 服务器，支持 HTML 转 Markdown。
 
@@ -563,7 +563,7 @@ packages/mcp-servers/fetch/
 
 ```json
 {
-  "name": "@agent-stack-mcp/fetch",
+  "name": "@ai-stack-mcp/fetch",
   "version": "0.0.1",
   "bin": {
     "mcp-fetch": "./dist/cli.js"
@@ -583,13 +583,13 @@ packages/mcp-servers/fetch/
   "mcpServers": {
     "fetch": {
       "command": "npx",
-      "args": ["-y", "@agent-stack-mcp/fetch"]
+      "args": ["-y", "@ai-stack-mcp/fetch"]
     }
   }
 }
 ```
 
-### 8.2 @agent-stack-mcp/time
+### 8.2 @ai-stack-mcp/time
 
 时间和时区转换 MCP 服务器，提供当前时间查询和时区转换功能。
 
@@ -636,7 +636,7 @@ packages/mcp-servers/time/
 
 ```json
 {
-  "name": "@agent-stack-mcp/time",
+  "name": "@ai-stack-mcp/time",
   "version": "0.0.1",
   "bin": {
     "mcp-time": "./dist/cli.js"
@@ -655,7 +655,7 @@ packages/mcp-servers/time/
   "mcpServers": {
     "time": {
       "command": "npx",
-      "args": ["-y", "@agent-stack-mcp/time"]
+      "args": ["-y", "@ai-stack-mcp/time"]
     }
   }
 }
@@ -668,13 +668,13 @@ packages/mcp-servers/time/
   "mcpServers": {
     "time": {
       "command": "npx",
-      "args": ["-y", "@agent-stack-mcp/time", "--local-timezone=America/New_York"]
+      "args": ["-y", "@ai-stack-mcp/time", "--local-timezone=America/New_York"]
     }
   }
 }
 ```
 
-### 8.3 @agent-stack-mcp/git
+### 8.3 @ai-stack-mcp/git
 
 Git 仓库操作 MCP 服务器，提供完整的 Git 操作工具集。
 
@@ -725,7 +725,7 @@ packages/mcp-servers/git/
 
 ```json
 {
-  "name": "@agent-stack-mcp/git",
+  "name": "@ai-stack-mcp/git",
   "version": "0.0.1",
   "bin": {
     "mcp-git": "./dist/cli.js"
@@ -744,7 +744,7 @@ packages/mcp-servers/git/
   "mcpServers": {
     "git": {
       "command": "npx",
-      "args": ["-y", "@agent-stack-mcp/git"]
+      "args": ["-y", "@ai-stack-mcp/git"]
     }
   }
 }
@@ -757,7 +757,7 @@ packages/mcp-servers/git/
   "mcpServers": {
     "git": {
       "command": "npx",
-      "args": ["-y", "@agent-stack-mcp/git", "--repository", "/path/to/repo"]
+      "args": ["-y", "@ai-stack-mcp/git", "--repository", "/path/to/repo"]
     }
   }
 }

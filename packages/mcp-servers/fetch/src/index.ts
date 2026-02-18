@@ -1,5 +1,5 @@
 /**
- * @agent-stack-mcp/fetch
+ * @ai-stack-mcp/fetch
  *
  * MCP server for web fetching with HTML to Markdown conversion
  */

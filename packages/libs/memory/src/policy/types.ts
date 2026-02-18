@@ -1,10 +1,10 @@
 /**
- * @agent-stack/memory - Policy Types
+ * @ai-stack/memory - Policy Types
  *
  * Type definitions for the memory policy layer.
  */
 
-import type { TokenCount, MemoryEvent, ProfileItem, ProfileKey } from '@agent-stack/memory-store-sqlite';
+import type { TokenCount, MemoryEvent, ProfileItem, ProfileKey } from '@ai-stack/memory-store-sqlite';
 
 // =============================================================================
 // Rule Types

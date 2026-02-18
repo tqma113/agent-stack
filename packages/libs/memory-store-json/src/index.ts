@@ -1,7 +1,7 @@
 /**
- * @agent-stack/memory-store-json
+ * @ai-stack/memory-store-json
  *
- * JSON/Markdown storage layer for agent-stack memory system.
+ * JSON/Markdown storage layer for ai-stack memory system.
  * Zero native dependencies - works everywhere Node.js runs.
  *
  * This package provides lightweight JSON-based storage implementations:
@@ -16,7 +16,7 @@
  * - Lightweight deployments
  * - Human-readable memory storage
  *
- * For high-performance production use, see @agent-stack/memory-store-sqlite (SQLite).
+ * For high-performance production use, see @ai-stack/memory-store-sqlite (SQLite).
  *
  * @packageDocumentation
  */
@@ -91,4 +91,4 @@ export type {
   ISummaryStore,
   IProfileStore,
   ISemanticStore,
-} from '@agent-stack/memory-store-sqlite';
+} from '@ai-stack/memory-store-sqlite';

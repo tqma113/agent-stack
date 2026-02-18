@@ -1,5 +1,5 @@
 /**
- * @agent-stack/memory-store-sqlite - Task State Store
+ * @ai-stack/memory-store-sqlite - Task State Store
  *
  * Stores working memory for task execution state.
  */

@@ -1,7 +1,7 @@
 /**
- * @agent-stack/memory-store-sqlite
+ * @ai-stack/memory-store-sqlite
  *
- * SQLite storage layer for agent-stack memory system.
+ * SQLite storage layer for ai-stack memory system.
  *
  * This package provides the low-level storage implementations:
  * - Event Store: Episodic memory (conversations, tool calls, decisions)

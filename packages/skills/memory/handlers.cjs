@@ -8,9 +8,9 @@ import {
   createSummaryStore,
   createProfileStore,
   createSemanticStore
-} from "@agent-stack/memory-store-sqlite";
+} from "@ai-stack/memory-store-sqlite";
 var DEFAULT_CONFIG = {
-  dbPath: ".agent-stack/memory.db",
+  dbPath: ".ai-stack/memory.db",
   debug: false
 };
 var instance = null;

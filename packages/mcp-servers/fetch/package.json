@@ -1,5 +1,5 @@
 {
-  "name": "@agent-stack-mcp/fetch",
+  "name": "@ai-stack-mcp/fetch",
   "version": "0.0.1",
   "description": "MCP server for web fetching with HTML to Markdown conversion",
   "main": "./dist/index.js",

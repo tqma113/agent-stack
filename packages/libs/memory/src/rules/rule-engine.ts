@@ -1,5 +1,5 @@
 /**
- * @agent-stack/memory - Rule Engine
+ * @ai-stack/memory - Rule Engine
  *
  * Manages and evaluates policy rules.
  */

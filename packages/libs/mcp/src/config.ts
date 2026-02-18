@@ -1,10 +1,11 @@
 /**
- * @agent-stack/mcp - Configuration Loading
+ * @ai-stack/mcp - Configuration Loading
  */
 
 import { readFile } from 'fs/promises';
 import { existsSync } from 'fs';
 import { resolve, dirname } from 'path';
+import JSON5 from 'json5';
 import type {
   MCPConfig,
   MCPServerConfig,
@@ -82,10 +83,10 @@ export function parseConfig(content: string): MCPConfig {
   let parsed: unknown;
 
   try {
-    parsed = JSON.parse(content);
+    parsed = JSON5.parse(content);
   } catch (error) {
     throw new MCPConfigurationError(
-      `Invalid JSON in configuration file: ${error instanceof Error ? error.message : String(error)}`
+      `Invalid JSON/JSON5 in configuration file: ${error instanceof Error ? error.message : String(error)}`
     );
   }
 

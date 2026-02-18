@@ -24,7 +24,7 @@ const TOOL_CONVERT_TIME = 'convert_time';
  * Create and configure the MCP server
  */
 export function createServer(config: ServerConfig = {}) {
-  const serverName = config.name || 'agent-stack-mcp-time';
+  const serverName = config.name || 'ai-stack-mcp-time';
   const serverVersion = config.version || '0.0.1';
   const localTimezone = config.localTimezone || getSystemTimezone();
 

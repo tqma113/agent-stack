@@ -5,7 +5,7 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import Database from 'better-sqlite3';
 import { createProfileStore, type ProfileStoreInstance } from '../../src/stores/profile.js';
-// Note: This file was moved from @agent-stack/memory to @agent-stack/memory-store-sqlite
+// Note: This file was moved from @ai-stack/memory to @ai-stack/memory-store-sqlite
 
 describe('ProfileStore', () => {
   let db: Database.Database;

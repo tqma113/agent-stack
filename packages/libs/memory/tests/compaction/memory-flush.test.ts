@@ -8,7 +8,7 @@ import {
   parseLLMFlushResponse,
   type IMemoryFlush,
 } from '../../src/compaction/memory-flush.js';
-import type { MemoryEvent } from '@agent-stack/memory-store-sqlite';
+import type { MemoryEvent } from '@ai-stack/memory-store-sqlite';
 
 // Helper to create mock events
 function createMockEvent(

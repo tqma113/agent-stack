@@ -1,7 +1,7 @@
 /**
- * @agent-stack/skill
+ * @ai-stack/skill
  *
- * Skill system for agent-stack - dynamic skill loading and management
+ * Skill system for ai-stack - dynamic skill loading and management
  */
 
 // Export types

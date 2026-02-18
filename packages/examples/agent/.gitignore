@@ -1,5 +1,5 @@
 # Runtime data
-.agent-stack/
+.ai-stack/
 
 # Environment
 .env.local

@@ -1,5 +1,5 @@
 /**
- * @agent-stack/memory-store-sqlite - Event Store
+ * @ai-stack/memory-store-sqlite - Event Store
  *
  * Stores episodic memory events (conversations, tool calls, decisions).
  */

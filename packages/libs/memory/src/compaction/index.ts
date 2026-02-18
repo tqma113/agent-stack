@@ -1,5 +1,5 @@
 /**
- * @agent-stack/memory - Compaction Module
+ * @ai-stack/memory - Compaction Module
  *
  * Handles memory compaction and flushing when approaching context limits.
  */

@@ -1,5 +1,5 @@
 /**
- * Types for @agent-stack-mcp/fetch
+ * Types for @ai-stack-mcp/fetch
  */
 
 import { z } from 'zod';

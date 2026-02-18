@@ -1,5 +1,5 @@
 /**
- * @agent-stack/skill - Type Definitions
+ * @ai-stack/skill - Type Definitions
  */
 
 // ============================================
@@ -199,7 +199,7 @@ export interface LoadedSkill {
 // ============================================
 
 /**
- * Agent Tool interface (from @agent-stack/index)
+ * Agent Tool interface (from @ai-stack/agent)
  * Duplicated here to avoid circular dependency
  */
 export interface AgentTool {

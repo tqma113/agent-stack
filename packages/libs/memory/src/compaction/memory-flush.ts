@@ -1,5 +1,5 @@
 /**
- * @agent-stack/memory - Memory Flush
+ * @ai-stack/memory - Memory Flush
  *
  * Automatically flushes important memories before context compaction.
  * Triggered when approaching context window limits.
@@ -15,7 +15,7 @@ import type {
   SemanticChunkInput,
   Summary,
   EventType,
-} from '@agent-stack/memory-store-sqlite';
+} from '@ai-stack/memory-store-sqlite';
 
 /**
  * Memory flush configuration

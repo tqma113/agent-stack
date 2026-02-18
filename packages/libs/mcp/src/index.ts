@@ -1,7 +1,7 @@
 /**
- * @agent-stack/mcp
+ * @ai-stack/mcp
  *
- * MCP (Model Context Protocol) integration for agent-stack
+ * MCP (Model Context Protocol) integration for ai-stack
  */
 
 // Core client

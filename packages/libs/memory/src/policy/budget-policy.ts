@@ -1,10 +1,10 @@
 /**
- * @agent-stack/memory - Budget Policy
+ * @ai-stack/memory - Budget Policy
  *
  * Token budget management for memory injection.
  */
 
-import type { TokenCount } from '@agent-stack/memory-store-sqlite';
+import type { TokenCount } from '@ai-stack/memory-store-sqlite';
 import type { TokenBudget, BudgetAllocation } from './types.js';
 
 /**

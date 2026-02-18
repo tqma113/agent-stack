@@ -1,5 +1,5 @@
 /**
- * @agent-stack/memory-store-json - Task State Store
+ * @ai-stack/memory-store-json - Task State Store
  *
  * JSON-based task state storage for working memory.
  */
@@ -12,7 +12,7 @@ import type {
   TaskStateSnapshot,
   TaskStatus,
   UUID,
-} from '@agent-stack/memory-store-sqlite';
+} from '@ai-stack/memory-store-sqlite';
 import {
   readJsonFile,
   writeJsonFile,

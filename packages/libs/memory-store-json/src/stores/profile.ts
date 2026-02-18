@@ -1,5 +1,5 @@
 /**
- * @agent-stack/memory-store-json - Profile Store
+ * @ai-stack/memory-store-json - Profile Store
  *
  * JSON-based profile storage for user preferences.
  */
@@ -10,7 +10,7 @@ import type {
   ProfileItem,
   ProfileItemInput,
   UUID,
-} from '@agent-stack/memory-store-sqlite';
+} from '@ai-stack/memory-store-sqlite';
 import {
   readJsonFile,
   writeJsonFile,

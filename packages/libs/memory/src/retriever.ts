@@ -1,5 +1,5 @@
 /**
- * @agent-stack/memory - Retriever
+ * @ai-stack/memory - Retriever
  *
  * Multi-layer memory retrieval and bundle assembly.
  */
@@ -16,7 +16,7 @@ import type {
   IProfileStore,
   ISemanticStore,
   UUID,
-} from '@agent-stack/memory-store-sqlite';
+} from '@ai-stack/memory-store-sqlite';
 import type {
   MemoryBundle,
   MemoryWarning,

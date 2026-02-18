@@ -2,11 +2,11 @@
 
 ## 1. 核心业务模型
 
-Agent Stack 的核心业务是提供一个可扩展的 AI Agent 开发框架，主要包含四层：
+AI Stack 的核心业务是提供一个可扩展的 AI Agent 开发框架，主要包含四层：
 
 ```
 ┌─────────────────────────────────────────────────────────┐
-│                   @agent-stack/index                     │
+│                   @ai-stack/agent                     │
 │  ┌───────────────────────────────────────────────────┐  │
 │  │                    Agent 类                        │  │
 │  │  - 对话管理                                        │  │
@@ -17,7 +17,7 @@ Agent Stack 的核心业务是提供一个可扩展的 AI Agent 开发框架，�
           │                     │                     │
           ▼                     ▼                     ▼
 ┌──────────────────┐   ┌──────────────────┐   ┌──────────────────┐
-│ @agent-stack/    │   │ @agent-stack/mcp │   │ @agent-stack/    │
+│ @ai-stack/    │   │ @ai-stack/mcp │   │ @ai-stack/    │
 │    provider      │   │                  │   │    skill         │
 │  ┌────────────┐  │   │  ┌────────────┐  │   │  ┌────────────┐  │
 │  │ OpenAI    │  │   │  │ MCPClient  │  │   │  │ Skill      │  │
@@ -33,7 +33,7 @@ Agent Stack 的核心业务是提供一个可扩展的 AI Agent 开发框架，�
 
 ---
 
-## 2. @agent-stack/provider 业务逻辑
+## 2. @ai-stack/provider 业务逻辑
 
 ### 2.1 createOpenAIClient() 工厂函数
 
@@ -87,7 +87,7 @@ chunkText(text, maxTokens)    // 按 token 分块
 
 ---
 
-## 3. @agent-stack/index 业务逻辑
+## 3. @ai-stack/agent 业务逻辑
 
 ### 3.1 createAgent() 工厂函数
 
@@ -220,29 +220,29 @@ LLM 返回 tool_calls
 
 ```bash
 # 交互式聊天
-agent-stack chat [--config PATH] [--model NAME] [--mcp PATH] [--skill DIR]
+ai-stack chat [--config PATH] [--model NAME] [--mcp PATH] [--skill DIR]
 
 # 单次执行任务
-agent-stack run "<task>" [--config PATH] [--model NAME] [--yes] [--json]
+ai-stack run "<task>" [--config PATH] [--model NAME] [--yes] [--json]
 
 # 工具管理
-agent-stack tools list [--config PATH]
-agent-stack tools info <name> [--config PATH]
+ai-stack tools list [--config PATH]
+ai-stack tools info <name> [--config PATH]
 
 # 配置管理
-agent-stack config init [--force]
-agent-stack config show [--config PATH]
+ai-stack config init [--force]
+ai-stack config show [--config PATH]
 ```
 
 **交互式聊天流程**：
 
 ```
-启动 agent-stack chat
+启动 ai-stack chat
     │
     ▼
 ┌─────────────────────────┐
 │ 加载配置文件            │
-│ (.agent-stack.json)     │
+│ (.ai-stack.json)     │
 └─────────────────────────┘
     │
     ▼
@@ -272,7 +272,7 @@ agent-stack config show [--config PATH]
     └───────────────────────────┘
 ```
 
-**配置文件格式** (`.agent-stack.json`):
+**配置文件格式** (`.ai-stack.json`):
 
 ```json
 {
@@ -358,7 +358,7 @@ if (signal?.aborted) {
 
 ---
 
-## 6. @agent-stack/mcp 业务逻辑
+## 6. @ai-stack/mcp 业务逻辑
 
 ### 6.1 createMCPClientManager() 工厂函数
 
@@ -491,7 +491,7 @@ Agent Tool
 ### 7.1 基础对话
 
 ```typescript
-import { createAgent } from '@agent-stack/index';
+import { createAgent } from '@ai-stack/agent';
 
 const agent = createAgent({
   model: 'gpt-4o',
@@ -535,7 +535,7 @@ await agent.stream('Tell me a story', {
 ### 7.4 使用 MCP 工具 (内置集成)
 
 ```typescript
-import { createAgent } from '@agent-stack/index';
+import { createAgent } from '@ai-stack/agent';
 
 // 方式 1: 使用配置文件，手动初始化
 const agent = createAgent({
@@ -576,7 +576,7 @@ await agent.closeMCP();
 如果需要更精细的控制，可以手动集成：
 
 ```typescript
-import { createAgent, createMCPClientManager, createMCPToolProvider } from '@agent-stack/index';
+import { createAgent, createMCPClientManager, createMCPToolProvider } from '@ai-stack/agent';
 
 const mcpManager = createMCPClientManager();
 await mcpManager.initialize('./.mcp.json');
@@ -595,7 +595,7 @@ await mcpManager.close();
 
 ---
 
-## 8. @agent-stack/skill 业务逻辑
+## 8. @ai-stack/skill 业务逻辑
 
 ### 8.1 createSkillManager() 工厂函数
 
@@ -746,7 +746,7 @@ unloaded ──────► loading ──────► loaded ◄───
 ### 8.6 使用示例
 
 ```typescript
-import { createAgent } from '@agent-stack/index';
+import { createAgent } from '@ai-stack/agent';
 
 // 方式 1: 使用配置文件
 const agent = createAgent({
@@ -789,7 +789,7 @@ await agent.closeSkills();
 
 ---
 
-## 9. @agent-stack/memory 业务逻辑
+## 9. @ai-stack/memory 业务逻辑
 
 ### 9.1 createMemoryManager() 工厂函数
 
@@ -853,14 +853,14 @@ interface MemoryManagerInstance {
 ### 9.3 Agent 集成
 
 ```typescript
-import { createAgent } from '@agent-stack/index';
+import { createAgent } from '@ai-stack/agent';
 
 // 启用 Memory
 const agent = createAgent({
   name: 'Memory Agent',
   memory: {
     enabled: true,
-    dbPath: '.agent-stack/memory.db',
+    dbPath: '.ai-stack/memory.db',
     autoInitialize: true,
     autoInject: true,
   }
@@ -900,7 +900,7 @@ await agent.close();  // 关闭所有资源 (MCP, Skill, Memory)
 {
   "memory": {
     "enabled": true,
-    "dbPath": ".agent-stack/memory.db",
+    "dbPath": ".ai-stack/memory.db",
     "autoInitialize": true,
     "autoInject": true,
     "tokenBudget": {
@@ -952,7 +952,7 @@ Memory 系统提供搜索结果后处理管道：
 优先返回最近的内容：
 
 ```typescript
-import { applyTemporalDecay, createRankingPipeline } from '@agent-stack/memory';
+import { applyTemporalDecay, createRankingPipeline } from '@ai-stack/memory';
 
 // 公式: score × e^(-λ × ageInDays)
 // λ = ln(2) / halfLifeDays
@@ -970,7 +970,7 @@ const decayed = applyTemporalDecay(results, {
 避免返回相似内容：
 
 ```typescript
-import { applyMMR } from '@agent-stack/memory';
+import { applyMMR } from '@ai-stack/memory';
 
 // 公式: MMR = λ × relevance - (1-λ) × max_similarity_to_selected
 
@@ -986,7 +986,7 @@ const diverse = applyMMR(results, 10, {
 #### 9.5.4 组合管道
 
 ```typescript
-import { createRankingPipeline, rankResults } from '@agent-stack/memory';
+import { createRankingPipeline, rankResults } from '@ai-stack/memory';
 
 // 方式 1: 快速使用
 const ranked = rankResults(results, {
@@ -1016,7 +1016,7 @@ const result = pipeline(searchResults);
 #### 9.6.1 Memory Flush
 
 ```typescript
-import { createMemoryFlush } from '@agent-stack/memory';
+import { createMemoryFlush } from '@ai-stack/memory';
 
 const flush = createMemoryFlush({
   enabled: true,
@@ -1042,7 +1042,7 @@ const content = await flush.extractFlushContent(events, { sessionId });
 完整的 compaction 管理：
 
 ```typescript
-import { createCompactionManager } from '@agent-stack/memory';
+import { createCompactionManager } from '@ai-stack/memory';
 
 const compaction = createCompactionManager({
   flush: { softThresholdTokens: 4000, hardThresholdTokens: 8000 },
@@ -1104,7 +1104,7 @@ const compaction = createCompactionManager({
 #### 9.7.1 Session Transcript
 
 ```typescript
-import { createSessionTranscript, formatTranscript } from '@agent-stack/memory';
+import { createSessionTranscript, formatTranscript } from '@ai-stack/memory';
 
 const transcript = createSessionTranscript('session-123');
 
@@ -1132,7 +1132,7 @@ console.log(formatTranscript(transcript.getEntries()));
 #### 9.7.2 Transcript Indexer
 
 ```typescript
-import { createTranscriptIndexer } from '@agent-stack/memory';
+import { createTranscriptIndexer } from '@ai-stack/memory';
 
 const indexer = createTranscriptIndexer(semanticStore, {
   watchEnabled: true,
@@ -1178,7 +1178,7 @@ Agent 调用 → Write Pipeline
 ```
 
 ```typescript
-import { createMemoryPipeline } from '@agent-stack/memory';
+import { createMemoryPipeline } from '@ai-stack/memory';
 
 const pipeline = createMemoryPipeline(stores, {
   embedFunction: async (text) => openai.embed(text),

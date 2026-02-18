@@ -1,5 +1,5 @@
 /**
- * @agent-stack/memory - Compaction Manager
+ * @ai-stack/memory - Compaction Manager
  *
  * Orchestrates memory compaction and flush operations.
  * Integrates with MemoryManager to handle context window limits.
@@ -9,7 +9,7 @@ import type {
   MemoryEvent,
   Summary,
   SemanticChunk,
-} from '@agent-stack/memory-store-sqlite';
+} from '@ai-stack/memory-store-sqlite';
 import {
   createMemoryFlush,
   type IMemoryFlush,

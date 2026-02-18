@@ -1,5 +1,5 @@
 /**
- * @agent-stack/mcp - Helper Functions
+ * @ai-stack/mcp - Helper Functions
  */
 
 import type { MCPToolResult } from './types';

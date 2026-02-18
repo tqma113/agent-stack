@@ -1,5 +1,5 @@
 /**
- * @agent-stack/memory - Error Classes
+ * @ai-stack/memory - Error Classes
  *
  * Custom error types for the memory system.
  */

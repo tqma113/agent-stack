@@ -1,5 +1,5 @@
 /**
- * @agent-stack/skill-memory - Store Context
+ * @ai-stack/skill-memory - Store Context
  *
  * Manages database connection and store instances.
  * Implements singleton pattern for shared access.
@@ -19,7 +19,7 @@ import {
   type SummaryStoreInstance,
   type ProfileStoreInstance,
   type SemanticStoreInstance,
-} from '@agent-stack/memory-store-sqlite';
+} from '@ai-stack/memory-store-sqlite';
 
 /**
  * Store context configuration
@@ -35,7 +35,7 @@ export interface StoreContextConfig {
  * Default configuration
  */
 const DEFAULT_CONFIG: StoreContextConfig = {
-  dbPath: '.agent-stack/memory.db',
+  dbPath: '.ai-stack/memory.db',
   debug: false,
 };
 

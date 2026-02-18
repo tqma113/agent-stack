@@ -1,5 +1,5 @@
 /**
- * @agent-stack/memory - Transcript Indexer
+ * @ai-stack/memory - Transcript Indexer
  *
  * Indexes session transcripts into semantic memory for searchability.
  * Watches for changes and automatically re-indexes.
@@ -8,7 +8,7 @@
 import type {
   ISemanticStore,
   SemanticChunkInput,
-} from '@agent-stack/memory-store-sqlite';
+} from '@ai-stack/memory-store-sqlite';
 import type {
   ISessionTranscript,
   TranscriptChunk,

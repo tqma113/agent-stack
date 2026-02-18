@@ -1,7 +1,7 @@
 /**
- * @agent-stack/index
+ * @ai-stack/agent
  *
- * Main entry point for agent-stack AI agents
+ * Main entry point for ai-stack AI agents
  */
 
 // Agent - main export
@@ -21,7 +21,7 @@ export {
   type OpenAIClientInstance,
   type ChatModel,
   type ChatCompletionMessageParam,
-} from '@agent-stack/provider';
+} from '@ai-stack/provider';
 
 // Re-export MCP types and factory functions for convenience
 export {
@@ -36,7 +36,7 @@ export {
   type MCPResource,
   type MCPToolBridgeOptions,
   type BridgedTool,
-} from '@agent-stack/mcp';
+} from '@ai-stack/mcp';
 
 // Re-export Skill types and factory functions for convenience
 export {
@@ -54,7 +54,7 @@ export {
   type BridgedSkillTool,
   type LoadedSkill,
   type SkillState,
-} from '@agent-stack/skill';
+} from '@ai-stack/skill';
 
 // Re-export Memory types and factory functions for convenience
 export {
@@ -106,4 +106,4 @@ export {
   type TokenBudget,
   type WritePolicyConfig,
   type RetrievalConfig,
-} from '@agent-stack/memory';
+} from '@ai-stack/memory';
