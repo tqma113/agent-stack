@@ -15,8 +15,12 @@ import {
   serializeConfig,
   findConfigFile,
 } from './config';
+import * as ui from './ui/index.js';
 
 const VERSION = '0.0.1';
+
+// Detect if running in TTY mode
+const isTTY = process.stdout.isTTY ?? false;
 
 /**
  * Load .env file and set environment variables
@@ -64,55 +68,31 @@ function loadEnvFile(startDir: string = process.cwd()): void {
 // Load .env file on startup
 loadEnvFile();
 
-// ANSI color codes (minimal chalk replacement)
-const colors = {
-  green: (s: string) => `\x1b[32m${s}\x1b[0m`,
-  yellow: (s: string) => `\x1b[33m${s}\x1b[0m`,
-  blue: (s: string) => `\x1b[34m${s}\x1b[0m`,
-  cyan: (s: string) => `\x1b[36m${s}\x1b[0m`,
-  red: (s: string) => `\x1b[31m${s}\x1b[0m`,
-  gray: (s: string) => `\x1b[90m${s}\x1b[0m`,
-  bold: (s: string) => `\x1b[1m${s}\x1b[0m`,
-};
+// Get appropriate colors based on mode
+function getColors(classic: boolean) {
+  return classic ? ui.legacyColors : {
+    green: (s: string) => ui.theme.user(s),
+    yellow: (s: string) => ui.theme.warning(s),
+    blue: (s: string) => ui.theme.agent(s),
+    cyan: (s: string) => ui.theme.accent(s),
+    red: (s: string) => ui.theme.error(s),
+    gray: (s: string) => ui.theme.muted(s),
+    bold: (s: string) => ui.theme.highlight(s),
+  };
+}
 
-// Simple spinner
-function createSpinner(text: string) {
-  const frames = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏'];
-  let i = 0;
-  let interval: NodeJS.Timeout | null = null;
-
+// Get appropriate spinner based on mode
+function getSpinner(text: string, classic: boolean) {
+  if (classic || !isTTY) {
+    return ui.createLegacySpinner(text);
+  }
+  const spinner = ui.createLoadingSpinner(text);
   return {
-    start() {
-      process.stdout.write('\x1b[?25l'); // Hide cursor
-      interval = setInterval(() => {
-        process.stdout.write(`\r${colors.cyan(frames[i])} ${text}`);
-        i = (i + 1) % frames.length;
-      }, 80);
-      return this;
-    },
-    stop() {
-      if (interval) {
-        clearInterval(interval);
-        process.stdout.write('\r\x1b[K'); // Clear line
-        process.stdout.write('\x1b[?25h'); // Show cursor
-      }
-      return this;
-    },
-    succeed(msg: string) {
-      this.stop();
-      console.log(`${colors.green('✔')} ${msg}`);
-      return this;
-    },
-    fail(msg: string) {
-      this.stop();
-      console.log(`${colors.red('✖')} ${msg}`);
-      return this;
-    },
-    info(msg: string) {
-      this.stop();
-      console.log(`${colors.blue('ℹ')} ${msg}`);
-      return this;
-    },
+    start() { spinner.start(); return this; },
+    stop() { spinner.stop(); return this; },
+    succeed(msg: string) { spinner.succeed(msg); return this; },
+    fail(msg: string) { spinner.fail(msg); return this; },
+    info(msg: string) { spinner.info(msg); return this; },
   };
 }
 
@@ -134,6 +114,8 @@ program
   .option('--mcp <path>', 'MCP configuration file path')
   .option('--skill <dir>', 'Skill directory (can be specified multiple times)', collect, [])
   .option('--no-stream', 'Disable streaming output')
+  .option('--classic', 'Use classic (legacy) terminal UI')
+  .option('--compact', 'Use compact tool display')
   .action(async (options) => {
     await runChat(options);
   });
@@ -212,12 +194,23 @@ interface ChatOptions {
   mcp?: string;
   skill?: string[];
   stream?: boolean;
+  classic?: boolean;
+  compact?: boolean;
 }
 
 async function runChat(options: ChatOptions) {
-  console.log(colors.bold(`\n🤖 Agent Stack CLI v${VERSION}`));
+  const classicMode = options.classic || !isTTY;
+  const colors = getColors(classicMode);
 
-  const spinner = createSpinner('Loading configuration...').start();
+  // Render header
+  if (!classicMode) {
+    console.log('');
+  } else {
+    console.log(colors.bold(`\n${ui.icons.agent} Agent Stack CLI v${VERSION}`));
+  }
+
+  const spinner = getSpinner('Loading configuration...', classicMode);
+  spinner.start();
 
   try {
     // Load configuration
@@ -241,7 +234,8 @@ async function runChat(options: ChatOptions) {
     // Initialize MCP if configured
     if (agentConfig.mcp?.configPath || agentConfig.mcp?.servers) {
       spinner.stop();
-      const mcpSpinner = createSpinner('Connecting to MCP servers...').start();
+      const mcpSpinner = getSpinner('Connecting to MCP servers...', classicMode);
+      mcpSpinner.start();
       try {
         await agent.initializeMCP();
         mcpSpinner.succeed('MCP servers connected');
@@ -253,7 +247,8 @@ async function runChat(options: ChatOptions) {
     // Initialize Skills if configured
     if (agentConfig.skill?.directories || agentConfig.skill?.skills) {
       spinner.stop();
-      const skillSpinner = createSpinner('Loading skills...').start();
+      const skillSpinner = getSpinner('Loading skills...', classicMode);
+      skillSpinner.start();
       try {
         await agent.initializeSkills();
         skillSpinner.succeed('Skills loaded');
@@ -263,9 +258,28 @@ async function runChat(options: ChatOptions) {
     }
 
     spinner.stop();
-    console.log(colors.gray(`   Model: ${config.model || 'gpt-4o'}`));
-    console.log(colors.gray(`   Tools: ${agent.getTools().length} available`));
-    console.log(colors.gray('   Type "exit" or press Ctrl+C to quit.\n'));
+
+    const modelName = config.model || 'gpt-4o';
+    const toolCount = agent.getTools().length;
+
+    // Show header info
+    if (!classicMode) {
+      console.log(ui.renderHeader({
+        version: VERSION,
+        model: modelName,
+        toolCount,
+        configPath: configPath || undefined,
+      }));
+      console.log(ui.renderWelcome());
+      console.log('');
+    } else {
+      console.log(colors.gray(`   Model: ${modelName}`));
+      console.log(colors.gray(`   Tools: ${toolCount} available`));
+      console.log(colors.gray('   Type "exit" or press Ctrl+C to quit.\n'));
+    }
+
+    // Create stream renderer for new UI mode
+    const streamRenderer = !classicMode ? ui.createStreamRenderer({ compact: options.compact }) : null;
 
     // Start interactive loop
     const rl = readline.createInterface({
@@ -274,11 +288,12 @@ async function runChat(options: ChatOptions) {
     });
 
     const prompt = () => {
-      rl.question(colors.green('You: '), async (input) => {
+      const promptText = classicMode ? colors.green('You: ') : ui.renderPrompt();
+      rl.question(promptText, async (input) => {
         const trimmed = input.trim();
 
         if (trimmed.toLowerCase() === 'exit' || trimmed.toLowerCase() === 'quit') {
-          console.log(colors.gray('\nGoodbye! 👋'));
+          console.log(colors.gray('\nGoodbye!'));
           await cleanup(agent);
           rl.close();
           process.exit(0);
@@ -286,9 +301,13 @@ async function runChat(options: ChatOptions) {
 
         if (trimmed === '/tools') {
           const tools = agent.getTools();
-          console.log(colors.cyan(`\n📦 Available tools (${tools.length}):`));
+          console.log(colors.cyan(`\n${ui.icons.tool} Available tools (${tools.length}):`));
           for (const tool of tools) {
-            console.log(colors.gray(`   - ${tool.name}: ${tool.description.slice(0, 60)}...`));
+            if (classicMode) {
+              console.log(colors.gray(`   - ${tool.name}: ${tool.description.slice(0, 60)}...`));
+            } else {
+              console.log(`   ${ui.theme.tool(tool.name)}: ${ui.theme.muted(tool.description.slice(0, 50))}...`);
+            }
           }
           console.log();
           prompt();
@@ -318,29 +337,82 @@ async function runChat(options: ChatOptions) {
         }
 
         try {
-          process.stdout.write(colors.blue('\nAgent: '));
-
           if (options.stream !== false) {
+            // Track tool calls for enhanced display
+            const toolCalls = new Map<string, { name: string; args: Record<string, unknown>; startTime: number }>();
+
+            if (streamRenderer) {
+              streamRenderer.startThinking();
+            } else {
+              process.stdout.write(colors.blue('\nAgent: '));
+            }
+
             await agent.stream(trimmed, {
               onToken: (token) => {
-                process.stdout.write(token);
+                if (streamRenderer) {
+                  streamRenderer.addToken(token);
+                } else {
+                  process.stdout.write(token);
+                }
               },
-              onToolCall: (name, _args) => {
-                console.log(colors.yellow(`\n[Calling tool: ${name}]`));
+              onToolCall: (name, args) => {
+                const callId = `${name}-${Date.now()}`;
+                toolCalls.set(callId, { name, args: args as Record<string, unknown>, startTime: Date.now() });
+
+                if (streamRenderer) {
+                  streamRenderer.pauseForTool({
+                    name,
+                    args: args as Record<string, unknown>,
+                    status: 'running',
+                  });
+                } else {
+                  console.log(colors.yellow(`\n[${ui.icons.tool} Calling: ${name}]`));
+                }
               },
               onToolResult: (name, result) => {
-                const preview = result.length > 100 ? result.slice(0, 100) + '...' : result;
-                console.log(colors.gray(`[Tool ${name} returned: ${preview}]`));
+                // Find the matching tool call
+                let callInfo: { name: string; args: Record<string, unknown>; startTime: number } | undefined;
+                for (const [id, info] of toolCalls) {
+                  if (info.name === name) {
+                    callInfo = info;
+                    toolCalls.delete(id);
+                    break;
+                  }
+                }
+
+                const duration = callInfo ? Date.now() - callInfo.startTime : undefined;
+
+                if (streamRenderer) {
+                  streamRenderer.resumeAfterTool({
+                    name,
+                    args: callInfo?.args || {},
+                    status: result.startsWith('Error') ? 'error' : 'completed',
+                    result,
+                    duration,
+                  });
+                } else {
+                  const preview = result.length > 100 ? result.slice(0, 100) + '...' : result;
+                  console.log(colors.gray(`[${ui.icons.success} ${name}: ${preview}]`));
+                }
               },
             });
+
+            if (streamRenderer) {
+              streamRenderer.complete();
+            }
           } else {
+            process.stdout.write(colors.blue('\nAgent: '));
             const response = await agent.chat(trimmed);
             process.stdout.write(response.content);
           }
 
           console.log('\n');
         } catch (error) {
-          console.error(colors.red(`\nError: ${error instanceof Error ? error.message : error}`));
+          if (streamRenderer) {
+            streamRenderer.showError(error instanceof Error ? error.message : String(error));
+          } else {
+            console.error(colors.red(`\nError: ${error instanceof Error ? error.message : error}`));
+          }
           console.log();
         }
 
@@ -369,7 +441,8 @@ interface RunOptions {
 }
 
 async function runTask(task: string, options: RunOptions) {
-  const spinner = createSpinner('Initializing agent...').start();
+  const spinner = getSpinner('Initializing agent...', !isTTY);
+  spinner.start();
 
   try {
     // Load configuration
@@ -387,7 +460,7 @@ async function runTask(task: string, options: RunOptions) {
     if (agentConfig.mcp?.configPath || agentConfig.mcp?.servers) {
       try {
         await agent.initializeMCP();
-      } catch (error) {
+      } catch {
         // Continue without MCP
       }
     }
@@ -396,7 +469,7 @@ async function runTask(task: string, options: RunOptions) {
     if (agentConfig.skill?.directories || agentConfig.skill?.skills) {
       try {
         await agent.initializeSkills();
-      } catch (error) {
+      } catch {
         // Continue without skills
       }
     }
@@ -426,7 +499,9 @@ interface ToolsOptions {
 }
 
 async function listTools(options: ToolsOptions) {
-  const spinner = createSpinner('Loading tools...').start();
+  const colors = getColors(!isTTY);
+  const spinner = getSpinner('Loading tools...', !isTTY);
+  spinner.start();
 
   try {
     const { config, configPath } = loadConfig(options.config);
@@ -459,7 +534,7 @@ async function listTools(options: ToolsOptions) {
       console.log(colors.yellow('No tools available.'));
       console.log(colors.gray('Configure MCP servers or Skills to add tools.'));
     } else {
-      console.log(colors.bold(`\n📦 Available Tools (${tools.length}):\n`));
+      console.log(colors.bold(`\n${ui.icons.tool} Available Tools (${tools.length}):\n`));
       for (const tool of tools) {
         console.log(`  ${colors.cyan(tool.name)}`);
         console.log(`  ${colors.gray(tool.description)}`);
@@ -475,7 +550,9 @@ async function listTools(options: ToolsOptions) {
 }
 
 async function showToolInfo(name: string, options: ToolsOptions) {
-  const spinner = createSpinner('Loading tools...').start();
+  const colors = getColors(!isTTY);
+  const spinner = getSpinner('Loading tools...', !isTTY);
+  spinner.start();
 
   try {
     const { config, configPath } = loadConfig(options.config);
@@ -512,7 +589,7 @@ async function showToolInfo(name: string, options: ToolsOptions) {
       process.exit(1);
     }
 
-    console.log(colors.bold(`\n📦 Tool: ${tool.name}\n`));
+    console.log(colors.bold(`\n${ui.icons.tool} Tool: ${tool.name}\n`));
     console.log(`${colors.cyan('Description:')} ${tool.description}`);
     console.log(`${colors.cyan('Parameters:')}`);
     console.log(JSON.stringify(tool.parameters, null, 2));
@@ -529,6 +606,7 @@ interface InitOptions {
 }
 
 async function initConfig(options: InitOptions) {
+  const colors = getColors(!isTTY);
   const configPath = resolve(process.cwd(), '.agent-stack.json');
 
   if (existsSync(configPath) && !options.force) {
@@ -541,7 +619,7 @@ async function initConfig(options: InitOptions) {
   const content = serializeConfig(template);
 
   writeFileSync(configPath, content, 'utf-8');
-  console.log(colors.green(`✔ Configuration file created: ${configPath}`));
+  console.log(colors.green(`${ui.icons.success} Configuration file created: ${configPath}`));
 }
 
 interface ShowConfigOptions {
@@ -549,6 +627,7 @@ interface ShowConfigOptions {
 }
 
 async function showConfig(options: ShowConfigOptions) {
+  const colors = getColors(!isTTY);
   const { config, configPath } = loadConfig(options.config);
 
   if (!configPath) {
@@ -557,7 +636,7 @@ async function showConfig(options: ShowConfigOptions) {
     return;
   }
 
-  console.log(colors.bold(`\n📋 Configuration: ${configPath}\n`));
+  console.log(colors.bold(`\n${ui.icons.info} Configuration: ${configPath}\n`));
   console.log(serializeConfig(config));
 }
 

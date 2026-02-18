@@ -125,6 +125,30 @@ agent-stack tools      # 工具管理
 agent-stack config     # 配置管理
 ```
 
+### 终端 UI 库
+
+CLI 使用现代化终端 UI 库提供美观的交互体验：
+
+| 库 | 版本 | 用途 |
+|---|------|------|
+| chalk | ^5.4.0 | 终端颜色样式 (ESM 原生) |
+| boxen | ^8.0.1 | 绘制消息框边框 |
+| ora | ^8.1.0 | 优雅的 spinner 动画 |
+| strip-ansi | ^7.1.0 | 计算字符串真实长度 |
+| cli-truncate | ^4.0.0 | 智能文本截断 |
+| terminal-size | ^4.0.0 | 获取终端尺寸 |
+
+**CLI 选项**：
+- `--classic` - 使用经典 (legacy) 终端 UI
+- `--compact` - 使用紧凑的工具调用显示
+
+**UI 特性**：
+- 彩色消息框 (User: 绿色, Agent: 蓝色, Tool: 紫色)
+- Header 显示版本、模型、工具数量
+- 工具调用显示执行状态和耗时
+- 流式输出和 thinking spinner
+- 非 TTY 环境自动降级
+
 ### MCP SDK (@modelcontextprotocol/sdk ^1.0.0)
 
 Model Context Protocol SDK，支持连接 MCP 服务器：

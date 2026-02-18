@@ -359,6 +359,10 @@
     {
       "packageName": "@agent-stack/example",
       "projectFolder": "example"
+    },
+    {
+      "packageName": "@agent-stack-mcp/fetch",
+      "projectFolder": "mcp-servers/fetch"
     }
   ]
 }

@@ -4,12 +4,14 @@
 
 ```
 agent-stack/
-├── packages/                    # 业务包目录
+├── packages/                    # 核心业务包目录
 │   ├── provider/               # @agent-stack/provider
 │   ├── mcp/                    # @agent-stack/mcp
 │   ├── skill/                  # @agent-stack/skill
 │   ├── memory/                 # @agent-stack/memory
 │   └── index/                  # @agent-stack/index
+├── mcp-servers/                 # 自定义 MCP 服务器 (@agent-stack-mcp/*)
+│   └── fetch/                  # @agent-stack-mcp/fetch
 ├── examples/                   # 示例配置（非 Rush 项目）
 │   ├── .agent-stack.json      # Agent 配置示例
 │   ├── .mcp.json              # MCP 配置示例
@@ -91,7 +93,15 @@ packages/index/
 │   ├── agent.ts               # Agent 类实现
 │   ├── types.ts               # 类型定义
 │   ├── config.ts              # 配置文件加载
-│   └── cli.ts                 # 命令式 CLI
+│   ├── cli.ts                 # 命令式 CLI
+│   └── ui/                    # 终端 UI 模块
+│       ├── index.ts           # UI 模块导出
+│       ├── types.ts           # UI 类型定义
+│       ├── colors.ts          # 主题和颜色
+│       ├── spinner.ts         # Ora spinner 封装
+│       ├── box.ts             # 消息框渲染
+│       ├── layout.ts          # 布局组件
+│       └── stream.ts          # 流式输出管理
 ├── dist/                      # 构建输出
 ├── package.json
 └── tsup.config.ts
@@ -106,6 +116,7 @@ packages/index/
 | `src/types.ts` | Agent 相关类型定义 |
 | `src/config.ts` | 配置文件加载和解析 (.agent-stack.json) |
 | `src/cli.ts` | 命令式 CLI，支持 chat/run/tools/config 命令 |
+| `src/ui/` | 终端 UI 模块，提供现代化界面组件 |
 
 ### 3.3 package.json 关键配置
 
@@ -120,7 +131,14 @@ packages/index/
     "@agent-stack/provider": "workspace:*",
     "@agent-stack/mcp": "workspace:*",
     "@agent-stack/skill": "workspace:*",
-    "commander": "^12.1.0"
+    "@agent-stack/memory": "workspace:*",
+    "boxen": "^8.0.1",
+    "chalk": "^5.4.0",
+    "cli-truncate": "^4.0.0",
+    "commander": "^12.1.0",
+    "ora": "^8.1.0",
+    "strip-ansi": "^7.1.0",
+    "terminal-size": "^4.0.0"
   }
 }
 ```
@@ -313,9 +331,72 @@ packages/memory/
 
 ---
 
-## 7. Rush 配置目录
+## 7. MCP 服务器 (mcp-servers/)
 
-### 7.1 common/config/rush/
+自定义 MCP 服务器使用独立的包前缀 `@agent-stack-mcp/*`。
+
+### 7.1 @agent-stack-mcp/fetch
+
+Web 内容获取 MCP 服务器，支持 HTML 转 Markdown。
+
+```
+mcp-servers/fetch/
+├── src/
+│   ├── index.ts               # 包入口
+│   ├── types.ts               # 类型定义
+│   ├── fetcher.ts             # Web 获取和 HTML 处理
+│   ├── server.ts              # MCP Server 实现
+│   └── cli.ts                 # CLI 入口
+├── dist/                      # 构建输出
+├── package.json
+├── tsconfig.json
+└── tsup.config.ts
+```
+
+**文件职责**：
+
+| 文件 | 职责 |
+|------|------|
+| `src/types.ts` | FetchInput/FetchResult 类型, Zod schema |
+| `src/fetcher.ts` | `fetchUrl()` HTML 获取和 Markdown 转换 |
+| `src/server.ts` | `createServer()` / `runServer()` MCP 服务器 |
+| `src/cli.ts` | CLI 入口，读取环境变量配置 |
+
+**package.json 关键配置**：
+
+```json
+{
+  "name": "@agent-stack-mcp/fetch",
+  "version": "0.0.1",
+  "bin": {
+    "mcp-fetch": "./dist/cli.js"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.0.0",
+    "node-html-markdown": "^1.3.0",
+    "zod": "^3.24.0"
+  }
+}
+```
+
+**MCP 配置示例**：
+
+```json
+{
+  "mcpServers": {
+    "fetch": {
+      "command": "npx",
+      "args": ["-y", "@agent-stack-mcp/fetch"]
+    }
+  }
+}
+```
+
+---
+
+## 8. Rush 配置目录
+
+### 8.1 common/config/rush/
 
 ```
 common/config/rush/
@@ -327,7 +408,7 @@ common/config/rush/
 └── ... (其他 Rush 配置)
 ```
 
-### 7.2 common/scripts/
+### 8.2 common/scripts/
 
 ```
 common/scripts/
@@ -339,9 +420,9 @@ common/scripts/
 
 ---
 
-## 8. 开发工具配置
+## 9. 开发工具配置
 
-### 8.1 .claude/ 目录
+### 9.1 .claude/ 目录
 
 ```
 .claude/
@@ -357,7 +438,7 @@ common/scripts/
     └── common-knowledge/    # 通用知识库
 ```
 
-### 8.2 .ttadk/ 目录
+### 9.2 .ttadk/ 目录
 
 ```
 .ttadk/
@@ -373,9 +454,9 @@ common/scripts/
 
 ---
 
-## 9. 构建输出
+## 10. 构建输出
 
-### 9.1 dist/ 目录结构
+### 10.1 dist/ 目录结构
 
 每个包的 `dist/` 目录输出：
 
@@ -388,7 +469,7 @@ dist/
 └── index.js.map       # Source Map
 ```
 
-### 9.2 构建命令
+### 10.2 构建命令
 
 ```bash
 # 单包构建

@@ -12,6 +12,7 @@
     "tools": "agent-stack tools list"
   },
   "dependencies": {
-    "@agent-stack/index": "workspace:*"
+    "@agent-stack/index": "workspace:*",
+    "@agent-stack-mcp/fetch": "workspace:*"
   }
 }
