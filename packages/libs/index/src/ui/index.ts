@@ -17,14 +17,18 @@ export {
   createLegacySpinner,
 } from './spinner.js';
 
-// Box rendering
+// Box rendering (tool calls)
 export {
   getTerminalWidth,
-  renderMessage,
   renderToolCall,
-  renderStatusBox,
   renderToolCallInline,
 } from './box.js';
+
+// Message rendering (uses strip-ansi)
+export {
+  renderMessage,
+  renderStatusBox,
+} from './message.js';
 
 // Layout components
 export {

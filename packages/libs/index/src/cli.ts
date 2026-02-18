@@ -15,7 +15,10 @@ import {
   serializeConfig,
   findConfigFile,
 } from './config';
-import * as ui from './ui/index.js';
+import { theme, icons, legacyColors } from './ui/colors.js';
+import { createLegacySpinner, createLoadingSpinner } from './ui/spinner.js';
+import { createStreamRenderer } from './ui/stream.js';
+import { renderHeader, renderWelcome, renderPrompt } from './ui/layout.js';
 
 const VERSION = '0.0.1';
 
@@ -70,23 +73,23 @@ loadEnvFile();
 
 // Get appropriate colors based on mode
 function getColors(classic: boolean) {
-  return classic ? ui.legacyColors : {
-    green: (s: string) => ui.theme.user(s),
-    yellow: (s: string) => ui.theme.warning(s),
-    blue: (s: string) => ui.theme.agent(s),
-    cyan: (s: string) => ui.theme.accent(s),
-    red: (s: string) => ui.theme.error(s),
-    gray: (s: string) => ui.theme.muted(s),
-    bold: (s: string) => ui.theme.highlight(s),
+  return classic ? legacyColors : {
+    green: (s: string) => theme.user(s),
+    yellow: (s: string) => theme.warning(s),
+    blue: (s: string) => theme.agent(s),
+    cyan: (s: string) => theme.accent(s),
+    red: (s: string) => theme.error(s),
+    gray: (s: string) => theme.muted(s),
+    bold: (s: string) => theme.highlight(s),
   };
 }
 
 // Get appropriate spinner based on mode
 function getSpinner(text: string, classic: boolean) {
   if (classic || !isTTY) {
-    return ui.createLegacySpinner(text);
+    return createLegacySpinner(text);
   }
-  const spinner = ui.createLoadingSpinner(text);
+  const spinner = createLoadingSpinner(text);
   return {
     start() { spinner.start(); return this; },
     stop() { spinner.stop(); return this; },
@@ -206,7 +209,7 @@ async function runChat(options: ChatOptions) {
   if (!classicMode) {
     console.log('');
   } else {
-    console.log(colors.bold(`\n${ui.icons.agent} Agent Stack CLI v${VERSION}`));
+    console.log(colors.bold(`\n${icons.agent} Agent Stack CLI v${VERSION}`));
   }
 
   const spinner = getSpinner('Loading configuration...', classicMode);
@@ -264,13 +267,13 @@ async function runChat(options: ChatOptions) {
 
     // Show header info
     if (!classicMode) {
-      console.log(ui.renderHeader({
+      console.log(renderHeader({
         version: VERSION,
         model: modelName,
         toolCount,
         configPath: configPath || undefined,
       }));
-      console.log(ui.renderWelcome());
+      console.log(renderWelcome());
       console.log('');
     } else {
       console.log(colors.gray(`   Model: ${modelName}`));
@@ -279,7 +282,7 @@ async function runChat(options: ChatOptions) {
     }
 
     // Create stream renderer for new UI mode
-    const streamRenderer = !classicMode ? ui.createStreamRenderer({ compact: options.compact }) : null;
+    const streamRenderer = !classicMode ? createStreamRenderer({ compact: options.compact }) : null;
 
     // Start interactive loop
     const rl = readline.createInterface({
@@ -288,7 +291,7 @@ async function runChat(options: ChatOptions) {
     });
 
     const prompt = () => {
-      const promptText = classicMode ? colors.green('You: ') : ui.renderPrompt();
+      const promptText = classicMode ? colors.green('You: ') : renderPrompt();
       rl.question(promptText, async (input) => {
         const trimmed = input.trim();
 
@@ -301,12 +304,12 @@ async function runChat(options: ChatOptions) {
 
         if (trimmed === '/tools') {
           const tools = agent.getTools();
-          console.log(colors.cyan(`\n${ui.icons.tool} Available tools (${tools.length}):`));
+          console.log(colors.cyan(`\n${icons.tool} Available tools (${tools.length}):`));
           for (const tool of tools) {
             if (classicMode) {
               console.log(colors.gray(`   - ${tool.name}: ${tool.description.slice(0, 60)}...`));
             } else {
-              console.log(`   ${ui.theme.tool(tool.name)}: ${ui.theme.muted(tool.description.slice(0, 50))}...`);
+              console.log(`   ${theme.tool(tool.name)}: ${theme.muted(tool.description.slice(0, 50))}...`);
             }
           }
           console.log();
@@ -366,7 +369,7 @@ async function runChat(options: ChatOptions) {
                     status: 'running',
                   });
                 } else {
-                  console.log(colors.yellow(`\n[${ui.icons.tool} Calling: ${name}]`));
+                  console.log(colors.yellow(`\n[${icons.tool} Calling: ${name}]`));
                 }
               },
               onToolResult: (name, result) => {
@@ -392,7 +395,7 @@ async function runChat(options: ChatOptions) {
                   });
                 } else {
                   const preview = result.length > 100 ? result.slice(0, 100) + '...' : result;
-                  console.log(colors.gray(`[${ui.icons.success} ${name}: ${preview}]`));
+                  console.log(colors.gray(`[${icons.success} ${name}: ${preview}]`));
                 }
               },
             });
@@ -534,7 +537,7 @@ async function listTools(options: ToolsOptions) {
       console.log(colors.yellow('No tools available.'));
       console.log(colors.gray('Configure MCP servers or Skills to add tools.'));
     } else {
-      console.log(colors.bold(`\n${ui.icons.tool} Available Tools (${tools.length}):\n`));
+      console.log(colors.bold(`\n${icons.tool} Available Tools (${tools.length}):\n`));
       for (const tool of tools) {
         console.log(`  ${colors.cyan(tool.name)}`);
         console.log(`  ${colors.gray(tool.description)}`);
@@ -589,7 +592,7 @@ async function showToolInfo(name: string, options: ToolsOptions) {
       process.exit(1);
     }
 
-    console.log(colors.bold(`\n${ui.icons.tool} Tool: ${tool.name}\n`));
+    console.log(colors.bold(`\n${icons.tool} Tool: ${tool.name}\n`));
     console.log(`${colors.cyan('Description:')} ${tool.description}`);
     console.log(`${colors.cyan('Parameters:')}`);
     console.log(JSON.stringify(tool.parameters, null, 2));
@@ -619,7 +622,7 @@ async function initConfig(options: InitOptions) {
   const content = serializeConfig(template);
 
   writeFileSync(configPath, content, 'utf-8');
-  console.log(colors.green(`${ui.icons.success} Configuration file created: ${configPath}`));
+  console.log(colors.green(`${icons.success} Configuration file created: ${configPath}`));
 }
 
 interface ShowConfigOptions {
@@ -636,7 +639,7 @@ async function showConfig(options: ShowConfigOptions) {
     return;
   }
 
-  console.log(colors.bold(`\n${ui.icons.info} Configuration: ${configPath}\n`));
+  console.log(colors.bold(`\n${icons.info} Configuration: ${configPath}\n`));
   console.log(serializeConfig(config));
 }
 
