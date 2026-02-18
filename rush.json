@@ -95,8 +95,8 @@
    * To remove these restrictions, you could set projectFolderMinDepth=1
    * and set projectFolderMaxDepth to a large number.
    */
-  // "projectFolderMinDepth": 2,
-  // "projectFolderMaxDepth": 2,
+  "projectFolderMinDepth": 1,
+  "projectFolderMaxDepth": 3,
 
   /**
    * Today the npmjs.com registry enforces fairly strict naming rules for packages, but in the early
@@ -338,23 +338,31 @@
   "projects": [
     {
       "packageName": "@agent-stack/provider",
-      "projectFolder": "packages/provider"
+      "projectFolder": "packages/libs/provider"
     },
     {
       "packageName": "@agent-stack/index",
-      "projectFolder": "packages/index"
+      "projectFolder": "packages/libs/index"
     },
     {
       "packageName": "@agent-stack/mcp",
-      "projectFolder": "packages/mcp"
+      "projectFolder": "packages/libs/mcp"
     },
     {
       "packageName": "@agent-stack/skill",
-      "projectFolder": "packages/skill"
+      "projectFolder": "packages/libs/skill"
     },
     {
       "packageName": "@agent-stack/memory",
-      "projectFolder": "packages/memory"
+      "projectFolder": "packages/libs/memory"
+    },
+    {
+      "packageName": "@agent-stack/memory-store",
+      "projectFolder": "packages/libs/memory-store"
+    },
+    {
+      "packageName": "@agent-stack-skill/memory",
+      "projectFolder": "packages/skills/memory"
     },
     {
       "packageName": "@agent-stack/example",
@@ -362,7 +370,15 @@
     },
     {
       "packageName": "@agent-stack-mcp/fetch",
-      "projectFolder": "mcp-servers/fetch"
+      "projectFolder": "packages/mcp-servers/fetch"
+    },
+    {
+      "packageName": "@agent-stack-mcp/time",
+      "projectFolder": "packages/mcp-servers/time"
+    },
+    {
+      "packageName": "@agent-stack-mcp/git",
+      "projectFolder": "packages/mcp-servers/git"
     }
   ]
 }

@@ -42,17 +42,30 @@ Rush 是微软开源的 Monorepo 管理工具，主要特点：
 - **项目隔离**: 每个项目独立的 node_modules
 
 **关键配置** (`rush.json`):
+
+项目分为三类，统一放在 `packages/` 目录下：
+- **核心库** (`packages/libs/`): `@agent-stack/*`
+- **自定义 Skills** (`packages/skills/`): `@agent-stack-skill/*`
+- **自定义 MCP 服务器** (`packages/mcp-servers/`): `@agent-stack-mcp/*`
+
 ```json
 {
   "rushVersion": "5.165.0",
   "pnpmVersion": "9.15.9",
   "nodeSupportedVersionRange": ">=20.0.0 <23.0.0",
+  "projectFolderMinDepth": 1,
+  "projectFolderMaxDepth": 3,
   "projects": [
-    { "packageName": "@agent-stack/provider", "projectFolder": "packages/provider" },
-    { "packageName": "@agent-stack/mcp", "projectFolder": "packages/mcp" },
-    { "packageName": "@agent-stack/skill", "projectFolder": "packages/skill" },
-    { "packageName": "@agent-stack/memory", "projectFolder": "packages/memory" },
-    { "packageName": "@agent-stack/index", "projectFolder": "packages/index" }
+    { "packageName": "@agent-stack/provider", "projectFolder": "packages/libs/provider" },
+    { "packageName": "@agent-stack/mcp", "projectFolder": "packages/libs/mcp" },
+    { "packageName": "@agent-stack/skill", "projectFolder": "packages/libs/skill" },
+    { "packageName": "@agent-stack/memory", "projectFolder": "packages/libs/memory" },
+    { "packageName": "@agent-stack/memory-store", "projectFolder": "packages/libs/memory-store" },
+    { "packageName": "@agent-stack/index", "projectFolder": "packages/libs/index" },
+    { "packageName": "@agent-stack-skill/memory", "projectFolder": "packages/skills/memory" },
+    { "packageName": "@agent-stack-mcp/fetch", "projectFolder": "packages/mcp-servers/fetch" },
+    { "packageName": "@agent-stack-mcp/time", "projectFolder": "packages/mcp-servers/time" },
+    { "packageName": "@agent-stack-mcp/git", "projectFolder": "packages/mcp-servers/git" }
   ]
 }
 ```

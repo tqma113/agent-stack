@@ -13,6 +13,9 @@
   },
   "dependencies": {
     "@agent-stack/index": "workspace:*",
-    "@agent-stack-mcp/fetch": "workspace:*"
+    "@agent-stack-mcp/fetch": "workspace:*",
+    "@agent-stack-mcp/time": "workspace:*",
+    "@agent-stack-mcp/git": "workspace:*",
+    "@agent-stack-skill/memory": "workspace:*"
   }
 }

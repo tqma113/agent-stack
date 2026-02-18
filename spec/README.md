@@ -49,67 +49,36 @@ Agent Stack 是一个基于 TypeScript 的 AI Agent 开发框架，采用 Rush m
 
 ```
 agent-stack/
-├── packages/                    # 子包目录
-│   ├── provider/               # @agent-stack/provider - OpenAI API 封装
-│   │   └── src/
-│   │       ├── index.ts
-│   │       └── openai/
+├── packages/                    # 所有包目录
+│   ├── libs/                   # 核心业务库 (@agent-stack/*)
+│   │   ├── provider/           # @agent-stack/provider - OpenAI API 封装
+│   │   ├── mcp/                # @agent-stack/mcp - MCP 协议支持
+│   │   ├── skill/              # @agent-stack/skill - Skill 系统
+│   │   ├── memory/             # @agent-stack/memory - Memory 策略层
+│   │   ├── memory-store/       # @agent-stack/memory-store - Memory 存储层
+│   │   └── index/              # @agent-stack/index - Agent 实现 + CLI
 │   │
-│   ├── mcp/                    # @agent-stack/mcp - MCP 协议支持
-│   │   └── src/
-│   │       ├── index.ts       # 入口文件
-│   │       ├── types.ts       # 类型定义
-│   │       ├── config.ts      # 配置加载
-│   │       ├── transport.ts   # 传输层
-│   │       ├── client.ts      # MCPClientManager
-│   │       ├── bridge.ts      # 工具桥接
-│   │       └── helpers.ts     # 辅助函数
+│   ├── skills/                 # 自定义 Skills (@agent-stack-skill/*)
+│   │   └── memory/             # @agent-stack-skill/memory - Memory Skill
 │   │
-│   ├── skill/                  # @agent-stack/skill - Skill 系统
-│   │   └── src/
-│   │       ├── index.ts       # 入口文件
-│   │       ├── types.ts       # 类型定义
-│   │       ├── config.ts      # 配置加载
-│   │       ├── loader.ts      # Skill 加载器
-│   │       ├── manager.ts     # SkillManager
-│   │       ├── bridge.ts      # 工具桥接
-│   │       └── helpers.ts     # 辅助函数
-│   │
-│   ├── memory/                 # @agent-stack/memory - Memory 系统
-│   │   └── src/
-│   │       ├── index.ts       # 入口文件
-│   │       ├── types.ts       # 类型定义
-│   │       ├── errors.ts      # 错误类
-│   │       ├── manager.ts     # MemoryManager
-│   │       ├── stores/        # 存储层 (Event/TaskState/Summary/Profile/Semantic)
-│   │       ├── observer.ts    # 事件采集
-│   │       ├── retriever.ts   # 多路召回
-│   │       ├── injector.ts    # 模板注入
-│   │       ├── budgeter.ts    # Token 预算
-│   │       ├── write-policy.ts # 写入策略
-│   │       └── summarizer.ts  # 摘要生成
-│   │
-│   └── index/                  # @agent-stack/index - Agent 实现 + CLI
-│       └── src/
-│           ├── index.ts       # 包入口
-│           ├── agent.ts       # Agent 核心类
-│           ├── types.ts       # 类型定义
-│           ├── config.ts      # 配置文件加载
-│           └── cli.ts         # 命令行工具
+│   └── mcp-servers/            # 自定义 MCP 服务器 (@agent-stack-mcp/*)
+│       ├── fetch/              # @agent-stack-mcp/fetch - Web 内容获取
+│       ├── time/               # @agent-stack-mcp/time - 时间和时区转换
+│       └── git/                # @agent-stack-mcp/git - Git 仓库操作
 │
-├── examples/                   # 示例配置
-│   ├── .agent-stack.json      # Agent 配置示例
-│   ├── .mcp.json              # MCP 配置示例
-│   └── skills/                # 示例 Skills
-│       ├── file-skill/        # 文件操作
-│       ├── shell-skill/       # Shell 命令
-│       └── search-skill/      # 文件搜索
+├── example/                     # 示例项目
+│   ├── .agent-stack.json       # Agent 配置示例
+│   ├── .mcp.json               # MCP 配置示例
+│   └── skills/                 # 示例 Skills
+│       ├── file-skill/         # 文件操作
+│       ├── shell-skill/        # Shell 命令
+│       └── search-skill/       # 文件搜索
 │
-├── common/                     # Rush 公共配置
-├── .github/workflows/          # CI/CD 配置
-├── .mcp.json                   # MCP 服务器配置
-├── rush.json                   # Rush 主配置
-└── spec/                       # 项目文档
+├── common/                      # Rush 公共配置
+├── .github/workflows/           # CI/CD 配置
+├── .mcp.json                    # MCP 服务器配置
+├── rush.json                    # Rush 主配置
+└── spec/                        # 项目文档
 ```
 
 ---
@@ -129,10 +98,18 @@ agent-stack/
         │
         └── (无外部依赖)
 
-@agent-stack/memory    (Memory 系统)
+@agent-stack/memory-store (存储层)
         │
         ├── better-sqlite3 (^11.7.0)
         └── sqlite-vec (^0.1.6)
+
+@agent-stack/memory    (策略层)
+        │
+        └── @agent-stack/memory-store (workspace:*)
+
+@agent-stack-skill/memory (Memory Skill)
+        │
+        └── @agent-stack/memory-store (workspace:*)
 
 @agent-stack/index     (Agent 实现 + CLI，内置 MCP、Skill 和 Memory 支持)
         │

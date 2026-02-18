@@ -1,0 +1,110 @@
+{
+  "name": "memory",
+  "version": "1.0.0",
+  "description": "Memory management tools for AI agents - search, store, and delete memory entries",
+  "author": "@agent-stack",
+  "tools": [
+    {
+      "name": "search",
+      "description": "Search memory across events, profiles, semantic chunks, summaries, and tasks. Returns relevant memory entries matching the query.",
+      "handler": "./handlers.cjs#search",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string",
+            "description": "Search query text for semantic/FTS search"
+          },
+          "layers": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": ["events", "profiles", "semantic", "summaries", "tasks"]
+            },
+            "description": "Memory layers to search (default: all)"
+          },
+          "sessionId": {
+            "type": "string",
+            "description": "Filter by session ID"
+          },
+          "limit": {
+            "type": "number",
+            "description": "Maximum results per layer (default: 10)"
+          },
+          "tags": {
+            "type": "array",
+            "items": { "type": "string" },
+            "description": "Filter by tags"
+          }
+        },
+        "required": []
+      }
+    },
+    {
+      "name": "upsert",
+      "description": "Create or update memory entries. Routes to the appropriate store based on the entry type.",
+      "handler": "./handlers.cjs#upsert",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "layer": {
+            "type": "string",
+            "enum": ["event", "profile", "semantic", "summary", "task"],
+            "description": "Target memory layer"
+          },
+          "data": {
+            "type": "object",
+            "description": "Entry data (schema varies by layer)"
+          },
+          "sessionId": {
+            "type": "string",
+            "description": "Session ID for the entry"
+          }
+        },
+        "required": ["layer", "data"]
+      }
+    },
+    {
+      "name": "delete",
+      "description": "Delete memory entries by filter criteria.",
+      "handler": "./handlers.cjs#delete",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "layer": {
+            "type": "string",
+            "enum": ["events", "profiles", "semantic", "summaries", "tasks"],
+            "description": "Target memory layer"
+          },
+          "filter": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "description": "Specific entry ID to delete"
+              },
+              "ids": {
+                "type": "array",
+                "items": { "type": "string" },
+                "description": "Multiple entry IDs to delete"
+              },
+              "sessionId": {
+                "type": "string",
+                "description": "Delete all entries for this session"
+              },
+              "beforeTimestamp": {
+                "type": "number",
+                "description": "Delete entries older than this timestamp"
+              },
+              "key": {
+                "type": "string",
+                "description": "Profile key to delete (profiles layer only)"
+              }
+            }
+          }
+        },
+        "required": ["layer", "filter"]
+      }
+    }
+  ]
+}

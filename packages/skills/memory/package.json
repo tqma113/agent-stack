@@ -1,0 +1,56 @@
+{
+  "name": "@agent-stack-skill/memory",
+  "version": "0.0.1",
+  "description": "Memory Skill for agent-stack - exposes memory operations as tools",
+  "type": "module",
+  "main": "./dist/handlers.js",
+  "types": "./dist/handlers.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/handlers.d.ts",
+      "import": "./dist/handlers.mjs",
+      "require": "./dist/handlers.js"
+    },
+    "./handlers": {
+      "types": "./dist/handlers.d.ts",
+      "import": "./dist/handlers.mjs",
+      "require": "./dist/handlers.js"
+    }
+  },
+  "files": [
+    "dist",
+    "skill.json",
+    "handlers.cjs"
+  ],
+  "scripts": {
+    "build": "tsup && node scripts/copy-handlers.js",
+    "dev": "tsup --watch",
+    "clean": "rimraf dist handlers.cjs",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage"
+  },
+  "keywords": [
+    "agent",
+    "memory",
+    "skill",
+    "tool",
+    "llm",
+    "ai"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "@agent-stack/memory-store": "workspace:*",
+    "better-sqlite3": "^11.7.0"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^7.6.12",
+    "@types/node": "^22.10.0",
+    "rimraf": "^6.0.1",
+    "tsup": "^8.3.5",
+    "typescript": "~5.7.2",
+    "vitest": "^2.1.0"
+  }
+}

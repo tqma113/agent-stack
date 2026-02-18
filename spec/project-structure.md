@@ -4,15 +4,21 @@
 
 ```
 agent-stack/
-├── packages/                    # 核心业务包目录
-│   ├── provider/               # @agent-stack/provider
-│   ├── mcp/                    # @agent-stack/mcp
-│   ├── skill/                  # @agent-stack/skill
-│   ├── memory/                 # @agent-stack/memory
-│   └── index/                  # @agent-stack/index
-├── mcp-servers/                 # 自定义 MCP 服务器 (@agent-stack-mcp/*)
-│   └── fetch/                  # @agent-stack-mcp/fetch
-├── examples/                   # 示例配置（非 Rush 项目）
+├── packages/                    # 所有包目录
+│   ├── libs/                   # 核心业务库 (@agent-stack/*)
+│   │   ├── provider/           # @agent-stack/provider
+│   │   ├── mcp/                # @agent-stack/mcp
+│   │   ├── skill/              # @agent-stack/skill
+│   │   ├── memory/             # @agent-stack/memory (策略层)
+│   │   ├── memory-store/       # @agent-stack/memory-store (存储层)
+│   │   └── index/              # @agent-stack/index
+│   ├── skills/                 # 自定义 Skills (@agent-stack-skill/*)
+│   │   └── memory/             # @agent-stack-skill/memory
+│   └── mcp-servers/            # 自定义 MCP 服务器 (@agent-stack-mcp/*)
+│       ├── fetch/              # @agent-stack-mcp/fetch
+│       ├── time/               # @agent-stack-mcp/time
+│       └── git/                # @agent-stack-mcp/git
+├── example/                    # 示例项目
 │   ├── .agent-stack.json      # Agent 配置示例
 │   ├── .mcp.json              # MCP 配置示例
 │   └── skills/                # 示例 Skills
@@ -35,7 +41,7 @@ agent-stack/
 ### 2.1 目录结构
 
 ```
-packages/provider/
+packages/libs/provider/
 ├── src/
 │   ├── index.ts               # 包入口
 │   └── openai/                # OpenAI 模块
@@ -87,7 +93,7 @@ packages/provider/
 ### 3.1 目录结构
 
 ```
-packages/index/
+packages/libs/index/
 ├── src/
 │   ├── index.ts               # 包入口
 │   ├── agent.ts               # Agent 类实现
@@ -150,7 +156,7 @@ packages/index/
 ### 4.1 目录结构
 
 ```
-packages/mcp/
+packages/libs/mcp/
 ├── src/
 │   ├── index.ts               # 包入口
 │   ├── types.ts               # 类型定义
@@ -196,7 +202,7 @@ packages/mcp/
 ### 5.1 目录结构
 
 ```
-packages/skill/
+packages/libs/skill/
 ├── src/
 │   ├── index.ts               # 包入口
 │   ├── types.ts               # 类型定义
@@ -237,73 +243,138 @@ packages/skill/
 
 ---
 
-## 6. @agent-stack/memory 包
+## 6. Memory 系统包
 
-### 6.1 目录结构
+Memory 系统采用三层架构，分离关注点：
+
+- **@agent-stack/memory-store**: SQLite 存储层 (IO 操作)
+- **@agent-stack/memory**: 策略层 (何时读写、写什么)
+- **@agent-stack-skill/memory**: Skill 工具层 (Agent 可调用的工具)
+
+### 6.1 @agent-stack/memory-store 包 (存储层)
 
 ```
-packages/memory/
+packages/libs/memory-store/
 ├── src/
 │   ├── index.ts               # 包入口
-│   ├── types.ts               # 类型定义 (800+ 行)
+│   ├── types.ts               # 类型定义
 │   ├── errors.ts              # 错误类
-│   ├── stores/                # 存储层
-│   │   ├── index.ts           # 存储导出
-│   │   ├── db-operations.ts   # 数据库操作组合函数
-│   │   ├── event.ts           # createEventStore() 工厂函数
-│   │   ├── task-state.ts      # createTaskStateStore() 工厂函数
-│   │   ├── summary.ts         # createSummaryStore() 工厂函数
-│   │   ├── profile.ts         # createProfileStore() 工厂函数
-│   │   └── semantic.ts        # createSemanticStore() 工厂函数
-│   ├── manager.ts             # MemoryManager 主入口
-│   ├── observer.ts            # 事件采集
-│   ├── retriever.ts           # 多路召回
-│   ├── injector.ts            # 模板注入
-│   ├── budgeter.ts            # Token 预算
-│   ├── write-policy.ts        # 写入策略
-│   ├── summarizer.ts          # 摘要生成
-│   └── state-reducer.ts       # 任务状态 Reducer
-├── tests/                     # 测试文件 (124 测试)
-│   ├── stores/
-│   │   ├── event.test.ts
-│   │   ├── task-state.test.ts
-│   │   ├── profile.test.ts
-│   │   ├── summary.test.ts
-│   │   └── semantic.test.ts
-│   ├── state-reducer.test.ts
-│   ├── write-policy.test.ts
-│   └── integration/
-│       └── regression.test.ts
-├── dist/                      # 构建输出
+│   └── stores/                # 存储实现
+│       ├── index.ts           # 存储导出
+│       ├── db-operations.ts   # 数据库操作组合函数
+│       ├── event.ts           # createEventStore()
+│       ├── task-state.ts      # createTaskStateStore()
+│       ├── summary.ts         # createSummaryStore()
+│       ├── profile.ts         # createProfileStore()
+│       └── semantic.ts        # createSemanticStore()
+├── dist/
 ├── package.json
-├── tsconfig.json
-├── tsup.config.ts
+└── tsup.config.ts
+```
+
+**package.json**:
+```json
+{
+  "name": "@agent-stack/memory-store",
+  "version": "0.0.1",
+  "dependencies": {
+    "better-sqlite3": "^11.7.0",
+    "sqlite-vec": "^0.1.6"
+  }
+}
+```
+
+### 6.2 @agent-stack/memory 包 (策略层)
+
+```
+packages/libs/memory/
+├── src/
+│   ├── index.ts               # 包入口
+│   ├── types.ts               # Legacy 类型 (向后兼容)
+│   ├── policy/                # 策略层 (NEW)
+│   │   ├── index.ts           # 策略导出
+│   │   ├── types.ts           # 策略类型定义
+│   │   ├── memory-policy.ts   # createMemoryPolicy() 主策略
+│   │   ├── retrieval-policy.ts# createRetrievalPolicy() 检索决策
+│   │   ├── write-policy.ts    # createWritePolicy() 写入决策
+│   │   └── budget-policy.ts   # createBudgetPolicy() Token 预算
+│   ├── rules/                 # 规则引擎 (NEW)
+│   │   ├── index.ts           # 规则导出
+│   │   ├── rule-engine.ts     # createRuleEngine()
+│   │   └── default-rules.ts   # 默认规则配置
+│   ├── observer.ts            # 事件创建辅助
+│   ├── injector.ts            # 模板注入
+│   ├── summarizer.ts          # 摘要生成
+│   ├── state-reducer.ts       # 任务状态 Reducer
+│   └── manager.ts             # Legacy MemoryManager (向后兼容)
+├── tests/
+├── dist/
+├── package.json
 └── vitest.config.ts
 ```
 
-### 6.2 文件职责
+**package.json**:
+```json
+{
+  "name": "@agent-stack/memory",
+  "version": "0.0.1",
+  "dependencies": {
+    "@agent-stack/memory-store": "workspace:*",
+    "better-sqlite3": "^11.7.0"
+  }
+}
+```
 
-| 文件 | 职责 |
-|------|------|
-| `src/index.ts` | 统一导出入口 |
-| `src/types.ts` | 完整类型定义 (Memory, Task, Profile, Semantic) |
-| `src/errors.ts` | 错误类定义 |
-| `src/stores/db-operations.ts` | `createDbOperations()` 数据库操作组合函数 |
-| `src/stores/event.ts` | `createEventStore()` 事件日志存储 |
-| `src/stores/task-state.ts` | `createTaskStateStore()` 任务状态存储 |
-| `src/stores/summary.ts` | `createSummaryStore()` 对话摘要存储 |
-| `src/stores/profile.ts` | `createProfileStore()` 用户偏好存储 |
-| `src/stores/semantic.ts` | `createSemanticStore()` 语义检索 (FTS5 + 向量) |
-| `src/manager.ts` | `createMemoryManager()` 主入口，协调所有组件 |
-| `src/observer.ts` | `createMemoryObserver()` 事件创建辅助函数 |
-| `src/retriever.ts` | `createMemoryRetriever()` 多路召回和优先级排序 |
-| `src/injector.ts` | `createMemoryInjector()` 模板引擎 |
-| `src/budgeter.ts` | `createMemoryBudgeter()` Token 预算分配 |
-| `src/write-policy.ts` | `createWritePolicyEngine()` 写入决策和冲突解决 |
-| `src/summarizer.ts` | `createMemorySummarizer()` 摘要生成和合并 |
-| `src/state-reducer.ts` | `TaskStateReducer` 不可变任务状态更新 (纯函数) |
+---
 
-### 6.3 五层记忆架构
+## 7. Skills 目录 (@agent-stack-skill/*)
+
+自定义 Skills 使用独立的包前缀 `@agent-stack-skill/*`。
+
+### 7.1 @agent-stack-skill/memory (Memory Skill)
+
+```
+packages/skills/memory/
+├── skill.json                 # Skill 定义文件
+├── handlers.cjs               # 编译后的处理函数
+├── src/
+│   ├── handlers.ts            # search/upsert/delete 实现
+│   ├── schema.ts              # JSON Schema 定义
+│   └── store-context.ts       # 数据库连接管理
+├── scripts/
+│   └── copy-handlers.js       # 构建脚本
+├── dist/
+└── package.json
+```
+
+**skill.json 工具定义**:
+```json
+{
+  "name": "memory",
+  "version": "1.0.0",
+  "tools": [
+    { "name": "search", "description": "Search memory...", "handler": "./handlers.cjs#search" },
+    { "name": "upsert", "description": "Create or update memory...", "handler": "./handlers.cjs#upsert" },
+    { "name": "delete", "description": "Delete memory...", "handler": "./handlers.cjs#delete" }
+  ]
+}
+```
+
+**package.json**:
+```json
+{
+  "name": "@agent-stack-skill/memory",
+  "version": "0.0.1",
+  "dependencies": {
+    "@agent-stack/memory-store": "workspace:*",
+    "better-sqlite3": "^11.7.0"
+  }
+}
+```
+
+---
+
+### 7.2 五层记忆架构
 
 | 层级 | 工厂函数 | 用途 | 优先级 |
 |------|----------|------|--------|
@@ -313,34 +384,44 @@ packages/memory/
 | Episodic | `createEventStore()` | 事件日志 (对话/工具/决策) | 4 |
 | Semantic | `createSemanticStore()` | 可检索材料 (全文/向量) | 5 (最低) |
 
-### 6.4 package.json 关键配置
+### 7.3 调用流程
 
-```json
-{
-  "name": "@agent-stack/memory",
-  "version": "0.0.1",
-  "dependencies": {
-    "better-sqlite3": "^11.10.0"
-  },
-  "devDependencies": {
-    "vitest": "^2.1.0",
-    "@types/better-sqlite3": "^7.6.12"
+**Before (直接调用)**:
+```typescript
+// agent.ts - 旧方式
+await memoryManager.recordEvent(event);
+const bundle = await memoryManager.retrieve({ query });
+```
+
+**After (Policy + Skill)**:
+```typescript
+// agent.ts - 新方式
+const decision = memoryPolicy.shouldRetrieve({ userQuery, sessionId });
+if (decision.shouldRetrieve) {
+  const params = memoryPolicy.buildSearchParams(context);
+  const result = await tools.get('skill__memory__search').execute(params);
+}
+
+const writeDecision = memoryPolicy.shouldWrite({ event });
+if (writeDecision.shouldWrite) {
+  for (const op of writeDecision.operations) {
+    await tools.get('skill__memory__upsert').execute(op.payload);
   }
 }
 ```
 
 ---
 
-## 7. MCP 服务器 (mcp-servers/)
+## 8. MCP 服务器 (packages/mcp-servers/)
 
 自定义 MCP 服务器使用独立的包前缀 `@agent-stack-mcp/*`。
 
-### 7.1 @agent-stack-mcp/fetch
+### 8.1 @agent-stack-mcp/fetch
 
 Web 内容获取 MCP 服务器，支持 HTML 转 Markdown。
 
 ```
-mcp-servers/fetch/
+packages/mcp-servers/fetch/
 ├── src/
 │   ├── index.ts               # 包入口
 │   ├── types.ts               # 类型定义
@@ -392,11 +473,185 @@ mcp-servers/fetch/
 }
 ```
 
+### 8.2 @agent-stack-mcp/time
+
+时间和时区转换 MCP 服务器，提供当前时间查询和时区转换功能。
+
+```
+packages/mcp-servers/time/
+├── src/
+│   ├── index.ts               # 包入口
+│   ├── types.ts               # 类型定义
+│   ├── timezone.ts            # 时区工具函数
+│   ├── server.ts              # MCP Server 实现
+│   └── cli.ts                 # CLI 入口
+├── dist/                      # 构建输出
+├── package.json
+├── tsconfig.json
+└── tsup.config.ts
+```
+
+**提供的工具**：
+
+| 工具名 | 描述 |
+|--------|------|
+| `get_current_time` | 获取指定时区或系统时区的当前时间 |
+| `convert_time` | 在不同时区之间转换时间 |
+
+**get_current_time 返回格式**：
+```json
+{
+  "timezone": "Asia/Tokyo",
+  "datetime": "2024-01-01T13:00:00+09:00",
+  "is_dst": false
+}
+```
+
+**convert_time 返回格式**：
+```json
+{
+  "source": { "timezone": "America/New_York", "datetime": "...", "is_dst": false },
+  "target": { "timezone": "Asia/Tokyo", "datetime": "...", "is_dst": false },
+  "time_difference": "+14.0h"
+}
+```
+
+**package.json 关键配置**：
+
+```json
+{
+  "name": "@agent-stack-mcp/time",
+  "version": "0.0.1",
+  "bin": {
+    "mcp-time": "./dist/cli.js"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.0.0",
+    "zod": "^3.24.0"
+  }
+}
+```
+
+**MCP 配置示例**：
+
+```json
+{
+  "mcpServers": {
+    "time": {
+      "command": "npx",
+      "args": ["-y", "@agent-stack-mcp/time"]
+    }
+  }
+}
+```
+
+**自定义本地时区**：
+
+```json
+{
+  "mcpServers": {
+    "time": {
+      "command": "npx",
+      "args": ["-y", "@agent-stack-mcp/time", "--local-timezone=America/New_York"]
+    }
+  }
+}
+```
+
+### 8.3 @agent-stack-mcp/git
+
+Git 仓库操作 MCP 服务器，提供完整的 Git 操作工具集。
+
+```
+packages/mcp-servers/git/
+├── src/
+│   ├── index.ts               # 包入口
+│   ├── types.ts               # 类型定义
+│   ├── git-operations.ts      # Git 操作实现
+│   ├── server.ts              # MCP Server 实现
+│   └── cli.ts                 # CLI 入口
+├── dist/                      # 构建输出
+├── package.json
+├── tsconfig.json
+└── tsup.config.ts
+```
+
+**提供的工具**：
+
+| 工具名 | 描述 |
+|--------|------|
+| `git_status` | 显示工作区状态 |
+| `git_diff_unstaged` | 显示未暂存的更改 |
+| `git_diff_staged` | 显示已暂存的更改 |
+| `git_diff` | 与目标分支/提交比较差异 |
+| `git_commit` | 提交更改 |
+| `git_add` | 添加文件到暂存区 |
+| `git_reset` | 取消所有暂存 |
+| `git_log` | 显示提交历史 |
+| `git_create_branch` | 创建新分支 |
+| `git_checkout` | 切换分支 |
+| `git_show` | 显示提交内容 |
+| `git_branch` | 列出分支 |
+
+**git_log 返回格式**：
+```json
+[
+  {
+    "hash": "abc123...",
+    "author": "John Doe",
+    "date": "2024-01-01T12:00:00+08:00",
+    "message": "feat: add new feature"
+  }
+]
+```
+
+**package.json 关键配置**：
+
+```json
+{
+  "name": "@agent-stack-mcp/git",
+  "version": "0.0.1",
+  "bin": {
+    "mcp-git": "./dist/cli.js"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.0.0",
+    "zod": "^3.24.0"
+  }
+}
+```
+
+**MCP 配置示例**：
+
+```json
+{
+  "mcpServers": {
+    "git": {
+      "command": "npx",
+      "args": ["-y", "@agent-stack-mcp/git"]
+    }
+  }
+}
+```
+
+**指定默认仓库路径**：
+
+```json
+{
+  "mcpServers": {
+    "git": {
+      "command": "npx",
+      "args": ["-y", "@agent-stack-mcp/git", "--repository", "/path/to/repo"]
+    }
+  }
+}
+```
+
 ---
 
-## 8. Rush 配置目录
+## 9. Rush 配置目录
 
-### 8.1 common/config/rush/
+### 9.1 common/config/rush/
 
 ```
 common/config/rush/
@@ -408,7 +663,7 @@ common/config/rush/
 └── ... (其他 Rush 配置)
 ```
 
-### 8.2 common/scripts/
+### 9.2 common/scripts/
 
 ```
 common/scripts/
@@ -420,9 +675,9 @@ common/scripts/
 
 ---
 
-## 9. 开发工具配置
+## 10. 开发工具配置
 
-### 9.1 .claude/ 目录
+### 10.1 .claude/ 目录
 
 ```
 .claude/
@@ -438,7 +693,7 @@ common/scripts/
     └── common-knowledge/    # 通用知识库
 ```
 
-### 9.2 .ttadk/ 目录
+### 10.2 .ttadk/ 目录
 
 ```
 .ttadk/
@@ -454,9 +709,9 @@ common/scripts/
 
 ---
 
-## 10. 构建输出
+## 11. 构建输出
 
-### 10.1 dist/ 目录结构
+### 11.1 dist/ 目录结构
 
 每个包的 `dist/` 目录输出：
 
@@ -469,7 +724,7 @@ dist/
 └── index.js.map       # Source Map
 ```
 
-### 10.2 构建命令
+### 11.2 构建命令
 
 ```bash
 # 单包构建
