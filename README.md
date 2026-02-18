@@ -7,3 +7,7 @@
 [ ] model、MCP、Skill 图形界面圈选（上下文控制，执行效率和准确率更高）
   [ ] 这一步由 AI 代替？
 [ ] 权限管控
+
+[ ] Personal Assitant
+  [ ] Calander + Task 管理
+  [ ] Corn Job
