@@ -14,6 +14,11 @@ import type {
 } from '../types.js';
 import { createDbOperations, type DbOperationsInstance } from './db-operations.js';
 import { SemanticSearchError, DatabaseError } from '../errors.js';
+import {
+  createEmbeddingCache,
+  type EmbeddingCacheInstance,
+  type EmbeddingCacheConfig,
+} from './embedding-cache.js';
 
 /**
  * Vector search options
@@ -53,6 +58,15 @@ export interface SemanticStoreConfig {
 
   /** Enable FTS search */
   enableFtsSearch: boolean;
+
+  /** Embedding cache configuration */
+  embeddingCache?: Partial<EmbeddingCacheConfig> & { enabled?: boolean };
+
+  /** Embedding provider name (for cache key) */
+  embeddingProvider?: string;
+
+  /** Embedding model name (for cache key) */
+  embeddingModel?: string;
 }
 
 /**
@@ -62,6 +76,9 @@ export const DEFAULT_SEMANTIC_CONFIG: SemanticStoreConfig = {
   vectorDimensions: 1536,
   enableVectorSearch: true,
   enableFtsSearch: true,
+  embeddingCache: { enabled: true },
+  embeddingProvider: 'default',
+  embeddingModel: 'default',
 };
 
 /**
@@ -110,6 +127,15 @@ export interface SemanticStoreInstance extends ISemanticStore {
   delete(id: UUID): Promise<boolean>;
   /** Get chunk count */
   count(sessionId?: string): Promise<number>;
+  /** Get embedding cache instance (if enabled) */
+  getEmbeddingCache(): EmbeddingCacheInstance | undefined;
+  /** Get embedding cache statistics */
+  getCacheStats(): Promise<{
+    totalEntries: number;
+    providers: Array<{ provider: string; model: string; count: number }>;
+  } | null>;
+  /** Set embedding provider/model for cache keys */
+  setEmbeddingProviderInfo(provider: string, model: string): void;
 }
 
 /**
@@ -123,6 +149,14 @@ export function createSemanticStore(
   const storeConfig: SemanticStoreConfig = { ...DEFAULT_SEMANTIC_CONFIG, ...config };
   let vecEnabled = false;
   let embedFunction: EmbedFunction | undefined;
+
+  // Embedding cache
+  const cacheEnabled = storeConfig.embeddingCache?.enabled !== false;
+  const embeddingCache: EmbeddingCacheInstance | undefined = cacheEnabled
+    ? createEmbeddingCache(storeConfig.embeddingCache)
+    : undefined;
+  let embeddingProvider = storeConfig.embeddingProvider ?? 'default';
+  let embeddingModel = storeConfig.embeddingModel ?? 'default';
 
   // ============================================================================
   // Private helper functions
@@ -422,6 +456,12 @@ export function createSemanticStore(
       }
     }
 
+    // Initialize embedding cache
+    if (embeddingCache) {
+      embeddingCache.setDatabase(db);
+      await embeddingCache.initialize();
+    }
+
     dbOps.setInitialized(true);
   }
 
@@ -449,6 +489,9 @@ export function createSemanticStore(
         // Vec table might not exist
       }
     }
+
+    // Note: We intentionally do NOT clear embedding cache on clear()
+    // because cached embeddings can be reused across sessions
   }
 
   async function add(input: SemanticChunkInput): Promise<SemanticChunk> {
@@ -458,7 +501,23 @@ export function createSemanticStore(
     let embedding = input.embedding;
     if (!embedding && embedFunction && vecEnabled) {
       try {
-        embedding = await embedFunction(input.text);
+        // Check cache first
+        if (embeddingCache) {
+          const cached = await embeddingCache.get(input.text, embeddingProvider, embeddingModel);
+          if (cached) {
+            embedding = cached;
+          }
+        }
+
+        // Generate if not cached
+        if (!embedding) {
+          embedding = await embedFunction(input.text);
+
+          // Cache the result
+          if (embeddingCache && embedding) {
+            await embeddingCache.set(input.text, embedding, embeddingProvider, embeddingModel);
+          }
+        }
       } catch (error) {
         // Log warning but continue without embedding
         console.warn('[SemanticStore] Failed to generate embedding for chunk:', (error as Error).message);
@@ -699,7 +758,23 @@ export function createSemanticStore(
     // Auto-generate embedding if embedFunction is set and no embedding provided
     if (shouldUseVector && !embedding && embedFunction) {
       try {
-        embedding = await embedFunction(query);
+        // Check cache first
+        if (embeddingCache) {
+          const cached = await embeddingCache.get(query, embeddingProvider, embeddingModel);
+          if (cached) {
+            embedding = cached;
+          }
+        }
+
+        // Generate if not cached
+        if (!embedding) {
+          embedding = await embedFunction(query);
+
+          // Cache the result
+          if (embeddingCache && embedding) {
+            await embeddingCache.set(query, embedding, embeddingProvider, embeddingModel);
+          }
+        }
       } catch (error) {
         // Log warning but continue with FTS-only
         console.warn('[SemanticStore] Failed to generate embedding:', (error as Error).message);
@@ -834,7 +909,12 @@ export function createSemanticStore(
   // Return the instance object
   return {
     // DbOperations delegation
-    setDatabase: (db: Database.Database) => dbOps.setDatabase(db),
+    setDatabase: (db: Database.Database) => {
+      dbOps.setDatabase(db);
+      if (embeddingCache) {
+        embeddingCache.setDatabase(db);
+      }
+    },
     isInitialized: () => dbOps.isInitialized(),
 
     // BaseStore methods
@@ -863,5 +943,20 @@ export function createSemanticStore(
     searchSimilar,
     delete: deleteChunk,
     count,
+
+    // Embedding cache methods
+    getEmbeddingCache: () => embeddingCache,
+    getCacheStats: async () => {
+      if (!embeddingCache) return null;
+      const stats = await embeddingCache.getStats();
+      return {
+        totalEntries: stats.totalEntries,
+        providers: stats.providers,
+      };
+    },
+    setEmbeddingProviderInfo: (provider: string, model: string) => {
+      embeddingProvider = provider;
+      embeddingModel = model;
+    },
   };
 }

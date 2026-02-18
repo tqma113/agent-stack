@@ -60,7 +60,8 @@ Rush 是微软开源的 Monorepo 管理工具，主要特点：
     { "packageName": "@agent-stack/mcp", "projectFolder": "packages/libs/mcp" },
     { "packageName": "@agent-stack/skill", "projectFolder": "packages/libs/skill" },
     { "packageName": "@agent-stack/memory", "projectFolder": "packages/libs/memory" },
-    { "packageName": "@agent-stack/memory-store", "projectFolder": "packages/libs/memory-store" },
+    { "packageName": "@agent-stack/memory-store-sqlite", "projectFolder": "packages/libs/memory-store-sqlite" },
+    { "packageName": "@agent-stack/memory-store-json", "projectFolder": "packages/libs/memory-store-json" },
     { "packageName": "@agent-stack/index", "projectFolder": "packages/libs/index" },
     { "packageName": "@agent-stack-skill/memory", "projectFolder": "packages/skills/memory" },
     { "packageName": "@agent-stack-mcp/fetch", "projectFolder": "packages/mcp-servers/fetch" },
@@ -237,20 +238,21 @@ TikTok Agent Development Kit 插件系统，提供：
 
 ## 7. 数据存储
 
-### better-sqlite3 (^11.10.0)
+### better-sqlite3 (^11.7.0)
 
-同步的 SQLite3 绑定库，用于 `@agent-stack/memory` 包：
+同步的 SQLite3 绑定库，用于 `@agent-stack/memory-store-sqlite` 包：
 
 - **同步 API**: 简化异步处理
 - **预编译语句**: 提高性能
 - **事务支持**: 原子操作
 
-**用途**：
+**存储层**：
 - EventStore - 事件日志存储
 - TaskStateStore - 任务状态存储
 - ProfileStore - 用户偏好存储
 - SummaryStore - 对话摘要存储
-- SemanticStore - 语义检索 (FTS5)
+- SemanticStore - 语义检索 (FTS5 + Vector)
+- EmbeddingCache - 嵌入向量缓存 (LRU + TTL)
 
 ### SQLite FTS5
 
@@ -266,13 +268,58 @@ CREATE VIRTUAL TABLE chunks_fts USING fts5(
 );
 ```
 
+### sqlite-vec (^0.1.6)
+
+向量搜索扩展，支持向量相似度检索：
+
+```sql
+-- 向量索引
+CREATE VIRTUAL TABLE vec_chunks USING vec0(
+  chunk_id INTEGER PRIMARY KEY,
+  embedding FLOAT[1536]
+);
+```
+
+### 嵌入缓存 (Embedding Cache)
+
+基于 SQLite 的嵌入向量缓存，避免重复 API 调用：
+
+- **缓存键**: SHA-256(text) + provider + model
+- **淘汰策略**: LRU (访问时间排序) + TTL (过期时间)
+- **批量操作**: `getBatch()`, `setBatch()` 支持批量查询/存储
+- **默认配置**: 50000 条目上限，7 天 TTL
+
+### 搜索结果排序算法
+
+Memory 系统内置搜索结果后处理管道：
+
+**时间衰减 (Temporal Decay)**:
+- 公式: `score × e^(-λ × ageInDays)`, λ = ln(2) / halfLifeDays
+- 支持指数/线性/阶梯三种衰减模式
+- 默认 30 天半衰期，最低保留 10% 分数
+
+**MMR 多样性去重 (Maximal Marginal Relevance)**:
+- 公式: `MMR = λ × relevance - (1-λ) × max_similarity`
+- 支持 Jaccard/Overlap/Cosine 相似度函数
+- 默认 λ=0.7 (70% 相关性, 30% 多样性)
+
+**组合管道**:
+```typescript
+const pipeline = createRankingPipeline({
+  temporalDecay: { enabled: true, halfLifeDays: 30 },
+  mmr: { enabled: true, lambda: 0.7 },
+  limit: 10,
+  minScore: 0.1,
+});
+```
+
 ---
 
 ## 8. 测试框架
 
 ### Vitest (^2.1.0)
 
-用于 `@agent-stack/memory` 包的单元测试和集成测试：
+用于 Memory 子系统的单元测试和集成测试：
 
 ```typescript
 // vitest.config.ts
@@ -287,8 +334,18 @@ export default defineConfig({
 ```
 
 **测试覆盖**：
-- 134 个测试用例
-- 单元测试 (Stores, Reducer, Policy)
+- `@agent-stack/memory`: 220 个测试用例 (11 个测试文件)
+- `@agent-stack/memory-store-sqlite`: 87 个测试用例 (6 个测试文件)
+- `@agent-stack/memory-store-json`: 通过
+- `@agent-stack-skill/memory`: 28 个测试用例 (1 个测试文件)
+- **总计**: 335+ 测试用例
+
+**测试模块**：
+- 存储层测试 (Event, TaskState, Summary, Profile, Semantic, EmbeddingCache)
+- 排序测试 (Temporal Decay, MMR, Pipeline)
+- Compaction 测试 (Memory Flush, Compaction Manager)
+- Transcript 测试 (Session Transcript, Transcript Indexer)
+- Pipeline 测试 (Memory Pipeline)
 - 集成测试 (长对话模拟, 性能测试)
 
 ---

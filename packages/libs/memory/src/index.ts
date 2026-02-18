@@ -117,6 +117,107 @@ export { TaskStateReducer, TaskActions } from './state-reducer.js';
 export type { TaskAction, ReducerResult } from './state-reducer.js';
 
 // =============================================================================
+// Compaction Module (NEW)
+// =============================================================================
+
+export {
+  // Memory Flush
+  createMemoryFlush,
+  DEFAULT_MEMORY_FLUSH_CONFIG,
+  DEFAULT_FLUSH_PROMPT,
+  parseLLMFlushResponse,
+  type MemoryFlushConfig,
+  type FlushCheckResult,
+  type FlushContent,
+  type FlushResult,
+  type FlushTriggerReason,
+  type IMemoryFlush,
+  // Compaction Manager
+  createCompactionManager,
+  DEFAULT_COMPACTION_CONFIG,
+  type CompactionConfig,
+  type CompactionState,
+  type CompactionResult,
+  type ICompactionManager,
+} from './compaction/index.js';
+
+// =============================================================================
+// Transcript Module (NEW)
+// =============================================================================
+
+export {
+  // Session Transcript
+  createSessionTranscript,
+  formatTranscript,
+  type ISessionTranscript,
+  type TranscriptEntry,
+  type TranscriptContent,
+  type TranscriptMetadata,
+  type TranscriptSearchOptions,
+  type TranscriptSearchResult,
+  type TranscriptChunk,
+  // Transcript Indexer
+  createTranscriptIndexer,
+  createDebouncer,
+  DEFAULT_INDEXER_CONFIG,
+  type ITranscriptIndexer,
+  type TranscriptIndexerConfig,
+  type IndexedTranscript,
+  type SyncResult,
+} from './transcript/index.js';
+
+// =============================================================================
+// Pipeline Module (NEW)
+// =============================================================================
+
+export {
+  createMemoryPipeline,
+  DEFAULT_WRITE_CONFIG,
+  DEFAULT_READ_CONFIG,
+  type IMemoryPipeline,
+  type WritePipelineConfig,
+  type ReadPipelineConfig,
+  type WriteInput,
+  type WriteResult,
+  type ReadInput,
+  type ReadResult,
+  type PipelineStores,
+} from './pipeline/index.js';
+
+// =============================================================================
+// Ranking Module (NEW)
+// =============================================================================
+
+export {
+  // Temporal Decay
+  applyTemporalDecay,
+  createTemporalDecayProcessor,
+  calculateExponentialDecay,
+  calculateLinearDecay,
+  calculateStepDecay,
+  getTemporalDecayStats,
+  DEFAULT_TEMPORAL_DECAY_CONFIG,
+  type TemporalDecayConfig,
+  type DecayedSearchResult,
+  type TemporalDecayStats,
+  // MMR
+  applyMMR,
+  createMMRProcessor,
+  needsDiversityReranking,
+  getMMRStats,
+  jaccardSimilarity,
+  overlapSimilarity,
+  cosineSimilarity,
+  DEFAULT_MMR_CONFIG,
+  type MMRConfig,
+  type MMRSearchResult,
+  type MMRStats,
+  // Pipeline
+  createRankingPipeline,
+  type RankingPipelineConfig,
+} from './ranking/index.js';
+
+// =============================================================================
 // Legacy Manager (deprecated, kept for backward compatibility)
 // =============================================================================
 
@@ -151,6 +252,12 @@ export {
   type VectorSearchOptions,
   type HybridSearchOptions,
   type EmbedFunction,
+  // Embedding Cache
+  createEmbeddingCache,
+  DEFAULT_EMBEDDING_CACHE_CONFIG,
+  type EmbeddingCacheInstance,
+  type EmbeddingCacheConfig,
+  type EmbeddingCacheEntry,
 } from '@agent-stack/memory-store-sqlite';
 
 // Errors

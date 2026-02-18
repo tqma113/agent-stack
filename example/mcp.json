@@ -19,10 +19,6 @@
       "command": "npx",
       "args": ["-y", "@agent-stack-mcp/git"],
       "env": {}
-    },
-    "openaiDeveloperDocs": {
-      "type": "http",
-      "url": "https://developers.openai.com/mcp"
     }
   }
 }

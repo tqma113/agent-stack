@@ -16,7 +16,7 @@ import { MCPConfigurationError } from './types';
 /**
  * Default configuration file names to search for
  */
-export const CONFIG_FILE_NAMES = ['mcp.json', '.mcp.json'];
+export const CONFIG_FILE_NAMES = ['mcp.json'];
 
 /**
  * Load MCP configuration from a file path

@@ -269,7 +269,16 @@ packages/libs/memory-store-sqlite/
 │       ├── task-state.ts      # createTaskStateStore()
 │       ├── summary.ts         # createSummaryStore()
 │       ├── profile.ts         # createProfileStore()
-│       └── semantic.ts        # createSemanticStore()
+│       ├── semantic.ts        # createSemanticStore()
+│       └── embedding-cache.ts # createEmbeddingCache() - 嵌入向量缓存
+├── tests/
+│   └── stores/
+│       ├── event.test.ts
+│       ├── task-state.test.ts
+│       ├── summary.test.ts
+│       ├── profile.test.ts
+│       ├── semantic.test.ts
+│       └── embedding-cache.test.ts
 ├── dist/
 ├── package.json
 └── tsup.config.ts
@@ -344,6 +353,7 @@ packages/libs/memory/
 ├── src/
 │   ├── index.ts               # 包入口
 │   ├── types.ts               # Legacy 类型 (向后兼容)
+│   ├── errors.ts              # 错误类定义
 │   ├── stores-interface.ts    # MemoryStores 聚合接口
 │   ├── policy/                # 策略层
 │   │   ├── index.ts           # 策略导出
@@ -356,12 +366,47 @@ packages/libs/memory/
 │   │   ├── index.ts           # 规则导出
 │   │   ├── rule-engine.ts     # createRuleEngine()
 │   │   └── default-rules.ts   # 默认规则配置
+│   ├── ranking/               # 搜索结果排序 (NEW)
+│   │   ├── index.ts           # 排序模块导出
+│   │   ├── temporal-decay.ts  # applyTemporalDecay() 时间衰减
+│   │   ├── mmr.ts             # applyMMR() 多样性去重
+│   │   └── pipeline.ts        # createRankingPipeline() 组合管道
+│   ├── compaction/            # Context Compaction (NEW)
+│   │   ├── index.ts           # Compaction 模块导出
+│   │   ├── memory-flush.ts    # createMemoryFlush() Flush 触发
+│   │   └── compaction-manager.ts # createCompactionManager() 完整管理
+│   ├── transcript/            # 会话转录 (NEW)
+│   │   ├── index.ts           # Transcript 模块导出
+│   │   ├── session-transcript.ts # createSessionTranscript() JSONL 存储
+│   │   └── transcript-indexer.ts # createTranscriptIndexer() 索引器
+│   ├── pipeline/              # 统一读写管道 (NEW)
+│   │   ├── index.ts           # Pipeline 模块导出
+│   │   └── memory-pipeline.ts # createMemoryPipeline() 完整流程
 │   ├── observer.ts            # 事件创建辅助
 │   ├── injector.ts            # 模板注入
 │   ├── summarizer.ts          # 摘要生成
+│   ├── retriever.ts           # 检索器
+│   ├── budgeter.ts            # Token 预算管理
+│   ├── write-policy.ts        # 写入策略
 │   ├── state-reducer.ts       # 任务状态 Reducer
 │   └── manager.ts             # createMemoryManager() (接受注入的 stores)
 ├── tests/
+│   ├── state-reducer.test.ts
+│   ├── write-policy.test.ts
+│   ├── ranking/
+│   │   ├── temporal-decay.test.ts
+│   │   ├── mmr.test.ts
+│   │   └── pipeline.test.ts
+│   ├── compaction/
+│   │   ├── memory-flush.test.ts
+│   │   └── compaction-manager.test.ts
+│   ├── transcript/
+│   │   ├── session-transcript.test.ts
+│   │   └── transcript-indexer.test.ts
+│   ├── pipeline/
+│   │   └── memory-pipeline.test.ts
+│   └── integration/
+│       └── regression.test.ts
 ├── dist/
 ├── package.json
 └── vitest.config.ts

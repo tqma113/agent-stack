@@ -4,20 +4,55 @@
 
 import { existsSync, readFileSync } from 'fs';
 import { resolve, dirname, join } from 'path';
-import type { AgentConfig, AgentMCPConfig, AgentSkillConfig } from './types';
+import type { AgentConfig, AgentMCPConfig, AgentSkillConfig, AgentMemoryConfig } from './types';
 
 /**
  * Configuration file names to search for (in order of priority)
  */
 const CONFIG_FILE_NAMES = [
   'agent-stack.json',
-  '.agent-stack.json',
-  'agent-stack.config.json',
 ];
 
 /**
  * Agent Stack configuration file format
  */
+/**
+ * Memory configuration section
+ */
+export interface MemoryConfigSection {
+  /** Whether to enable memory */
+  enabled?: boolean;
+  /** Database file path (default: '.agent-stack/memory.db') */
+  dbPath?: string;
+  /** Whether to auto-initialize on first chat (default: true) */
+  autoInitialize?: boolean;
+  /** Whether to auto-inject memory context into prompts (default: true) */
+  autoInject?: boolean;
+  /** Token budget configuration */
+  tokenBudget?: {
+    profile?: number;
+    taskState?: number;
+    recentEvents?: number;
+    semanticChunks?: number;
+    summary?: number;
+    total?: number;
+  };
+  /** Write policy configuration */
+  writePolicy?: {
+    autoSummarize?: boolean;
+    summarizeEveryNEvents?: number;
+    conflictStrategy?: 'latest' | 'confidence' | 'explicit' | 'manual';
+  };
+  /** Retrieval configuration */
+  retrieval?: {
+    maxRecentEvents?: number;
+    maxSemanticChunks?: number;
+    enableSemanticSearch?: boolean;
+  };
+  /** Enable debug logging */
+  debug?: boolean;
+}
+
 export interface AgentStackConfig {
   /** LLM model to use */
   model?: string;
@@ -35,6 +70,8 @@ export interface AgentStackConfig {
   skill?: SkillConfigSection;
   /** MCP configuration */
   mcp?: MCPConfigSection;
+  /** Memory configuration */
+  memory?: MemoryConfigSection;
   /** Security settings */
   security?: SecurityConfigSection;
 }
@@ -60,7 +97,7 @@ export interface SkillConfigSection {
  * MCP configuration section
  */
 export interface MCPConfigSection {
-  /** Path to MCP config file (e.g., '.mcp.json') */
+  /** Path to MCP config file (e.g., 'mcp.json') */
   configPath?: string;
   /** Whether to auto-connect MCP servers */
   autoConnect?: boolean;
@@ -218,6 +255,44 @@ export function toAgentConfig(stackConfig: AgentStackConfig, baseDir?: string): 
     agentConfig.mcp = mcpConfig;
   }
 
+  // Convert Memory config
+  if (stackConfig.memory) {
+    const memoryConfig: AgentMemoryConfig = {
+      enabled: stackConfig.memory.enabled,
+      autoInitialize: stackConfig.memory.autoInitialize,
+      autoInject: stackConfig.memory.autoInject,
+      debug: stackConfig.memory.debug,
+    };
+
+    // Resolve dbPath relative to config file
+    if (stackConfig.memory.dbPath) {
+      memoryConfig.dbPath = baseDir
+        ? resolve(baseDir, stackConfig.memory.dbPath)
+        : stackConfig.memory.dbPath;
+    }
+
+    // Copy token budget if provided
+    if (stackConfig.memory.tokenBudget) {
+      memoryConfig.tokenBudget = stackConfig.memory.tokenBudget;
+    }
+
+    // Copy write policy if provided
+    if (stackConfig.memory.writePolicy) {
+      memoryConfig.writePolicy = stackConfig.memory.writePolicy;
+    }
+
+    // Copy retrieval config if provided
+    if (stackConfig.memory.retrieval) {
+      memoryConfig.retrieval = {
+        maxRecentEvents: stackConfig.memory.retrieval.maxRecentEvents,
+        maxSemanticChunks: stackConfig.memory.retrieval.maxSemanticChunks,
+      };
+      memoryConfig.enableSemanticSearch = stackConfig.memory.retrieval.enableSemanticSearch;
+    }
+
+    agentConfig.memory = memoryConfig;
+  }
+
   return agentConfig;
 }
 
@@ -235,8 +310,14 @@ export function generateConfigTemplate(): AgentStackConfig {
       autoLoad: true,
     },
     mcp: {
-      configPath: '.mcp.json',
+      configPath: 'mcp.json',
       autoConnect: true,
+    },
+    memory: {
+      enabled: true,
+      dbPath: '.agent-stack/memory.db',
+      autoInitialize: true,
+      autoInject: true,
     },
     security: {
       confirmDangerousCommands: true,

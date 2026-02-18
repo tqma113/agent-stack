@@ -1,0 +1,11 @@
+# Runtime data
+.agent-stack/
+
+# Environment
+.env.local
+
+# Node
+node_modules/
+
+# Logs
+*.log

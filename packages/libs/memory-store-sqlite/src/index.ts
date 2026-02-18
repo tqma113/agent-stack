@@ -49,6 +49,12 @@ export {
   type VectorSearchOptions,
   type HybridSearchOptions,
   type EmbedFunction,
+  // Embedding Cache
+  createEmbeddingCache,
+  DEFAULT_EMBEDDING_CACHE_CONFIG,
+  type EmbeddingCacheInstance,
+  type EmbeddingCacheConfig,
+  type EmbeddingCacheEntry,
 } from './stores/index.js';
 
 // Errors

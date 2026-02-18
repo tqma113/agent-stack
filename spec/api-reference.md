@@ -1686,6 +1686,37 @@ export {
   createSummaryStore,
   createProfileStore,
   createSemanticStore,
+  createEmbeddingCache,
+
+  // Ranking 模块
+  applyTemporalDecay,
+  createTemporalDecayProcessor,
+  calculateExponentialDecay,
+  calculateLinearDecay,
+  calculateStepDecay,
+  getTemporalDecayStats,
+  applyMMR,
+  createMMRProcessor,
+  needsDiversityReranking,
+  getMMRStats,
+  jaccardSimilarity,
+  overlapSimilarity,
+  cosineSimilarity,
+  createRankingPipeline,
+
+  // Compaction 模块
+  createMemoryFlush,
+  createCompactionManager,
+  parseLLMFlushResponse,
+
+  // Transcript 模块
+  createSessionTranscript,
+  formatTranscript,
+  createTranscriptIndexer,
+  createDebouncer,
+
+  // Pipeline 模块
+  createMemoryPipeline,
 
   // Instance 类型
   type MemoryManagerInstance,
@@ -1700,6 +1731,7 @@ export {
   type SummaryStoreInstance,
   type ProfileStoreInstance,
   type SemanticStoreInstance,
+  type EmbeddingCacheInstance,
 
   // 错误类
   MemoryError,
@@ -1744,6 +1776,48 @@ export {
   type TokenCount,
   type Confidence,
   type ConflictStrategy,
+  // Ranking 类型
+  type TemporalDecayConfig,
+  type DecayedSearchResult,
+  type TemporalDecayStats,
+  type MMRConfig,
+  type MMRSearchResult,
+  type MMRStats,
+  type RankingPipelineConfig,
+  type EmbeddingCacheConfig,
+  type EmbeddingCacheEntry,
+  // Compaction 类型
+  type MemoryFlushConfig,
+  type FlushCheckResult,
+  type FlushContent,
+  type FlushResult,
+  type FlushTriggerReason,
+  type IMemoryFlush,
+  type CompactionConfig,
+  type CompactionState,
+  type CompactionResult,
+  type ICompactionManager,
+  // Transcript 类型
+  type ISessionTranscript,
+  type TranscriptEntry,
+  type TranscriptContent,
+  type TranscriptMetadata,
+  type TranscriptSearchOptions,
+  type TranscriptSearchResult,
+  type TranscriptChunk,
+  type ITranscriptIndexer,
+  type TranscriptIndexerConfig,
+  type IndexedTranscript,
+  type SyncResult,
+  // Pipeline 类型
+  type IMemoryPipeline,
+  type WritePipelineConfig,
+  type ReadPipelineConfig,
+  type WriteInput,
+  type WriteResult,
+  type ReadInput,
+  type ReadResult,
+  type PipelineStores,
 
   // 常量
   PROFILE_KEYS,
@@ -1751,5 +1825,14 @@ export {
   DEFAULT_WRITE_POLICY,
   DEFAULT_RETRIEVAL_CONFIG,
   DEFAULT_MEMORY_CONFIG,
+  DEFAULT_TEMPORAL_DECAY_CONFIG,
+  DEFAULT_MMR_CONFIG,
+  DEFAULT_EMBEDDING_CACHE_CONFIG,
+  DEFAULT_MEMORY_FLUSH_CONFIG,
+  DEFAULT_COMPACTION_CONFIG,
+  DEFAULT_FLUSH_PROMPT,
+  DEFAULT_INDEXER_CONFIG,
+  DEFAULT_WRITE_CONFIG,
+  DEFAULT_READ_CONFIG,
 };
 ```

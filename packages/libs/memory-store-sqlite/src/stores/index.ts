@@ -41,3 +41,12 @@ export {
   type HybridSearchOptions,
   type EmbedFunction,
 } from './semantic.js';
+
+// Embedding Cache
+export {
+  createEmbeddingCache,
+  DEFAULT_EMBEDDING_CACHE_CONFIG,
+  type EmbeddingCacheInstance,
+  type EmbeddingCacheConfig,
+  type EmbeddingCacheEntry,
+} from './embedding-cache.js';

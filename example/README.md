@@ -9,7 +9,7 @@ This directory contains example configurations and skills for agent-stack.
 npm install -g @agent-stack/index
 
 # Go to examples directory
-cd examples
+cd example
 
 # Start interactive chat
 agent-stack chat
@@ -21,9 +21,11 @@ agent-stack run "List the files in this directory"
 ## Directory Structure
 
 ```
-examples/
+example/
 ├── .agent-stack.json   # Agent configuration
 ├── .mcp.json           # MCP server configuration
+├── .agent-stack/       # Runtime data (auto-created)
+│   └── memory.db       # SQLite memory database
 ├── skills/             # Example skills
 │   ├── file-skill/     # File operations
 │   ├── shell-skill/    # Shell commands
@@ -49,6 +51,12 @@ Main agent configuration:
   "mcp": {
     "configPath": "./.mcp.json",
     "autoConnect": true
+  },
+  "memory": {
+    "enabled": true,
+    "dbPath": "./.agent-stack/memory.db",
+    "autoInitialize": true,
+    "autoInject": true
   }
 }
 ```
@@ -63,6 +71,18 @@ MCP server configuration (compatible with Claude Code format):
     "filesystem": {
       "command": "npx",
       "args": ["-y", "@modelcontextprotocol/server-filesystem", "."]
+    },
+    "fetch": {
+      "command": "npx",
+      "args": ["-y", "@agent-stack-mcp/fetch"]
+    },
+    "time": {
+      "command": "npx",
+      "args": ["-y", "@agent-stack-mcp/time"]
+    },
+    "git": {
+      "command": "npx",
+      "args": ["-y", "@agent-stack-mcp/git"]
     }
   }
 }
@@ -93,6 +113,58 @@ Search for files and content.
 **Tools:**
 - `search_files` - Find files by glob pattern
 - `grep_content` - Search text in files
+
+### memory-skill (@agent-stack-skill/memory)
+
+Persistent memory across conversations.
+
+**Tools:**
+- `search` - Search memory across layers (events, profiles, semantic, summaries, tasks)
+- `upsert` - Create or update memory entries
+- `delete` - Delete memory entries
+
+## Memory System
+
+The agent has a persistent memory system with five layers:
+
+| Layer | Purpose | Priority |
+|-------|---------|----------|
+| Profile | User preferences (language, format) | Highest |
+| TaskState | Current task (goal, plan, progress) | High |
+| Summary | Rolling summary (decisions, todos) | Medium |
+| Events | Event log (messages, tool calls) | Low |
+| Semantic | Searchable chunks (FTS + vector) | Lowest |
+
+### Memory Configuration
+
+```json
+{
+  "memory": {
+    "enabled": true,
+    "dbPath": "./.agent-stack/memory.db",
+    "autoInitialize": true,
+    "autoInject": true,
+    "tokenBudget": {
+      "profile": 200,
+      "taskState": 300,
+      "recentEvents": 500,
+      "semanticChunks": 800,
+      "summary": 400,
+      "total": 2200
+    },
+    "writePolicy": {
+      "autoSummarize": true,
+      "summarizeEveryNEvents": 20,
+      "conflictStrategy": "latest"
+    },
+    "retrieval": {
+      "maxRecentEvents": 10,
+      "maxSemanticChunks": 5,
+      "enableSemanticSearch": true
+    }
+  }
+}
+```
 
 ## CLI Commands
 
@@ -126,9 +198,29 @@ See `skills/` directory for examples.
 
 Try these with `agent-stack chat`:
 
+### Basic Operations
 - "List the files in this directory"
 - "Read the README.md file"
 - "Create a file called hello.txt with 'Hello World'"
 - "Find all JSON files"
 - "Search for 'agent' in the skill files"
-- "What is the current date?"
+
+### Memory Operations
+- "Remember that my preferred language is Chinese"
+- "What do you remember about my preferences?"
+- "Search your memory for information about skills"
+- "Forget my language preference"
+
+### Time Operations
+- "What is the current time?"
+- "What time is it in Tokyo?"
+- "Convert 3pm New York time to London time"
+
+### Git Operations
+- "Show the git status"
+- "Show recent commits"
+- "What changes were made in the last commit?"
+
+### Web Operations
+- "Fetch the content from https://example.com"
+- "Search the OpenAI documentation for embeddings"

@@ -924,3 +924,349 @@ await agent.close();  // 关闭所有资源 (MCP, Skill, Memory)
   }
 }
 ```
+
+### 9.5 搜索结果排序
+
+Memory 系统提供搜索结果后处理管道：
+
+#### 9.5.1 嵌入缓存
+
+避免重复计算嵌入向量，减少 API 调用：
+
+```typescript
+// 配置
+{
+  "embeddingCache": {
+    "enabled": true,
+    "maxEntries": 50000,
+    "ttlMs": 604800000  // 7 天
+  }
+}
+
+// 缓存键: hash(text) + provider + model
+// 支持批量操作: getBatch, setBatch
+```
+
+#### 9.5.2 时间衰减
+
+优先返回最近的内容：
+
+```typescript
+import { applyTemporalDecay, createRankingPipeline } from '@agent-stack/memory';
+
+// 公式: score × e^(-λ × ageInDays)
+// λ = ln(2) / halfLifeDays
+
+const decayed = applyTemporalDecay(results, {
+  enabled: true,
+  halfLifeDays: 30,        // 30 天后分数减半
+  minMultiplier: 0.1,      // 最低保留 10% 分数
+  decayType: 'exponential' // 或 'linear', 'step'
+});
+```
+
+#### 9.5.3 MMR 多样性去重
+
+避免返回相似内容：
+
+```typescript
+import { applyMMR } from '@agent-stack/memory';
+
+// 公式: MMR = λ × relevance - (1-λ) × max_similarity_to_selected
+
+const diverse = applyMMR(results, 10, {
+  enabled: true,
+  lambda: 0.7,              // 0.7 relevance, 0.3 diversity
+  similarityFunction: 'jaccard',
+  duplicateThreshold: 0.8,  // 相似度超过 0.8 视为重复
+  useEmbeddings: true       // 优先使用向量相似度
+});
+```
+
+#### 9.5.4 组合管道
+
+```typescript
+import { createRankingPipeline, rankResults } from '@agent-stack/memory';
+
+// 方式 1: 快速使用
+const ranked = rankResults(results, {
+  limit: 10,
+  temporalDecay: { halfLifeDays: 30 },
+  mmr: { lambda: 0.7 },
+  minScore: 0.1
+});
+
+// 方式 2: 可复用管道
+const pipeline = createRankingPipeline({
+  temporalDecay: { enabled: true, halfLifeDays: 30 },
+  mmr: { enabled: true, lambda: 0.7 },
+  limit: 10,
+  minScore: 0.1
+});
+
+const result = pipeline(searchResults);
+// result.results: 排序后的结果
+// result.metadata: { temporalDecayApplied, mmrApplied, filteredCount, ... }
+```
+
+### 9.6 Context Compaction 自动 Memory Flush
+
+在接近上下文窗口限制时，自动将重要内容持久化到长期记忆：
+
+#### 9.6.1 Memory Flush
+
+```typescript
+import { createMemoryFlush } from '@agent-stack/memory';
+
+const flush = createMemoryFlush({
+  enabled: true,
+  softThresholdTokens: 4000,   // 触发 flush 的软阈值
+  hardThresholdTokens: 8000,   // 强制 flush 的硬阈值
+  minEventsSinceFlush: 5,      // 最少事件数
+  includeSummary: true,
+});
+
+// 检查是否需要 flush
+const check = flush.checkFlush(currentTokens, eventsSinceFlush);
+if (check.shouldFlush) {
+  console.log(`Flush needed: ${check.reason}, urgency: ${check.urgency}`);
+}
+
+// 提取要保存的内容
+const content = await flush.extractFlushContent(events, { sessionId });
+// content: { decisions, facts, todos, preferences, summary, chunks }
+```
+
+#### 9.6.2 Compaction Manager
+
+完整的 compaction 管理：
+
+```typescript
+import { createCompactionManager } from '@agent-stack/memory';
+
+const compaction = createCompactionManager({
+  flush: { softThresholdTokens: 4000, hardThresholdTokens: 8000 },
+  maxContextTokens: 128000,
+  reserveTokens: 4000,
+  autoCompact: true,
+  onCompaction: (result) => {
+    console.log(`Compacted: ${result.tokensBefore} → ${result.tokensAfter}`);
+  },
+});
+
+// 每轮更新 token 使用量
+compaction.updateTokenCount(tokenUsage);
+
+// 记录事件
+compaction.recordEvent(event);
+
+// 检查上下文健康状态
+const health = compaction.checkHealth();
+// { healthy, usage, remaining, urgency, recommendation }
+
+// 自动判断是否需要 compaction
+if (compaction.shouldCompact()) {
+  const result = await compaction.compact(events, {
+    sessionId,
+    writeChunks: (chunks) => semanticStore.addBatch(chunks),
+    createSummary: (content) => summaryStore.add(content),
+  });
+}
+```
+
+#### 9.6.3 LLM 辅助提取
+
+可以使用 LLM 进行更智能的内容提取：
+
+```typescript
+const compaction = createCompactionManager({
+  llmExtractor: async (events, prompt) => {
+    const response = await agent.complete(prompt + '\n\nEvents:\n' +
+      events.map(e => e.summary).join('\n'));
+    return response;
+  },
+});
+```
+
+#### 9.6.4 健康检查建议
+
+| 使用率 | 建议 | 操作 |
+|--------|------|------|
+| < 60% | `none` | 正常运行 |
+| 60-80% | `flush_soon` | 准备 flush |
+| 80-95% | `flush_now` | 立即 flush |
+| > 95% | `critical` | 强制 compaction |
+
+### 9.7 会话转录索引
+
+将会话对话存储为 JSONL 格式并索引到语义存储：
+
+#### 9.7.1 Session Transcript
+
+```typescript
+import { createSessionTranscript, formatTranscript } from '@agent-stack/memory';
+
+const transcript = createSessionTranscript('session-123');
+
+// 从 MemoryEvent 追加
+transcript.appendFromEvent(userMessageEvent);
+transcript.appendFromEvent(assistantMessageEvent);
+
+// 序列化为 JSONL
+const jsonl = transcript.toJSONL();
+// {"type":"message","timestamp":1234,"message":{"role":"user","content":"Hello"}}
+// {"type":"message","timestamp":1235,"message":{"role":"assistant","content":"Hi!"}}
+
+// 生成索引块
+const chunks = transcript.generateChunks({
+  maxTokensPerChunk: 400,
+  overlapTokens: 80,
+});
+
+// 格式化显示
+console.log(formatTranscript(transcript.getEntries()));
+// [USER]: Hello
+// [ASSISTANT]: Hi!
+```
+
+#### 9.7.2 Transcript Indexer
+
+```typescript
+import { createTranscriptIndexer } from '@agent-stack/memory';
+
+const indexer = createTranscriptIndexer(semanticStore, {
+  watchEnabled: true,
+  watchDebounceMs: 1500,
+  chunkTokens: 400,
+  overlapTokens: 80,
+});
+
+// 索引单个转录
+const result = await indexer.indexTranscript(transcript);
+// { success, chunksAdded, chunksRemoved, durationMs }
+
+// 批量同步
+await indexer.syncAll(transcripts, {
+  force: false,
+  progress: (current, total) => console.log(`${current}/${total}`),
+});
+
+// 搜索转录
+const results = await indexer.searchTranscripts('TypeScript', {
+  sessionIds: ['session-1', 'session-2'],
+  roles: ['user', 'assistant'],
+  limit: 10,
+});
+```
+
+### 9.8 完整读写流程管道
+
+统一的读写流程，集成所有功能：
+
+#### 9.8.1 写入流程
+
+```
+Agent 调用 → Write Pipeline
+    │
+    ├─ 1. 内容提取 (Event/Chunk/Transcript/Flush)
+    │
+    ├─ 2. 自动分块 (400 tokens, 80 overlap)
+    │
+    ├─ 3. 生成嵌入 (如果 embedFunction 可用)
+    │
+    └─ 4. 存储索引 (SemanticStore)
+```
+
+```typescript
+import { createMemoryPipeline } from '@agent-stack/memory';
+
+const pipeline = createMemoryPipeline(stores, {
+  embedFunction: async (text) => openai.embed(text),
+});
+
+// 写入内容
+const writeResult = await pipeline.write({
+  type: 'chunk',              // 'event' | 'chunk' | 'transcript' | 'flush'
+  content: 'TypeScript is a typed superset of JavaScript.',
+  sessionId: 'session-123',
+  tags: ['programming'],
+});
+// { success, chunks, chunkCount, embeddingsGenerated, durationMs }
+```
+
+#### 9.8.2 读取流程
+
+```
+查询 → Read Pipeline
+    │
+    ├─ 1. 混合搜索 (FTS + Vector)
+    │
+    ├─ 2. 结果合并 (fts: 0.3, vector: 0.7)
+    │
+    ├─ 3. 时间衰减 (halfLife: 30 days)
+    │
+    ├─ 4. MMR 去重 (lambda: 0.7)
+    │
+    └─ 5. 返回片段 (snippet + metadata)
+```
+
+```typescript
+const readResult = await pipeline.read({
+  query: 'TypeScript programming',
+  sessionId: 'session-123',
+  limit: 10,
+});
+
+// readResult.results[0]:
+// {
+//   chunk: SemanticChunk,
+//   score: 0.85,
+//   matchType: 'hybrid',
+//   snippet: '...TypeScript is a typed superset...',
+//   metadata: { originalScore, decayedScore, mmrScore, ageInDays }
+// }
+
+// readResult.stages: { fts: true, vector: true, temporalDecay: true, mmr: true }
+```
+
+#### 9.8.3 Pipeline 配置
+
+```typescript
+// 写入配置
+pipeline.setWriteConfig({
+  autoChunk: true,
+  chunkTokens: 400,
+  overlapTokens: 80,
+  autoEmbed: true,
+  minContentLength: 20,
+});
+
+// 读取配置
+pipeline.setReadConfig({
+  hybridSearch: true,
+  ftsWeight: 0.3,
+  vectorWeight: 0.7,
+  temporalDecay: true,
+  temporalDecayConfig: { halfLifeDays: 30 },
+  mmrEnabled: true,
+  mmrConfig: { lambda: 0.7 },
+  maxResults: 10,
+  minScore: 0.1,
+});
+```
+
+#### 9.8.4 一体化操作
+
+```typescript
+// 写入后立即检索 (RAG 场景)
+const { write, read } = await pipeline.writeAndRead(
+  { type: 'chunk', content: newDocument, sessionId },
+  { query: userQuestion }
+);
+
+// 索引转录
+await pipeline.indexTranscript(transcript);
+
+// 处理 Flush 内容
+await pipeline.processFlush(flushContent, sessionId);
+```
