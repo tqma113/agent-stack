@@ -60,6 +60,8 @@ export interface AgentStackConfig {
   temperature?: number;
   /** Maximum tokens in response */
   maxTokens?: number;
+  /** Maximum tool call iterations per conversation turn (default: 10) */
+  maxIterations?: number;
   /** System prompt for the agent */
   systemPrompt?: string;
   /** OpenAI API key (prefer env var OPENAI_API_KEY) */
@@ -119,6 +121,8 @@ export interface LoadConfigResult {
   config: AgentStackConfig;
   /** Path to the configuration file (if found) */
   configPath?: string;
+  /** Max iterations for tool calls */
+  maxIterations?: number;
 }
 
 /**
@@ -177,17 +181,21 @@ export function loadConfigFile(configPath: string): AgentStackConfig {
 export function loadConfig(configPath?: string): LoadConfigResult {
   if (configPath) {
     const absolutePath = resolve(configPath);
+    const config = loadConfigFile(absolutePath);
     return {
-      config: loadConfigFile(absolutePath),
+      config,
       configPath: absolutePath,
+      maxIterations: config.maxIterations,
     };
   }
 
   const foundPath = findConfigFile();
   if (foundPath) {
+    const config = loadConfigFile(foundPath);
     return {
-      config: loadConfigFile(foundPath),
+      config,
       configPath: foundPath,
+      maxIterations: config.maxIterations,
     };
   }
 

@@ -123,6 +123,20 @@ Persistent memory across conversations.
 - `upsert` - Create or update memory entries
 - `delete` - Delete memory entries
 
+### knowledge-skill (@ai-stack-skill/knowledge)
+
+Code and documentation search with hybrid FTS + vector retrieval.
+
+**Tools:**
+- `search_code` - Search code with language/symbol filters
+- `search_docs` - Search indexed documentation
+- `index_code` - Trigger code re-indexing
+- `add_doc_source` - Add a documentation URL to index
+- `remove_doc_source` - Remove a documentation source
+- `list_doc_sources` - List all documentation sources
+- `crawl_docs` - Crawl and index documentation
+- `get_knowledge_stats` - Get indexing statistics
+
 ## Memory System
 
 The agent has a persistent memory system with five layers:
@@ -162,6 +176,50 @@ The agent has a persistent memory system with five layers:
       "maxSemanticChunks": 5,
       "enableSemanticSearch": true
     }
+  }
+}
+```
+
+## Knowledge System
+
+The agent includes a code and documentation indexing system with hybrid FTS + vector search:
+
+| Feature | Description |
+|---------|-------------|
+| Code Indexing | AST-aware chunking for TypeScript/JavaScript |
+| Doc Indexing | Crawl URLs, sitemaps, GitHub repos |
+| Hybrid Search | Full-text + vector similarity |
+| Auto Inject | Relevant context injected into prompts |
+
+### Knowledge Configuration
+
+```json
+{
+  "knowledge": {
+    "enabled": true,
+    "code": {
+      "enabled": true,
+      "rootDir": ".",
+      "extensions": [".ts", ".js", ".json", ".md"],
+      "excludePatterns": ["node_modules/**", "dist/**"]
+    },
+    "doc": {
+      "enabled": true,
+      "sources": [
+        {
+          "name": "OpenAI Docs",
+          "url": "https://platform.openai.com/docs",
+          "type": "sitemap"
+        }
+      ]
+    },
+    "search": {
+      "autoSearch": true,
+      "autoInject": true,
+      "minScore": 0.3,
+      "maxResults": 5
+    },
+    "autoInitialize": true
   }
 }
 ```
@@ -224,3 +282,11 @@ Try these with `ai-stack chat`:
 ### Web Operations
 - "Fetch the content from https://example.com"
 - "Search the OpenAI documentation for embeddings"
+
+### Knowledge Operations
+- "Index the codebase"
+- "Search the code for agent implementation"
+- "Find all functions related to memory"
+- "Add the OpenAI docs as a documentation source"
+- "Show knowledge statistics"
+- "Search docs for how to use embeddings"

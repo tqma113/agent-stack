@@ -40,6 +40,7 @@
     "@ai-stack/skill": "workspace:*",
     "@ai-stack/memory": "workspace:*",
     "@ai-stack/memory-store-sqlite": "workspace:*",
+    "@ai-stack/knowledge": "workspace:*",
     "boxen": "^8.0.1",
     "chalk": "^5.4.0",
     "cli-truncate": "^4.0.0",

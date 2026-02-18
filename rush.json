@@ -365,8 +365,16 @@
       "projectFolder": "packages/libs/memory-store-json"
     },
     {
+      "packageName": "@ai-stack/knowledge",
+      "projectFolder": "packages/libs/knowledge"
+    },
+    {
       "packageName": "@ai-stack-skill/memory",
       "projectFolder": "packages/skills/memory"
+    },
+    {
+      "packageName": "@ai-stack-skill/knowledge",
+      "projectFolder": "packages/skills/knowledge"
     },
     {
       "packageName": "@ai-stack-example/agent",

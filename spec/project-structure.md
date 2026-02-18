@@ -443,7 +443,122 @@ await memory.initialize();
 
 ---
 
-## 7. Skills 目录 (@ai-stack-skill/*)
+## 7. @ai-stack/knowledge 包 (知识索引)
+
+Knowledge 包提供代码库和外部文档的索引能力，复用 Memory 系统的 SemanticStore 作为存储层。
+
+### 7.1 目录结构
+
+```
+packages/libs/knowledge/
+├── src/
+│   ├── index.ts                    # 包入口
+│   ├── types.ts                    # 类型定义
+│   ├── errors.ts                   # 错误类
+│   ├── manager.ts                  # createKnowledgeManager() 统一管理
+│   │
+│   ├── code/                       # 代码索引模块
+│   │   ├── index.ts                # 模块导出
+│   │   ├── indexer.ts              # createCodeIndexer() 代码索引器
+│   │   ├── chunker.ts              # 代码切分策略
+│   │   ├── watcher.ts              # 文件监听 + 增量更新
+│   │   └── languages/              # 语言特定解析器
+│   │       ├── index.ts            # 解析器注册表
+│   │       ├── typescript.ts       # TypeScript/JavaScript 解析
+│   │       └── generic.ts          # 通用文本/Markdown/JSON 解析
+│   │
+│   ├── doc/                        # 文档索引模块
+│   │   ├── index.ts                # 模块导出
+│   │   ├── indexer.ts              # createDocIndexer() 文档索引器
+│   │   ├── crawler.ts              # URL 爬取
+│   │   ├── parser.ts               # HTML → Markdown
+│   │   └── registry.ts             # 文档源管理
+│   │
+│   └── retriever/                  # 统一检索
+│       ├── index.ts                # 模块导出
+│       └── hybrid-search.ts        # 混合搜索 + Reranking
+│
+├── tests/
+├── dist/
+├── package.json
+├── tsconfig.json
+└── tsup.config.ts
+```
+
+### 7.2 核心功能
+
+| 模块 | 功能 | 说明 |
+|------|------|------|
+| CodeIndexer | 代码索引 | AST 解析、智能切分、文件监听 |
+| DocIndexer | 文档索引 | URL 爬取、HTML 解析、章节提取 |
+| HybridSearch | 混合搜索 | FTS + Vector + 时间衰减 + MMR |
+| KnowledgeManager | 统一管理 | 协调代码和文档索引 |
+
+### 7.3 package.json
+
+```json
+{
+  "name": "@ai-stack/knowledge",
+  "version": "0.0.1",
+  "dependencies": {
+    "@ai-stack/memory-store-sqlite": "workspace:*",
+    "@ai-stack/memory": "workspace:*",
+    "node-html-markdown": "^1.3.0",
+    "glob": "^11.0.0",
+    "chokidar": "^4.0.0"
+  }
+}
+```
+
+### 7.4 使用示例
+
+```typescript
+import { createKnowledgeManager } from '@ai-stack/knowledge';
+import { createSqliteStores } from '@ai-stack/memory-store-sqlite';
+
+// 创建存储
+const stores = await createSqliteStores({ dbPath: './knowledge.db' });
+
+// 创建知识管理器
+const knowledge = createKnowledgeManager({
+  code: {
+    enabled: true,
+    rootDir: './src',
+    include: ['**/*.ts', '**/*.tsx'],
+    watch: true,
+  },
+  doc: {
+    enabled: true,
+  },
+});
+
+// 设置存储
+knowledge.setStore(stores.semantic);
+await knowledge.initialize();
+
+// 索引代码
+await knowledge.indexCode();
+
+// 添加文档源并抓取
+await knowledge.addDocSource({
+  name: 'React Docs',
+  type: 'url',
+  url: 'https://react.dev/reference/react',
+  tags: ['react'],
+  enabled: true,
+});
+await knowledge.crawlDocs();
+
+// 统一搜索
+const results = await knowledge.search('useEffect cleanup', {
+  sources: ['code', 'doc'],
+  limit: 10,
+});
+```
+
+---
+
+## 8. Skills 目录 (@ai-stack-skill/*)
 
 自定义 Skills 使用独立的包前缀 `@ai-stack-skill/*`。
 
@@ -490,7 +605,52 @@ packages/skills/memory/
 
 ---
 
-### 7.2 五层记忆架构
+### 8.2 @ai-stack-skill/knowledge (Knowledge Skill)
+
+```
+packages/skills/knowledge/
+├── skill.json                 # Skill 定义文件
+├── handlers.cjs               # 编译后的处理函数
+├── src/
+│   ├── handlers.ts            # 工具实现
+│   └── store-context.ts       # 知识库连接管理
+├── scripts/
+│   └── copy-handlers.js       # 构建脚本
+├── dist/
+└── package.json
+```
+
+**skill.json 工具定义**:
+```json
+{
+  "name": "knowledge",
+  "version": "1.0.0",
+  "tools": [
+    { "name": "search_code", "description": "Search code...", "handler": "./handlers.cjs#searchCode" },
+    { "name": "search_docs", "description": "Search docs...", "handler": "./handlers.cjs#searchDocs" },
+    { "name": "index_code", "description": "Index codebase...", "handler": "./handlers.cjs#indexCode" },
+    { "name": "add_doc_source", "description": "Add doc source...", "handler": "./handlers.cjs#addDocSource" },
+    { "name": "crawl_docs", "description": "Crawl docs...", "handler": "./handlers.cjs#crawlDocs" },
+    { "name": "get_knowledge_stats", "description": "Get stats...", "handler": "./handlers.cjs#getStats" }
+  ]
+}
+```
+
+**package.json**:
+```json
+{
+  "name": "@ai-stack-skill/knowledge",
+  "version": "0.0.1",
+  "dependencies": {
+    "@ai-stack/knowledge": "workspace:*",
+    "@ai-stack/memory-store-sqlite": "workspace:*"
+  }
+}
+```
+
+---
+
+### 8.3 五层记忆架构
 
 | 层级 | 工厂函数 | 用途 | 优先级 |
 |------|----------|------|--------|
@@ -528,7 +688,7 @@ if (writeDecision.shouldWrite) {
 
 ---
 
-## 8. MCP 服务器 (packages/mcp-servers/)
+## 9. MCP 服务器 (packages/mcp-servers/)
 
 自定义 MCP 服务器使用独立的包前缀 `@ai-stack-mcp/*`。
 
@@ -765,7 +925,7 @@ packages/mcp-servers/git/
 
 ---
 
-## 9. Rush 配置目录
+## 10. Rush 配置目录
 
 ### 9.1 common/config/rush/
 
@@ -791,7 +951,7 @@ common/scripts/
 
 ---
 
-## 10. 开发工具配置
+## 11. 开发工具配置
 
 ### 10.1 .claude/ 目录
 
@@ -825,7 +985,7 @@ common/scripts/
 
 ---
 
-## 11. 构建输出
+## 12. 构建输出
 
 ### 11.1 dist/ 目录结构
 

@@ -43,11 +43,22 @@ import {
 import {
   createSqliteStores,
 } from '@ai-stack/memory-store-sqlite';
+import {
+  createKnowledgeManager,
+  type KnowledgeManagerInstance,
+  type KnowledgeSearchResult,
+  type KnowledgeStats,
+  type DocSource,
+  type DocSourceInput,
+  type IndexSummary,
+  type CrawlSummary,
+} from '@ai-stack/knowledge';
 import type {
   AgentConfig,
   AgentMCPConfig,
   AgentSkillConfig,
   AgentMemoryConfig,
+  AgentKnowledgeConfig,
   Tool,
   AgentResponse,
   ToolCallResult,
@@ -83,6 +94,20 @@ export interface AgentInstance {
   retrieveMemory(query?: string): Promise<MemoryBundle | null>;
   getMemoryContext(query?: string): Promise<string>;
   closeMemory(): Promise<void>;
+
+  // Knowledge Integration
+  initializeKnowledge(): Promise<void>;
+  getKnowledgeManager(): KnowledgeManagerInstance | null;
+  searchKnowledge(query: string, options?: { sources?: ('code' | 'doc')[]; limit?: number }): Promise<KnowledgeSearchResult[]>;
+  searchCode(query: string, options?: { languages?: string[]; limit?: number }): Promise<KnowledgeSearchResult[]>;
+  searchDocs(query: string, options?: { sourceIds?: string[]; limit?: number }): Promise<KnowledgeSearchResult[]>;
+  getKnowledgeContext(query: string): Promise<string>;
+  indexCode(options?: { force?: boolean }): Promise<IndexSummary>;
+  addDocSource(source: DocSourceInput): Promise<DocSource>;
+  removeDocSource(sourceId: string): Promise<void>;
+  crawlDocs(options?: { force?: boolean }): Promise<CrawlSummary>;
+  getKnowledgeStats(): Promise<KnowledgeStats>;
+  closeKnowledge(): Promise<void>;
 
   // Task Management
   createTask(goal: string, options?: {
@@ -167,6 +192,14 @@ export function createAgent(config: AgentConfig = {}): AgentInstance {
       : { enabled: true, ...config.memory }
     : null;
   const taskReducer = new TaskStateReducer();
+
+  // Knowledge integration
+  let knowledgeManager: KnowledgeManagerInstance | null = null;
+  const knowledgeConfig: AgentKnowledgeConfig | null = config.knowledge
+    ? config.knowledge === true
+      ? { enabled: true }
+      : { enabled: true, ...config.knowledge }
+    : null;
 
   // Return the instance object
   const instance: AgentInstance = {
@@ -439,6 +472,211 @@ export function createAgent(config: AgentConfig = {}): AgentInstance {
     },
 
     // ============================================
+    // Knowledge Integration
+    // ============================================
+
+    async initializeKnowledge(): Promise<void> {
+      if (!knowledgeConfig || !knowledgeConfig.enabled) {
+        throw new Error('No Knowledge configuration provided or knowledge is disabled');
+      }
+
+      // Create knowledge manager with config
+      knowledgeManager = createKnowledgeManager({
+        code: knowledgeConfig.code?.enabled !== false
+          ? {
+              rootDir: knowledgeConfig.code?.rootDir ?? '.',
+              include: knowledgeConfig.code?.include,
+              exclude: knowledgeConfig.code?.exclude,
+              maxFileSize: knowledgeConfig.code?.maxFileSize,
+              chunkTokens: knowledgeConfig.code?.chunkTokens,
+              overlapTokens: knowledgeConfig.code?.overlapTokens,
+              watch: knowledgeConfig.code?.watch,
+              watchDebounceMs: knowledgeConfig.code?.watchDebounceMs,
+              concurrency: knowledgeConfig.code?.concurrency,
+              enabled: true,
+            }
+          : { enabled: false, rootDir: '.' },
+        doc: knowledgeConfig.doc?.enabled !== false
+          ? {
+              userAgent: knowledgeConfig.doc?.userAgent,
+              defaultCrawlOptions: knowledgeConfig.doc?.defaultCrawlOptions,
+              chunkTokens: knowledgeConfig.doc?.chunkTokens,
+              overlapTokens: knowledgeConfig.doc?.overlapTokens,
+              concurrency: knowledgeConfig.doc?.concurrency,
+              cacheDir: knowledgeConfig.doc?.cacheDir,
+              cacheTtl: knowledgeConfig.doc?.cacheTtl,
+              enabled: true,
+            }
+          : { enabled: false },
+        search: {
+          defaultWeights: knowledgeConfig.search?.weights ?? { fts: 0.3, vector: 0.7 },
+          defaultLimit: knowledgeConfig.search?.maxResults ?? 5,
+          temporalDecay: { enabled: true, halfLifeDays: 30 },
+          mmr: { enabled: true, lambda: 0.7 },
+        },
+      });
+
+      // Create SQLite stores for knowledge (shared with memory if available)
+      const dbPath = memoryConfig?.dbPath ?? '.ai-stack/memory.db';
+      const stores = await createSqliteStores({ dbPath });
+
+      // Set store and initialize
+      knowledgeManager.setStore(stores.semanticStore);
+      await knowledgeManager.initialize();
+
+      // Add pre-configured document sources
+      if (knowledgeConfig.doc?.sources) {
+        for (const source of knowledgeConfig.doc.sources) {
+          await knowledgeManager.addDocSource(source);
+        }
+      }
+
+      // Start file watching if enabled
+      if (knowledgeConfig.code?.watch) {
+        knowledgeManager.startWatching();
+      }
+    },
+
+    getKnowledgeManager(): KnowledgeManagerInstance | null {
+      return knowledgeManager;
+    },
+
+    async searchKnowledge(
+      query: string,
+      options?: { sources?: ('code' | 'doc')[]; limit?: number }
+    ): Promise<KnowledgeSearchResult[]> {
+      if (!knowledgeManager) return [];
+
+      return knowledgeManager.search(query, {
+        sources: options?.sources,
+        limit: options?.limit ?? knowledgeConfig?.search?.maxResults ?? 5,
+        minScore: knowledgeConfig?.search?.minScore ?? 0.3,
+      });
+    },
+
+    async searchCode(
+      query: string,
+      options?: { languages?: string[]; limit?: number }
+    ): Promise<KnowledgeSearchResult[]> {
+      if (!knowledgeManager) return [];
+
+      return knowledgeManager.searchCode(query, {
+        languages: options?.languages,
+        limit: options?.limit ?? knowledgeConfig?.search?.maxResults ?? 5,
+        minScore: knowledgeConfig?.search?.minScore ?? 0.3,
+      });
+    },
+
+    async searchDocs(
+      query: string,
+      options?: { sourceIds?: string[]; limit?: number }
+    ): Promise<KnowledgeSearchResult[]> {
+      if (!knowledgeManager) return [];
+
+      return knowledgeManager.searchDocs(query, {
+        sourceIds: options?.sourceIds,
+        limit: options?.limit ?? knowledgeConfig?.search?.maxResults ?? 5,
+        minScore: knowledgeConfig?.search?.minScore ?? 0.3,
+      });
+    },
+
+    async getKnowledgeContext(query: string): Promise<string> {
+      if (!knowledgeManager) return '';
+
+      const results = await knowledgeManager.search(query, {
+        limit: knowledgeConfig?.search?.maxResults ?? 5,
+        minScore: knowledgeConfig?.search?.minScore ?? 0.3,
+      });
+
+      if (results.length === 0) return '';
+
+      // Format results as context
+      const sections: string[] = [];
+
+      // Group by source type
+      const codeResults = results.filter((r) => r.sourceType === 'code');
+      const docResults = results.filter((r) => r.sourceType === 'doc');
+
+      if (codeResults.length > 0) {
+        sections.push('### Relevant Code\n');
+        for (const result of codeResults) {
+          const meta = result.chunk.code;
+          if (meta) {
+            sections.push(`**${meta.filePath}:${meta.startLine}-${meta.endLine}** (${meta.language})`);
+            if (meta.symbolName) {
+              sections.push(`Symbol: \`${meta.symbolName}\` (${meta.symbolType})`);
+            }
+          }
+          sections.push('```');
+          sections.push(result.chunk.text.trim());
+          sections.push('```\n');
+        }
+      }
+
+      if (docResults.length > 0) {
+        sections.push('### Relevant Documentation\n');
+        for (const result of docResults) {
+          const meta = result.chunk.doc;
+          if (meta) {
+            sections.push(`**${meta.title || meta.url}**`);
+            if (meta.section) {
+              sections.push(`Section: ${meta.section}`);
+            }
+          }
+          sections.push(result.chunk.text.trim());
+          sections.push('');
+        }
+      }
+
+      return sections.join('\n');
+    },
+
+    async indexCode(options?: { force?: boolean }): Promise<IndexSummary> {
+      if (!knowledgeManager) {
+        throw new Error('Knowledge not initialized. Call initializeKnowledge() first.');
+      }
+      return knowledgeManager.indexCode(options);
+    },
+
+    async addDocSource(source: DocSourceInput): Promise<DocSource> {
+      if (!knowledgeManager) {
+        throw new Error('Knowledge not initialized. Call initializeKnowledge() first.');
+      }
+      return knowledgeManager.addDocSource(source);
+    },
+
+    async removeDocSource(sourceId: string): Promise<void> {
+      if (!knowledgeManager) {
+        throw new Error('Knowledge not initialized. Call initializeKnowledge() first.');
+      }
+      return knowledgeManager.removeDocSource(sourceId);
+    },
+
+    async crawlDocs(options?: { force?: boolean }): Promise<CrawlSummary> {
+      if (!knowledgeManager) {
+        throw new Error('Knowledge not initialized. Call initializeKnowledge() first.');
+      }
+      return knowledgeManager.crawlDocs(options);
+    },
+
+    async getKnowledgeStats(): Promise<KnowledgeStats> {
+      if (!knowledgeManager) {
+        return {
+          code: { enabled: false, totalFiles: 0, totalChunks: 0 },
+          doc: { enabled: false, totalSources: 0, totalPages: 0, totalChunks: 0 },
+        };
+      }
+      return knowledgeManager.getStats();
+    },
+
+    async closeKnowledge(): Promise<void> {
+      if (knowledgeManager) {
+        await knowledgeManager.close();
+        knowledgeManager = null;
+      }
+    },
+
+    // ============================================
     // Task Management
     // ============================================
 
@@ -624,6 +862,7 @@ export function createAgent(config: AgentConfig = {}): AgentInstance {
         instance.closeMCP(),
         instance.closeSkills(),
         instance.closeMemory(),
+        instance.closeKnowledge(),
       ]);
     },
 
@@ -704,6 +943,11 @@ export function createAgent(config: AgentConfig = {}): AgentInstance {
         await instance.initializeMemory();
       }
 
+      // Auto-initialize Knowledge if configured with autoInitialize
+      if (knowledgeConfig?.enabled && knowledgeConfig.autoInitialize !== false && !knowledgeManager) {
+        await instance.initializeKnowledge();
+      }
+
       const { maxIterations = 10, signal } = options;
 
       // Record user message to memory
@@ -717,12 +961,22 @@ export function createAgent(config: AgentConfig = {}): AgentInstance {
       // Add user message to history
       conversationHistory.push(userMessage(input));
 
-      // Build system prompt with memory context
+      // Build system prompt with memory and knowledge context
       let effectiveSystemPrompt = agentConfig.systemPrompt;
+
+      // Inject memory context
       if (memoryManager && memoryConfig?.autoInject !== false) {
         const memContext = await instance.getMemoryContext(input);
         if (memContext) {
-          effectiveSystemPrompt = `${agentConfig.systemPrompt}\n\n---\n\n## Memory Context\n\n${memContext}`;
+          effectiveSystemPrompt = `${effectiveSystemPrompt}\n\n---\n\n## Memory Context\n\n${memContext}`;
+        }
+      }
+
+      // Inject knowledge context (auto-search)
+      if (knowledgeManager && knowledgeConfig?.search?.autoSearch !== false && knowledgeConfig?.search?.autoInject !== false) {
+        const knowledgeContext = await instance.getKnowledgeContext(input);
+        if (knowledgeContext) {
+          effectiveSystemPrompt = `${effectiveSystemPrompt}\n\n---\n\n## Knowledge Context\n\n${knowledgeContext}`;
         }
       }
 
@@ -864,6 +1118,11 @@ export function createAgent(config: AgentConfig = {}): AgentInstance {
         await instance.initializeMemory();
       }
 
+      // Auto-initialize Knowledge if configured with autoInitialize
+      if (knowledgeConfig?.enabled && knowledgeConfig.autoInitialize !== false && !knowledgeManager) {
+        await instance.initializeKnowledge();
+      }
+
       try {
         // Record user message to memory
         if (memoryManager) {
@@ -876,12 +1135,22 @@ export function createAgent(config: AgentConfig = {}): AgentInstance {
         // Add user message to history
         conversationHistory.push(userMessage(input));
 
-        // Build system prompt with memory context
+        // Build system prompt with memory and knowledge context
         let effectiveSystemPrompt = agentConfig.systemPrompt;
+
+        // Inject memory context
         if (memoryManager && memoryConfig?.autoInject !== false) {
           const memContext = await instance.getMemoryContext(input);
           if (memContext) {
-            effectiveSystemPrompt = `${agentConfig.systemPrompt}\n\n---\n\n## Memory Context\n\n${memContext}`;
+            effectiveSystemPrompt = `${effectiveSystemPrompt}\n\n---\n\n## Memory Context\n\n${memContext}`;
+          }
+        }
+
+        // Inject knowledge context (auto-search)
+        if (knowledgeManager && knowledgeConfig?.search?.autoSearch !== false && knowledgeConfig?.search?.autoInject !== false) {
+          const knowledgeContext = await instance.getKnowledgeContext(input);
+          if (knowledgeContext) {
+            effectiveSystemPrompt = `${effectiveSystemPrompt}\n\n---\n\n## Knowledge Context\n\n${knowledgeContext}`;
           }
         }
 

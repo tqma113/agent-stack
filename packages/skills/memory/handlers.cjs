@@ -1,14 +1,46 @@
+"use strict";
+var __create = Object.create;
+var __defProp = Object.defineProperty;
+var __getOwnPropDesc = Object.getOwnPropertyDescriptor;
+var __getOwnPropNames = Object.getOwnPropertyNames;
+var __getProtoOf = Object.getPrototypeOf;
+var __hasOwnProp = Object.prototype.hasOwnProperty;
+var __export = (target, all) => {
+  for (var name in all)
+    __defProp(target, name, { get: all[name], enumerable: true });
+};
+var __copyProps = (to, from, except, desc) => {
+  if (from && typeof from === "object" || typeof from === "function") {
+    for (let key of __getOwnPropNames(from))
+      if (!__hasOwnProp.call(to, key) && key !== except)
+        __defProp(to, key, { get: () => from[key], enumerable: !(desc = __getOwnPropDesc(from, key)) || desc.enumerable });
+  }
+  return to;
+};
+var __toESM = (mod, isNodeMode, target) => (target = mod != null ? __create(__getProtoOf(mod)) : {}, __copyProps(
+  // If the importer is in node compatibility mode or this is not an ESM
+  // file that has been converted to a CommonJS file using a Babel-
+  // compatible transform (i.e. "__esModule" has not been set), then set
+  // "default" to the CommonJS "module.exports" for node compatibility.
+  isNodeMode || !mod || !mod.__esModule ? __defProp(target, "default", { value: mod, enumerable: true }) : target,
+  mod
+));
+var __toCommonJS = (mod) => __copyProps(__defProp({}, "__esModule", { value: true }), mod);
+
+// src/handlers.ts
+var handlers_exports = {};
+__export(handlers_exports, {
+  delete: () => deleteEntries,
+  search: () => search,
+  upsert: () => upsert
+});
+module.exports = __toCommonJS(handlers_exports);
+
 // src/store-context.ts
-import Database from "better-sqlite3";
-import * as fs from "fs";
-import * as path from "path";
-import {
-  createEventStore,
-  createTaskStateStore,
-  createSummaryStore,
-  createProfileStore,
-  createSemanticStore
-} from "@ai-stack/memory-store-sqlite";
+var import_better_sqlite3 = __toESM(require("better-sqlite3"), 1);
+var fs = __toESM(require("fs"), 1);
+var path = __toESM(require("path"), 1);
+var import_memory_store_sqlite = require("@ai-stack/memory-store-sqlite");
 var DEFAULT_CONFIG = {
   dbPath: ".ai-stack/memory.db",
   debug: false
@@ -24,14 +56,14 @@ async function getStoreContext(config = {}) {
   if (!fs.existsSync(dbDir)) {
     fs.mkdirSync(dbDir, { recursive: true });
   }
-  db = new Database(mergedConfig.dbPath);
+  db = new import_better_sqlite3.default(mergedConfig.dbPath);
   db.pragma("journal_mode = WAL");
   db.pragma("foreign_keys = ON");
-  const events = createEventStore();
-  const tasks = createTaskStateStore();
-  const summaries = createSummaryStore();
-  const profiles = createProfileStore();
-  const semantic = createSemanticStore();
+  const events = (0, import_memory_store_sqlite.createEventStore)();
+  const tasks = (0, import_memory_store_sqlite.createTaskStateStore)();
+  const summaries = (0, import_memory_store_sqlite.createSummaryStore)();
+  const profiles = (0, import_memory_store_sqlite.createProfileStore)();
+  const semantic = (0, import_memory_store_sqlite.createSemanticStore)();
   events.setDatabase(db);
   tasks.setDatabase(db);
   summaries.setDatabase(db);
@@ -433,9 +465,10 @@ async function deleteEntries(args) {
   };
   return JSON.stringify(result, null, 2);
 }
-export {
-  deleteEntries as delete,
+// Annotate the CommonJS export names for ESM import in node:
+0 && (module.exports = {
+  delete: null,
   search,
   upsert
-};
-//# sourceMappingURL=handlers.js.map
+});
+//# sourceMappingURL=handlers.cjs.map

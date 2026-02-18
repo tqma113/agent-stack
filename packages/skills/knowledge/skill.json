@@ -1,0 +1,181 @@
+{
+  "name": "knowledge",
+  "version": "1.0.0",
+  "description": "Knowledge management tools for AI agents - search code, manage and search documentation",
+  "author": "@ai-stack",
+  "tools": [
+    {
+      "name": "search_code",
+      "description": "Search the indexed codebase for relevant code snippets, functions, classes, etc. Returns matching code blocks with file paths and line numbers.",
+      "handler": "./handlers.cjs#searchCode",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string",
+            "description": "Search query for finding relevant code"
+          },
+          "languages": {
+            "type": "array",
+            "items": { "type": "string" },
+            "description": "Filter by programming languages (e.g., ['typescript', 'python'])"
+          },
+          "filePatterns": {
+            "type": "array",
+            "items": { "type": "string" },
+            "description": "Glob patterns to filter files (e.g., ['src/**/*.ts'])"
+          },
+          "symbolTypes": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": ["file", "class", "interface", "function", "method", "variable", "type", "enum"]
+            },
+            "description": "Filter by symbol types"
+          },
+          "limit": {
+            "type": "number",
+            "description": "Maximum number of results (default: 10)"
+          }
+        },
+        "required": ["query"]
+      }
+    },
+    {
+      "name": "search_docs",
+      "description": "Search indexed external documentation. Returns relevant documentation sections with URLs and titles.",
+      "handler": "./handlers.cjs#searchDocs",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string",
+            "description": "Search query for finding relevant documentation"
+          },
+          "sourceIds": {
+            "type": "array",
+            "items": { "type": "string" },
+            "description": "Filter by document source IDs"
+          },
+          "limit": {
+            "type": "number",
+            "description": "Maximum number of results (default: 10)"
+          }
+        },
+        "required": ["query"]
+      }
+    },
+    {
+      "name": "index_code",
+      "description": "Index the codebase for searching. This will scan files and create searchable chunks.",
+      "handler": "./handlers.cjs#indexCode",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "rootDir": {
+            "type": "string",
+            "description": "Root directory to index (default: current directory)"
+          },
+          "include": {
+            "type": "array",
+            "items": { "type": "string" },
+            "description": "Glob patterns to include"
+          },
+          "exclude": {
+            "type": "array",
+            "items": { "type": "string" },
+            "description": "Glob patterns to exclude"
+          },
+          "force": {
+            "type": "boolean",
+            "description": "Force re-indexing even if files haven't changed"
+          }
+        },
+        "required": []
+      }
+    },
+    {
+      "name": "add_doc_source",
+      "description": "Add a new documentation source for indexing. Use type 'website' to recursively crawl all pages from an entry URL (follows links). Use 'sitemap' to discover pages from sitemap.xml. Use 'url' for a single page only. After adding, call crawl_docs to fetch and index the content.",
+      "handler": "./handlers.cjs#addDocSource",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "Name of the documentation source"
+          },
+          "url": {
+            "type": "string",
+            "description": "URL of the documentation (entry point for 'website' type)"
+          },
+          "type": {
+            "type": "string",
+            "enum": ["url", "website", "sitemap", "github", "local"],
+            "description": "Type: 'website' for recursive crawl, 'sitemap' for sitemap.xml, 'url' for single page (default: url)"
+          },
+          "tags": {
+            "type": "array",
+            "items": { "type": "string" },
+            "description": "Tags for categorizing the documentation"
+          }
+        },
+        "required": ["name", "url"]
+      }
+    },
+    {
+      "name": "remove_doc_source",
+      "description": "Remove a documentation source and its indexed content.",
+      "handler": "./handlers.cjs#removeDocSource",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "sourceId": {
+            "type": "string",
+            "description": "ID of the documentation source to remove"
+          }
+        },
+        "required": ["sourceId"]
+      }
+    },
+    {
+      "name": "list_doc_sources",
+      "description": "List all registered documentation sources.",
+      "handler": "./handlers.cjs#listDocSources",
+      "parameters": {
+        "type": "object",
+        "properties": {},
+        "required": []
+      }
+    },
+    {
+      "name": "crawl_docs",
+      "description": "Crawl and index documentation sources. Automatically discovers all pages from sitemap.xml and indexes them in batch. Use this instead of manually fetching pages one by one.",
+      "handler": "./handlers.cjs#crawlDocs",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "sourceId": {
+            "type": "string",
+            "description": "Specific source ID to crawl (optional, crawls all if not specified)"
+          },
+          "force": {
+            "type": "boolean",
+            "description": "Force re-crawling even if content hasn't changed"
+          }
+        },
+        "required": []
+      }
+    },
+    {
+      "name": "get_knowledge_stats",
+      "description": "Get statistics about indexed code and documentation.",
+      "handler": "./handlers.cjs#getStats",
+      "parameters": {
+        "type": "object",
+        "properties": {},
+        "required": []
+      }
+    }
+  ]
+}

@@ -2,7 +2,7 @@
 
 ## 项目概述
 
-AI Stack 是一个基于 TypeScript 的 AI Agent 开发框架，采用 Rush monorepo 架构管理多个包。项目旨在提供一个简洁、易用的 OpenAI API 封装、MCP 协议支持、Skill 系统、Memory 系统和 AI Agent 实现。
+AI Stack 是一个基于 TypeScript 的 AI Agent 开发框架，采用 Rush monorepo 架构管理多个包。项目旨在提供一个简洁、易用的 OpenAI API 封装、MCP 协议支持、Skill 系统、Memory 系统、Knowledge 知识库系统和 AI Agent 实现。
 
 ### 设计理念
 
@@ -57,10 +57,12 @@ ai-stack/
 │   │   ├── memory/             # @ai-stack/memory - Memory 策略层
 │   │   ├── memory-store-sqlite/# @ai-stack/memory-store-sqlite - SQLite 存储
 │   │   ├── memory-store-json/  # @ai-stack/memory-store-json - JSON 存储
+│   │   ├── knowledge/          # @ai-stack/knowledge - 代码和文档索引
 │   │   └── index/              # @ai-stack/agent - Agent 实现 + CLI
 │   │
 │   ├── skills/                 # 自定义 Skills (@ai-stack-skill/*)
-│   │   └── memory/             # @ai-stack-skill/memory - Memory Skill
+│   │   ├── memory/             # @ai-stack-skill/memory - Memory Skill
+│   │   └── knowledge/          # @ai-stack-skill/knowledge - Knowledge Skill
 │   │
 │   └── mcp-servers/            # 自定义 MCP 服务器 (@ai-stack-mcp/*)
 │       ├── fetch/              # @ai-stack-mcp/fetch - Web 内容获取
@@ -116,12 +118,26 @@ ai-stack/
         │
         └── @ai-stack/memory-store-sqlite (workspace:*)
 
-@ai-stack/agent     (Agent 实现 + CLI，内置 MCP、Skill 和 Memory 支持)
+@ai-stack/knowledge (代码和文档索引)
+        │
+        ├── @ai-stack/memory-store-sqlite (workspace:*)
+        ├── @ai-stack/memory (workspace:*)
+        ├── node-html-markdown (^1.3.0)
+        ├── glob (^11.0.0)
+        └── chokidar (^4.0.0)
+
+@ai-stack-skill/knowledge (Knowledge Skill)
+        │
+        ├── @ai-stack/knowledge (workspace:*)
+        └── @ai-stack/memory-store-sqlite (workspace:*)
+
+@ai-stack/agent     (Agent 实现 + CLI，内置 MCP、Skill、Memory 和 Knowledge 支持)
         │
         ├── @ai-stack/provider (workspace:*)
         ├── @ai-stack/mcp (workspace:*)
         ├── @ai-stack/skill (workspace:*)
         ├── @ai-stack/memory (workspace:*)
+        ├── @ai-stack/knowledge (workspace:*)
         └── commander (^12.1.0) - CLI 框架
 ```
 
@@ -133,3 +149,4 @@ ai-stack/
 - [项目结构详解](./project-structure.md)
 - [业务逻辑详解](./business-logic.md)
 - [API 参考](./api-reference.md)
+- [Knowledge 设计文档](./knowledge-design.md)

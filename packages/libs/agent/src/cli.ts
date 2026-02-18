@@ -116,6 +116,7 @@ program
   .option('-m, --model <name>', 'LLM model to use')
   .option('--mcp <path>', 'MCP configuration file path')
   .option('--skill <dir>', 'Skill directory (can be specified multiple times)', collect, [])
+  .option('--max-iterations <n>', 'Maximum tool call iterations per turn (default: 10)', parseInt)
   .option('--no-stream', 'Disable streaming output')
   .option('--classic', 'Use classic (legacy) terminal UI')
   .option('--compact', 'Use compact tool display')
@@ -131,6 +132,7 @@ program
   .description('Execute a single task')
   .option('-c, --config <path>', 'Configuration file path')
   .option('-m, --model <name>', 'LLM model to use')
+  .option('--max-iterations <n>', 'Maximum tool call iterations (default: 10)', parseInt)
   .option('-y, --yes', 'Skip confirmation prompts')
   .option('--json', 'Output result as JSON')
   .action(async (task, options) => {
@@ -199,6 +201,7 @@ interface ChatOptions {
   stream?: boolean;
   classic?: boolean;
   compact?: boolean;
+  maxIterations?: number;
 }
 
 async function runChat(options: ChatOptions) {
@@ -217,8 +220,11 @@ async function runChat(options: ChatOptions) {
 
   try {
     // Load configuration
-    const { config, configPath } = loadConfig(options.config);
+    const { config, configPath, maxIterations: configMaxIterations } = loadConfig(options.config);
     const baseDir = configPath ? dirname(configPath) : process.cwd();
+
+    // Determine maxIterations: CLI option > config file > default (10)
+    const maxIterations = options.maxIterations ?? configMaxIterations ?? 10;
 
     // Override with CLI options
     if (options.model) config.model = options.model;
@@ -398,14 +404,14 @@ async function runChat(options: ChatOptions) {
                   console.log(colors.gray(`[${icons.success} ${name}: ${preview}]`));
                 }
               },
-            });
+            }, { maxIterations });
 
             if (streamRenderer) {
               streamRenderer.complete();
             }
           } else {
             process.stdout.write(colors.blue('\nAgent: '));
-            const response = await agent.chat(trimmed);
+            const response = await agent.chat(trimmed, { maxIterations });
             process.stdout.write(response.content);
           }
 
@@ -441,6 +447,7 @@ interface RunOptions {
   model?: string;
   yes?: boolean;
   json?: boolean;
+  maxIterations?: number;
 }
 
 async function runTask(task: string, options: RunOptions) {
@@ -449,8 +456,11 @@ async function runTask(task: string, options: RunOptions) {
 
   try {
     // Load configuration
-    const { config, configPath } = loadConfig(options.config);
+    const { config, configPath, maxIterations: configMaxIterations } = loadConfig(options.config);
     const baseDir = configPath ? dirname(configPath) : process.cwd();
+
+    // Determine maxIterations: CLI option > config file > default (10)
+    const maxIterations = options.maxIterations ?? configMaxIterations ?? 10;
 
     // Override with CLI options
     if (options.model) config.model = options.model;
@@ -480,7 +490,7 @@ async function runTask(task: string, options: RunOptions) {
     spinner.stop();
 
     // Execute task
-    const response = await agent.chat(task);
+    const response = await agent.chat(task, { maxIterations });
 
     // Output result
     if (options.json) {

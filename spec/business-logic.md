@@ -1270,3 +1270,160 @@ await pipeline.indexTranscript(transcript);
 // 处理 Flush 内容
 await pipeline.processFlush(flushContent, sessionId);
 ```
+
+---
+
+## 10. @ai-stack/knowledge 业务逻辑
+
+### 10.1 Knowledge 集成模式
+
+Knowledge 功能采用混合方案，参照 Memory 的设计：
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                         Agent                                │
+│                                                              │
+│  ┌─────────────────┐    ┌─────────────────────────────────┐ │
+│  │ MemoryManager   │    │ KnowledgeManager                │ │
+│  │ (内嵌)          │    │ (内嵌，核心检索)                 │ │
+│  │                 │    │                                  │ │
+│  │ - retrieve()    │    │ - search()      ← 自动检索      │ │
+│  │ - inject()      │    │ - inject()      ← 上下文注入    │ │
+│  └─────────────────┘    └─────────────────────────────────┘ │
+│           │                         │                        │
+└───────────┼─────────────────────────┼────────────────────────┘
+            │                         │
+            ▼                         ▼
+┌─────────────────────┐    ┌─────────────────────────────────┐
+│ @ai-stack-skill/    │    │ @ai-stack-skill/knowledge       │
+│ memory              │    │ (显式管理工具)                   │
+│                     │    │                                  │
+│ - search            │    │ - search_code   ← 代码搜索      │
+│ - upsert            │    │ - search_docs   ← 文档搜索      │
+│ - delete            │    │ - index_code    ← 索引代码      │
+└─────────────────────┘    │ - add_doc       ← 添加文档源    │
+                           │ - crawl_docs    ← 爬取文档      │
+                           └─────────────────────────────────┘
+```
+
+### 10.2 Agent Knowledge 配置
+
+```typescript
+const agent = createAgent({
+  knowledge: {
+    enabled: true,
+    code: {
+      enabled: true,
+      rootDir: './src',
+      include: ['**/*.ts', '**/*.tsx'],
+      watch: true,          // 启用文件监听
+    },
+    doc: {
+      enabled: true,
+      sources: [
+        { name: 'React Docs', url: 'https://react.dev', type: 'url', tags: ['react'] },
+      ],
+    },
+    search: {
+      autoSearch: true,     // 自动检索
+      autoInject: true,     // 自动注入上下文
+      maxResults: 5,
+      minScore: 0.3,
+    },
+  },
+});
+```
+
+### 10.3 自动检索流程
+
+当 `autoSearch` 和 `autoInject` 启用时，Agent 在每次对话中自动：
+
+```
+用户输入
+    │
+    ▼
+┌─────────────────────────────────────┐
+│ 1. 自动初始化 Knowledge (首次)       │
+│    - 创建 KnowledgeManager           │
+│    - 连接 SemanticStore              │
+└─────────────────────────────────────┘
+    │
+    ▼
+┌─────────────────────────────────────┐
+│ 2. 自动检索相关知识                  │
+│    - searchKnowledge(input)          │
+│    - 混合搜索 (FTS + Vector)         │
+│    - 时间衰减 + MMR 去重             │
+└─────────────────────────────────────┘
+    │
+    ▼
+┌─────────────────────────────────────┐
+│ 3. 注入上下文到 System Prompt        │
+│    - 代码片段 (文件路径 + 行号)      │
+│    - 文档片段 (URL + 章节)           │
+└─────────────────────────────────────┘
+    │
+    ▼
+┌─────────────────────────────────────┐
+│ 4. 调用 LLM                          │
+│    - System Prompt 包含知识上下文    │
+└─────────────────────────────────────┘
+```
+
+### 10.4 Knowledge Skill 工具
+
+通过 `@ai-stack-skill/knowledge` 提供显式管理工具：
+
+| 工具 | 用途 | 触发方式 |
+|------|------|----------|
+| `search_code` | 搜索代码库 | Agent 调用 |
+| `search_docs` | 搜索文档 | Agent 调用 |
+| `index_code` | 索引代码库 | `/index` 命令 |
+| `add_doc_source` | 添加文档源 | `/doc add <url>` |
+| `remove_doc_source` | 移除文档源 | `/doc remove <id>` |
+| `crawl_docs` | 爬取文档 | `/doc crawl` |
+| `get_knowledge_stats` | 获取统计 | `/doc status` |
+
+### 10.5 使用示例
+
+```typescript
+import { createAgent } from '@ai-stack/agent';
+
+// 启用 Knowledge 自动检索
+const agent = createAgent({
+  knowledge: {
+    enabled: true,
+    code: { rootDir: './src', watch: true },
+    search: { autoSearch: true, autoInject: true },
+  },
+});
+
+// 首次对话时自动初始化并索引
+const response = await agent.chat('这个项目的架构是怎样的？');
+// Agent 自动检索代码并注入上下文
+
+// 手动搜索代码
+const codeResults = await agent.searchCode('createAgent', { limit: 5 });
+
+// 添加文档源
+await agent.addDocSource({
+  name: 'OpenAI Docs',
+  url: 'https://platform.openai.com/docs',
+  type: 'url',
+  tags: ['openai', 'api'],
+});
+
+// 爬取并索引文档
+await agent.crawlDocs();
+
+// 搜索文档
+const docResults = await agent.searchDocs('function calling', { limit: 5 });
+
+// 获取统计信息
+const stats = await agent.getKnowledgeStats();
+console.log(stats);
+// {
+//   code: { enabled: true, totalFiles: 50, totalChunks: 200 },
+//   doc: { enabled: true, totalSources: 1, totalPages: 10, totalChunks: 50 }
+// }
+```

@@ -1836,3 +1836,287 @@ export {
   DEFAULT_READ_CONFIG,
 };
 ```
+
+---
+
+## 6. @ai-stack/knowledge
+
+### 6.1 createKnowledgeManager() 工厂函数
+
+管理代码和文档的索引与检索。
+
+#### 创建实例
+
+```typescript
+const manager = createKnowledgeManager(config?: KnowledgeManagerConfig): KnowledgeManagerInstance
+```
+
+**KnowledgeManagerConfig**:
+
+| 参数 | 类型 | 描述 |
+|------|------|------|
+| `code` | `CodeIndexerConfig & { enabled?: boolean }` | 代码索引配置 |
+| `doc` | `DocIndexerConfig & { enabled?: boolean }` | 文档索引配置 |
+| `search` | `SearchConfig` | 搜索配置 |
+
+---
+
+#### 生命周期方法
+
+```typescript
+// 初始化
+async initialize(): Promise<void>
+
+// 关闭
+async close(): Promise<void>
+```
+
+---
+
+#### 搜索方法
+
+```typescript
+// 统一搜索 (代码 + 文档)
+async search(query: string, options?: KnowledgeSearchOptions): Promise<KnowledgeSearchResult[]>
+
+// 搜索代码
+async searchCode(query: string, options?: CodeSearchOptions): Promise<KnowledgeSearchResult[]>
+
+// 搜索文档
+async searchDocs(query: string, options?: DocSearchOptions): Promise<KnowledgeSearchResult[]>
+```
+
+**KnowledgeSearchOptions**:
+
+| 参数 | 类型 | 描述 |
+|------|------|------|
+| `sources` | `('code' \| 'doc')[]` | 搜索的来源类型 |
+| `languages` | `string[]` | 代码语言过滤 |
+| `filePatterns` | `string[]` | 文件路径 glob 模式 |
+| `urlPrefixes` | `string[]` | 文档 URL 前缀过滤 |
+| `limit` | `number` | 结果数量限制 |
+| `minScore` | `number` | 最小相关度分数 |
+| `useVector` | `boolean` | 是否使用向量搜索 |
+| `weights` | `{ fts: number; vector: number }` | 混合搜索权重 |
+
+---
+
+#### 索引方法
+
+```typescript
+// 索引代码库
+async indexCode(options?: { force?: boolean }): Promise<IndexSummary>
+
+// 爬取并索引文档
+async crawlDocs(options?: { force?: boolean }): Promise<CrawlSummary>
+```
+
+---
+
+#### 文档源管理
+
+```typescript
+// 添加文档源
+async addDocSource(input: DocSourceInput): Promise<DocSource>
+
+// 移除文档源
+async removeDocSource(sourceId: string): Promise<void>
+```
+
+**DocSourceInput**:
+
+| 参数 | 类型 | 描述 |
+|------|------|------|
+| `name` | `string` | 文档源名称 |
+| `url` | `string` | 文档 URL |
+| `type` | `'url' \| 'sitemap' \| 'github' \| 'local'` | 源类型 |
+| `tags` | `string[]` | 标签 |
+| `enabled` | `boolean` | 是否启用 |
+| `crawlOptions` | `CrawlOptions` | 爬取选项 |
+
+---
+
+#### 统计和配置
+
+```typescript
+// 获取统计信息
+async getStats(): Promise<KnowledgeStats>
+
+// 设置语义存储
+setStore(store: SemanticStoreInstance): void
+
+// 设置 embedding 函数
+setEmbedFunction(fn: EmbedFunction): void
+
+// 启动文件监听
+startWatching(): void
+
+// 停止文件监听
+stopWatching(): void
+```
+
+**KnowledgeStats**:
+
+```typescript
+interface KnowledgeStats {
+  code: {
+    enabled: boolean;
+    totalFiles: number;
+    totalChunks: number;
+    lastIndexedAt?: number;
+  };
+  doc: {
+    enabled: boolean;
+    totalSources: number;
+    totalPages: number;
+    totalChunks: number;
+    lastCrawledAt?: number;
+  };
+}
+```
+
+---
+
+### 6.2 Agent Knowledge 集成
+
+Agent 中的 Knowledge 相关方法：
+
+```typescript
+// 初始化知识库
+async initializeKnowledge(): Promise<void>
+
+// 获取知识管理器
+getKnowledgeManager(): KnowledgeManagerInstance | null
+
+// 搜索知识
+async searchKnowledge(query: string, options?: {
+  sources?: ('code' | 'doc')[];
+  limit?: number;
+}): Promise<KnowledgeSearchResult[]>
+
+// 搜索代码
+async searchCode(query: string, options?: {
+  languages?: string[];
+  limit?: number;
+}): Promise<KnowledgeSearchResult[]>
+
+// 搜索文档
+async searchDocs(query: string, options?: {
+  sourceIds?: string[];
+  limit?: number;
+}): Promise<KnowledgeSearchResult[]>
+
+// 获取知识上下文 (用于 prompt 注入)
+async getKnowledgeContext(query: string): Promise<string>
+
+// 索引代码
+async indexCode(options?: { force?: boolean }): Promise<IndexSummary>
+
+// 添加文档源
+async addDocSource(source: DocSourceInput): Promise<DocSource>
+
+// 移除文档源
+async removeDocSource(sourceId: string): Promise<void>
+
+// 爬取文档
+async crawlDocs(options?: { force?: boolean }): Promise<CrawlSummary>
+
+// 获取统计信息
+async getKnowledgeStats(): Promise<KnowledgeStats>
+
+// 关闭知识库
+async closeKnowledge(): Promise<void>
+```
+
+---
+
+### 6.3 AgentKnowledgeConfig
+
+```typescript
+interface AgentKnowledgeConfig {
+  /** 是否启用 */
+  enabled?: boolean;
+
+  /** 代码索引配置 */
+  code?: Partial<CodeIndexerConfig> & { enabled?: boolean };
+
+  /** 文档索引配置 */
+  doc?: Partial<DocIndexerConfig> & {
+    enabled?: boolean;
+    sources?: DocSourceInput[];
+  };
+
+  /** 搜索配置 */
+  search?: {
+    autoSearch?: boolean;    // 自动检索 (默认: true)
+    autoInject?: boolean;    // 自动注入上下文 (默认: true)
+    minScore?: number;       // 最小相关度 (默认: 0.3)
+    maxResults?: number;     // 最大结果数 (默认: 5)
+    weights?: { fts: number; vector: number };
+  };
+
+  /** 是否自动初始化 (默认: true) */
+  autoInitialize?: boolean;
+
+  /** 调试模式 */
+  debug?: boolean;
+}
+```
+
+---
+
+### 6.4 从 @ai-stack/knowledge 导出
+
+```typescript
+export {
+  // 工厂函数
+  createKnowledgeManager,
+  createCodeIndexer,
+  createDocIndexer,
+  createHybridSearch,
+
+  // Instance 类型
+  type KnowledgeManagerInstance,
+  type CodeIndexerInstance,
+  type DocIndexerInstance,
+  type HybridSearchInstance,
+
+  // 错误类
+  KnowledgeError,
+  CodeIndexError,
+  CrawlError,
+  ParseError,
+  SearchError,
+  ConfigError,
+
+  // 类型
+  type KnowledgeSourceType,
+  type KnowledgeChunk,
+  type KnowledgeSearchResult,
+  type KnowledgeSearchOptions,
+  type KnowledgeManagerConfig,
+  type KnowledgeStats,
+  type CodeBlock,
+  type CodeSymbolType,
+  type CodeIndexerConfig,
+  type CodeSearchOptions,
+  type IndexStatus,
+  type IndexResult,
+  type IndexSummary,
+  type IndexStatusSummary,
+  type DocSource,
+  type DocSourceInput,
+  type DocSourceType,
+  type DocPage,
+  type DocSection,
+  type DocIndexerConfig,
+  type DocSearchOptions,
+  type CrawlOptions,
+  type CrawlResult,
+  type CrawlSummary,
+
+  // 常量
+  DEFAULT_CODE_INDEXER_CONFIG,
+  DEFAULT_DOC_INDEXER_CONFIG,
+};
+```

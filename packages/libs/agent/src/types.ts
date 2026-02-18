@@ -6,6 +6,7 @@ import type { ChatCompletionMessageParam } from '@ai-stack/provider';
 import type { MCPToolBridgeOptions } from '@ai-stack/mcp';
 import type { SkillToolBridgeOptions, SkillEntry } from '@ai-stack/skill';
 import type { MemoryConfig, TokenBudget, WritePolicyConfig, RetrievalConfig } from '@ai-stack/memory';
+import type { CodeIndexerConfig, DocIndexerConfig, DocSourceInput } from '@ai-stack/knowledge';
 
 /**
  * MCP configuration for Agent
@@ -68,6 +69,48 @@ export interface AgentMemoryConfig {
   debug?: boolean;
 }
 
+/**
+ * Knowledge configuration for Agent
+ */
+export interface AgentKnowledgeConfig {
+  /** Whether to enable knowledge (default: true if config provided) */
+  enabled?: boolean;
+
+  /** Code indexing configuration */
+  code?: Partial<CodeIndexerConfig> & {
+    /** Enable code indexing (default: true) */
+    enabled?: boolean;
+  };
+
+  /** Document indexing configuration */
+  doc?: Partial<DocIndexerConfig> & {
+    /** Enable document indexing (default: true) */
+    enabled?: boolean;
+    /** Pre-configured document sources */
+    sources?: DocSourceInput[];
+  };
+
+  /** Search configuration */
+  search?: {
+    /** Whether to auto-search knowledge on each chat (default: true) */
+    autoSearch?: boolean;
+    /** Whether to auto-inject knowledge context into prompts (default: true) */
+    autoInject?: boolean;
+    /** Minimum relevance score for results (default: 0.3) */
+    minScore?: number;
+    /** Maximum results to include in context (default: 5) */
+    maxResults?: number;
+    /** Default search weights */
+    weights?: { fts: number; vector: number };
+  };
+
+  /** Whether to auto-initialize on first chat (default: true) */
+  autoInitialize?: boolean;
+
+  /** Enable debug logging */
+  debug?: boolean;
+}
+
 export interface AgentConfig {
   /** Agent name for identification */
   name?: string;
@@ -89,6 +132,8 @@ export interface AgentConfig {
   skill?: AgentSkillConfig;
   /** Memory configuration for persistent memory */
   memory?: AgentMemoryConfig | boolean;
+  /** Knowledge configuration for code and document indexing */
+  knowledge?: AgentKnowledgeConfig | boolean;
 }
 
 export interface Tool {

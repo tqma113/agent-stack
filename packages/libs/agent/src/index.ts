@@ -107,3 +107,43 @@ export {
   type WritePolicyConfig,
   type RetrievalConfig,
 } from '@ai-stack/memory';
+
+// Re-export Knowledge types and factory functions for convenience
+export {
+  // Manager
+  createKnowledgeManager,
+  type KnowledgeManagerInstance,
+  // Indexers
+  createCodeIndexer,
+  createDocIndexer,
+  type CodeIndexerInstance,
+  type DocIndexerInstance,
+  // Search
+  createHybridSearch,
+  type HybridSearchInstance,
+  // Types
+  type KnowledgeSourceType,
+  type KnowledgeChunk,
+  type KnowledgeSearchResult,
+  type KnowledgeSearchOptions,
+  type KnowledgeManagerConfig,
+  type KnowledgeStats,
+  type CodeBlock,
+  type CodeSymbolType,
+  type CodeIndexerConfig,
+  type CodeSearchOptions,
+  type IndexStatus,
+  type IndexResult,
+  type IndexSummary,
+  type IndexStatusSummary,
+  type DocSource,
+  type DocSourceInput,
+  type DocSourceType,
+  type DocPage,
+  type DocSection,
+  type DocIndexerConfig,
+  type DocSearchOptions,
+  type CrawlOptions,
+  type CrawlResult,
+  type CrawlSummary,
+} from '@ai-stack/knowledge';

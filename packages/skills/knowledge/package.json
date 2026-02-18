@@ -1,0 +1,57 @@
+{
+  "name": "@ai-stack-skill/knowledge",
+  "version": "0.0.1",
+  "description": "Knowledge Skill for ai-stack - code and documentation search tools",
+  "type": "module",
+  "main": "./dist/handlers.js",
+  "types": "./dist/handlers.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/handlers.d.ts",
+      "import": "./dist/handlers.mjs",
+      "require": "./dist/handlers.js"
+    },
+    "./handlers": {
+      "types": "./dist/handlers.d.ts",
+      "import": "./dist/handlers.mjs",
+      "require": "./dist/handlers.js"
+    }
+  },
+  "files": [
+    "dist",
+    "skill.json",
+    "handlers.cjs"
+  ],
+  "scripts": {
+    "build": "tsup && node scripts/copy-handlers.js",
+    "dev": "tsup --watch",
+    "clean": "rimraf dist handlers.cjs",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "keywords": [
+    "agent",
+    "knowledge",
+    "code",
+    "documentation",
+    "search",
+    "skill",
+    "tool",
+    "llm",
+    "ai"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "@ai-stack/knowledge": "workspace:*",
+    "@ai-stack/memory-store-sqlite": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "rimraf": "^6.0.1",
+    "tsup": "^8.3.5",
+    "typescript": "~5.7.2",
+    "vitest": "^2.1.0"
+  }
+}

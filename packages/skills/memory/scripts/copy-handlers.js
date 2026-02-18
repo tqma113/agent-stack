@@ -9,7 +9,7 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const distDir = join(__dirname, '..', 'dist');
 const rootDir = join(__dirname, '..');
 
-const source = join(distDir, 'handlers.js');
+const source = join(distDir, 'handlers.cjs');
 const dest = join(rootDir, 'handlers.cjs');
 
 if (existsSync(source)) {
