@@ -20,17 +20,22 @@
       "args": ["-y", "@ai-stack-mcp/git"],
       "env": {}
     },
-    "sequential-thinking": {
-      "command": "npx",
-      "args": [
-        "-y",
-        "@modelcontextprotocol/server-sequential-thinking"
-      ]
-    },
-    // "chrome-devtools": {
+    // "brave-search": {
     //   "command": "npx",
-    //   "args": ["-y", "chrome-devtools-mcp@latest"]
+    //   "args": ["-y", "@brave/brave-search-mcp-server", "--transport", "http"],
+    //   "env": {}
+    // }
+    // "sequential-thinking": {
+    //   "command": "npx",
+    //   "args": [
+    //     "-y",
+    //     "@modelcontextprotocol/server-sequential-thinking"
+    //   ]
     // },
+    "chrome-devtools": {
+      "command": "npx",
+      "args": ["-y", "chrome-devtools-mcp@latest", "--no-usage-statistics", "--no-performance-crux"]
+    },
     // "github": {
     //   "type": "http",
     //   "url": "https://api.githubcopilot.com/mcp"
