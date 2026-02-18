@@ -19,7 +19,7 @@ import {
   type SummaryStoreInstance,
   type ProfileStoreInstance,
   type SemanticStoreInstance,
-} from '@agent-stack/memory-store';
+} from '@agent-stack/memory-store-sqlite';
 
 /**
  * Store context configuration

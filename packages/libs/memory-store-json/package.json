@@ -1,0 +1,48 @@
+{
+  "name": "@agent-stack/memory-store-json",
+  "version": "0.0.1",
+  "description": "JSON/Markdown storage layer for agent-stack memory system - zero native dependencies",
+  "main": "./dist/index.js",
+  "module": "./dist/index.mjs",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.mjs",
+      "require": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "clean": "rimraf dist",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage"
+  },
+  "keywords": [
+    "agent",
+    "memory",
+    "json",
+    "storage",
+    "llm",
+    "ai",
+    "lightweight"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "@agent-stack/memory-store-sqlite": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "rimraf": "^6.0.1",
+    "tsup": "^8.3.5",
+    "typescript": "~5.7.2",
+    "vitest": "^2.1.0"
+  }
+}

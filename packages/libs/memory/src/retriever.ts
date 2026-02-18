@@ -16,7 +16,7 @@ import type {
   IProfileStore,
   ISemanticStore,
   UUID,
-} from '@agent-stack/memory-store';
+} from '@agent-stack/memory-store-sqlite';
 import type {
   MemoryBundle,
   MemoryWarning,

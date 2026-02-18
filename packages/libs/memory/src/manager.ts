@@ -2,33 +2,24 @@
  * @agent-stack/memory - Memory Manager
  *
  * Main entry point for the memory system.
+ * Accepts externally injected stores for flexibility.
  */
 
-import Database from 'better-sqlite3';
-import {
-  createEventStore,
-  createTaskStateStore,
-  createSummaryStore,
-  createProfileStore,
-  createSemanticStore,
-  type EventStoreInstance,
-  type TaskStateStoreInstance,
-  type SummaryStoreInstance,
-  type ProfileStoreInstance,
-  type SemanticStoreInstance,
-  type EmbedFunction,
-  type MemoryEvent,
-  type EventInput,
-  type TaskState,
-  type TaskStateUpdate,
-  type ProfileItem,
-  type ProfileItemInput,
-  type Summary,
-  type SemanticChunk,
-  type SemanticChunkInput,
-  type SemanticSearchResult,
-  type UUID,
-} from '@agent-stack/memory-store';
+import type {
+  ISemanticStore,
+  EmbedFunction,
+  MemoryEvent,
+  EventInput,
+  TaskState,
+  TaskStateUpdate,
+  ProfileItem,
+  ProfileItemInput,
+  Summary,
+  SemanticChunk,
+  SemanticChunkInput,
+  SemanticSearchResult,
+  UUID,
+} from '@agent-stack/memory-store-sqlite';
 import type {
   IMemoryManager,
   MemoryConfig,
@@ -42,9 +33,17 @@ import { createMemoryInjector, type IMemoryInjector } from './injector.js';
 import { createMemoryBudgeter, type IMemoryBudgeter } from './budgeter.js';
 import { createWritePolicyEngine, type IWritePolicyEngine } from './write-policy.js';
 import { createMemorySummarizer, type IMemorySummarizer } from './summarizer.js';
-import { MemoryStoreError, StoreInitializationError } from '@agent-stack/memory-store';
-import * as fs from 'node:fs';
-import * as path from 'node:path';
+import { MemoryStoreError } from '@agent-stack/memory-store-sqlite';
+import type { MemoryStores } from './stores-interface.js';
+
+/**
+ * Extended semantic store interface with optional embed function
+ */
+interface ExtendedSemanticStore extends ISemanticStore {
+  setEmbedFunction?(fn: EmbedFunction): void;
+  hasEmbedFunction?(): boolean;
+  isVectorEnabled?(): boolean;
+}
 
 /**
  * Memory Manager instance type (returned by factory)
@@ -101,26 +100,55 @@ export interface MemoryManagerInstance extends IMemoryManager {
   setEmbedFunction(fn: EmbedFunction): void;
   hasEmbedFunction(): boolean;
   isVectorSearchEnabled(): boolean;
-  getSemanticStore(): SemanticStoreInstance;
+  getSemanticStore(): ISemanticStore;
 }
 
 /**
+ * Memory manager configuration (without dbPath since stores are injected)
+ */
+export type MemoryManagerConfig = Omit<MemoryConfig, 'dbPath'>;
+
+/**
  * Create a Memory Manager instance
+ *
+ * @param stores - Externally created stores (from createSqliteStores or createJsonStores)
+ * @param config - Optional configuration overrides
+ *
+ * @example
+ * ```typescript
+ * // Using SQLite stores (high performance)
+ * import { createSqliteStores } from '@agent-stack/memory-store-sqlite';
+ * const stores = await createSqliteStores({ dbPath: './memory.db' });
+ * const memory = createMemoryManager(stores);
+ * await memory.initialize();
+ *
+ * // Using JSON stores (zero native deps)
+ * import { createJsonStores } from '@agent-stack/memory-store-json';
+ * const stores = await createJsonStores({ basePath: './.agent-memory' });
+ * const memory = createMemoryManager(stores);
+ * await memory.initialize();
+ * ```
  */
 export function createMemoryManager(
-  config: Partial<MemoryConfig> = {}
+  stores: MemoryStores,
+  config: Partial<MemoryManagerConfig> = {}
 ): MemoryManagerInstance {
-  // Private state via closure
-  let db: Database.Database | null = null;
-  const mergedConfig: MemoryConfig = { ...DEFAULT_MEMORY_CONFIG, ...config };
+  // Merge config (excluding dbPath which is no longer used)
+  const { dbPath: _, ...defaultConfigWithoutDb } = DEFAULT_MEMORY_CONFIG;
+  const mergedConfig: MemoryManagerConfig = { ...defaultConfigWithoutDb, ...config };
   let initialized = false;
 
-  // Stores
-  const eventStore: EventStoreInstance = createEventStore();
-  const taskStateStore: TaskStateStoreInstance = createTaskStateStore();
-  const summaryStore: SummaryStoreInstance = createSummaryStore();
-  const profileStore: ProfileStoreInstance = createProfileStore();
-  const semanticStore: SemanticStoreInstance = createSemanticStore();
+  // Extract stores
+  const {
+    eventStore,
+    taskStateStore,
+    summaryStore,
+    profileStore,
+    semanticStore,
+  } = stores;
+
+  // Cast to extended type for optional methods
+  const extendedSemanticStore = semanticStore as ExtendedSemanticStore;
 
   // Components
   const observer: IMemoryObserver = createMemoryObserver();
@@ -178,74 +206,34 @@ export function createMemoryManager(
     async initialize(): Promise<void> {
       if (initialized) return;
 
-      try {
-        // Ensure directory exists
-        const dbDir = path.dirname(mergedConfig.dbPath);
-        if (!fs.existsSync(dbDir)) {
-          fs.mkdirSync(dbDir, { recursive: true });
-        }
+      // Initialize stores (they may already be initialized, but this is idempotent)
+      await stores.initialize();
 
-        // Open database
-        db = new Database(mergedConfig.dbPath);
-        db.pragma('journal_mode = WAL');
-        db.pragma('foreign_keys = ON');
-
-        // Initialize stores with database
-        const stores = [
+      // Initialize retriever with stores
+      retriever = createMemoryRetriever(
+        {
           eventStore,
           taskStateStore,
           summaryStore,
           profileStore,
           semanticStore,
-        ];
+        },
+        mergedConfig.retrieval,
+        mergedConfig.tokenBudget
+      );
 
-        for (const store of stores) {
-          store.setDatabase(db);
-          await store.initialize();
-        }
+      initialized = true;
 
-        // Initialize retriever with stores
-        retriever = createMemoryRetriever(
-          {
-            eventStore,
-            taskStateStore,
-            summaryStore,
-            profileStore,
-            semanticStore,
-          },
-          mergedConfig.retrieval,
-          mergedConfig.tokenBudget
-        );
-
-        initialized = true;
-
-        if (mergedConfig.debug) {
-          console.log(`[MemoryManager] Initialized with database: ${mergedConfig.dbPath}`);
-        }
-      } catch (error) {
-        throw new StoreInitializationError(
-          'MemoryManager',
-          (error as Error).message,
-          error as Error
-        );
+      if (mergedConfig.debug) {
+        console.log('[MemoryManager] Initialized with injected stores');
       }
     },
 
     async close(): Promise<void> {
       if (!initialized) return;
 
-      // Close all stores
-      await eventStore.close();
-      await taskStateStore.close();
-      await summaryStore.close();
-      await profileStore.close();
-      await semanticStore.close();
-
-      // Close database
-      if (db) {
-        db.close();
-        db = null;
-      }
+      // Close stores
+      await stores.close();
 
       initialized = false;
 
@@ -505,7 +493,8 @@ export function createMemoryManager(
     // ==========================================================================
 
     getConfig(): MemoryConfig {
-      return { ...mergedConfig };
+      // Return config with a placeholder dbPath since it's no longer used
+      return { ...mergedConfig, dbPath: '(injected stores)' };
     },
 
     async getBudgetUtilization(): Promise<ReturnType<IMemoryBudgeter['getUtilization']>> {
@@ -516,13 +505,7 @@ export function createMemoryManager(
 
     async clear(): Promise<void> {
       ensureInitialized();
-
-      await eventStore.clear();
-      await taskStateStore.clear();
-      await summaryStore.clear();
-      await profileStore.clear();
-      await semanticStore.clear();
-
+      await stores.clear();
       unsummarizedEventCount = 0;
 
       if (mergedConfig.debug) {
@@ -535,26 +518,27 @@ export function createMemoryManager(
     // ==========================================================================
 
     setEmbedFunction(fn: EmbedFunction): void {
-      semanticStore.setEmbedFunction(fn);
+      if (extendedSemanticStore.setEmbedFunction) {
+        extendedSemanticStore.setEmbedFunction(fn);
 
-      if (mergedConfig.debug) {
-        console.log('[MemoryManager] Embed function set - hybrid search enabled');
+        if (mergedConfig.debug) {
+          console.log('[MemoryManager] Embed function set - hybrid search enabled');
+        }
       }
     },
 
     hasEmbedFunction(): boolean {
-      return semanticStore.hasEmbedFunction();
+      return extendedSemanticStore.hasEmbedFunction?.() ?? false;
     },
 
     isVectorSearchEnabled(): boolean {
-      return semanticStore.isVectorEnabled();
+      return extendedSemanticStore.isVectorEnabled?.() ?? false;
     },
 
-    getSemanticStore(): SemanticStoreInstance {
+    getSemanticStore(): ISemanticStore {
       return semanticStore;
     },
   };
 
   return instance;
 }
-

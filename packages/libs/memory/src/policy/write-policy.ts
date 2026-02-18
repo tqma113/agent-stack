@@ -4,7 +4,7 @@
  * Decisions about when and what to write to memory.
  */
 
-import type { MemoryEvent, ProfileKey, ProfileItem, Confidence } from '@agent-stack/memory-store';
+import type { MemoryEvent, ProfileKey, ProfileItem, Confidence } from '@agent-stack/memory-store-sqlite';
 import type {
   WriteContext,
   WriteDecision,

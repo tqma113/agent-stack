@@ -11,7 +11,7 @@ import type {
   SummaryDecision,
   SummaryTodo,
   UUID,
-} from '@agent-stack/memory-store';
+} from '@agent-stack/memory-store-sqlite';
 
 /**
  * Summarizer options

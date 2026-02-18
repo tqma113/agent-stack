@@ -10,7 +10,8 @@ agent-stack/
 │   │   ├── mcp/                # @agent-stack/mcp
 │   │   ├── skill/              # @agent-stack/skill
 │   │   ├── memory/             # @agent-stack/memory (策略层)
-│   │   ├── memory-store/       # @agent-stack/memory-store (存储层)
+│   │   ├── memory-store-sqlite/# @agent-stack/memory-store-sqlite (SQLite 存储)
+│   │   ├── memory-store-json/  # @agent-stack/memory-store-json (JSON 存储)
 │   │   └── index/              # @agent-stack/index
 │   ├── skills/                 # 自定义 Skills (@agent-stack-skill/*)
 │   │   └── memory/             # @agent-stack-skill/memory
@@ -247,18 +248,20 @@ packages/libs/skill/
 
 Memory 系统采用三层架构，分离关注点：
 
-- **@agent-stack/memory-store**: SQLite 存储层 (IO 操作)
+- **@agent-stack/memory-store-sqlite**: SQLite 高性能存储层
+- **@agent-stack/memory-store-json**: JSON 轻量级存储层 (零 native 依赖)
 - **@agent-stack/memory**: 策略层 (何时读写、写什么)
 - **@agent-stack-skill/memory**: Skill 工具层 (Agent 可调用的工具)
 
-### 6.1 @agent-stack/memory-store 包 (存储层)
+### 6.1 @agent-stack/memory-store-sqlite 包 (SQLite 存储层)
 
 ```
-packages/libs/memory-store/
+packages/libs/memory-store-sqlite/
 ├── src/
 │   ├── index.ts               # 包入口
 │   ├── types.ts               # 类型定义
 │   ├── errors.ts              # 错误类
+│   ├── factory.ts             # createSqliteStores() 工厂函数
 │   └── stores/                # 存储实现
 │       ├── index.ts           # 存储导出
 │       ├── db-operations.ts   # 数据库操作组合函数
@@ -275,7 +278,7 @@ packages/libs/memory-store/
 **package.json**:
 ```json
 {
-  "name": "@agent-stack/memory-store",
+  "name": "@agent-stack/memory-store-sqlite",
   "version": "0.0.1",
   "dependencies": {
     "better-sqlite3": "^11.7.0",
@@ -284,21 +287,72 @@ packages/libs/memory-store/
 }
 ```
 
-### 6.2 @agent-stack/memory 包 (策略层)
+### 6.2 @agent-stack/memory-store-json 包 (JSON 存储层)
+
+轻量级 JSON/Markdown 存储实现，零 native 依赖，适用于开发环境和轻量部署。
+
+```
+packages/libs/memory-store-json/
+├── src/
+│   ├── index.ts               # 包入口
+│   ├── factory.ts             # createJsonStores() 工厂函数
+│   ├── utils/
+│   │   └── file-ops.ts        # 文件操作工具
+│   └── stores/                # 存储实现
+│       ├── index.ts           # 存储导出
+│       ├── event.ts           # JSON 事件存储
+│       ├── task-state.ts      # JSON 任务状态存储
+│       ├── summary.ts         # JSON + Markdown 摘要存储
+│       ├── profile.ts         # JSON 配置存储
+│       └── semantic.ts        # JSON + 倒排索引语义存储
+├── dist/
+├── package.json
+└── tsup.config.ts
+```
+
+**存储格式**:
+```
+.agent-stack/memory/
+├── events/{sessionId}/events.json
+├── tasks/{taskId}.json
+├── profiles/profiles.json
+├── summaries/{sessionId}/
+│   ├── summaries.json
+│   └── latest.md              # 人类可读的 Markdown
+└── semantic/
+    ├── chunks.json
+    └── index.json             # 倒排索引 (简单 FTS)
+```
+
+**package.json**:
+```json
+{
+  "name": "@agent-stack/memory-store-json",
+  "version": "0.0.1",
+  "dependencies": {
+    "@agent-stack/memory-store-sqlite": "workspace:*"
+  }
+}
+```
+
+### 6.3 @agent-stack/memory 包 (策略层)
+
+策略层不直接依赖任何存储实现，而是接受外部注入的 stores。
 
 ```
 packages/libs/memory/
 ├── src/
 │   ├── index.ts               # 包入口
 │   ├── types.ts               # Legacy 类型 (向后兼容)
-│   ├── policy/                # 策略层 (NEW)
+│   ├── stores-interface.ts    # MemoryStores 聚合接口
+│   ├── policy/                # 策略层
 │   │   ├── index.ts           # 策略导出
 │   │   ├── types.ts           # 策略类型定义
 │   │   ├── memory-policy.ts   # createMemoryPolicy() 主策略
 │   │   ├── retrieval-policy.ts# createRetrievalPolicy() 检索决策
 │   │   ├── write-policy.ts    # createWritePolicy() 写入决策
 │   │   └── budget-policy.ts   # createBudgetPolicy() Token 预算
-│   ├── rules/                 # 规则引擎 (NEW)
+│   ├── rules/                 # 规则引擎
 │   │   ├── index.ts           # 规则导出
 │   │   ├── rule-engine.ts     # createRuleEngine()
 │   │   └── default-rules.ts   # 默认规则配置
@@ -306,7 +360,7 @@ packages/libs/memory/
 │   ├── injector.ts            # 模板注入
 │   ├── summarizer.ts          # 摘要生成
 │   ├── state-reducer.ts       # 任务状态 Reducer
-│   └── manager.ts             # Legacy MemoryManager (向后兼容)
+│   └── manager.ts             # createMemoryManager() (接受注入的 stores)
 ├── tests/
 ├── dist/
 ├── package.json
@@ -319,10 +373,27 @@ packages/libs/memory/
   "name": "@agent-stack/memory",
   "version": "0.0.1",
   "dependencies": {
-    "@agent-stack/memory-store": "workspace:*",
-    "better-sqlite3": "^11.7.0"
+    "@agent-stack/memory-store-sqlite": "workspace:*"
   }
 }
+```
+
+**使用示例**:
+```typescript
+// 开发环境 - JSON store (零 native 依赖)
+import { createMemoryManager } from '@agent-stack/memory';
+import { createJsonStores } from '@agent-stack/memory-store-json';
+
+const stores = await createJsonStores({ basePath: './.agent-memory' });
+const memory = createMemoryManager(stores);
+await memory.initialize();
+
+// 生产环境 - SQLite store (高性能)
+import { createSqliteStores } from '@agent-stack/memory-store-sqlite';
+
+const stores = await createSqliteStores({ dbPath: './memory.db' });
+const memory = createMemoryManager(stores);
+await memory.initialize();
 ```
 
 ---
@@ -366,7 +437,7 @@ packages/skills/memory/
   "name": "@agent-stack-skill/memory",
   "version": "0.0.1",
   "dependencies": {
-    "@agent-stack/memory-store": "workspace:*",
+    "@agent-stack/memory-store-sqlite": "workspace:*",
     "better-sqlite3": "^11.7.0"
   }
 }

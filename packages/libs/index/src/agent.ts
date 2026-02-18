@@ -30,7 +30,7 @@ import {
   createMemoryManager,
   TaskStateReducer,
   TaskActions,
-  type MemoryConfig,
+  type MemoryManagerConfig,
   type MemoryBundle,
   type TaskState,
   type TaskStep,
@@ -38,7 +38,11 @@ import {
   type MemoryManagerInstance,
   type IMemoryObserver,
   type IMemoryBudgeter,
+  type MemoryStores,
 } from '@agent-stack/memory';
+import {
+  createSqliteStores,
+} from '@agent-stack/memory-store-sqlite';
 import type {
   AgentConfig,
   AgentMCPConfig,
@@ -351,14 +355,17 @@ export function createAgent(config: AgentConfig = {}): AgentInstance {
         throw new Error('No Memory configuration provided or memory is disabled');
       }
 
-      // Build memory config
-      const memConfig: Partial<MemoryConfig> = {
-        dbPath: memoryConfig.dbPath ?? '.agent-stack/memory.db',
+      // Create SQLite stores with configured path
+      const dbPath = memoryConfig.dbPath ?? '.agent-stack/memory.db';
+      const stores = await createSqliteStores({ dbPath });
+
+      // Build memory manager config
+      const memManagerConfig: Partial<MemoryManagerConfig> = {
         debug: memoryConfig.debug ?? false,
       };
 
       if (memoryConfig.tokenBudget) {
-        memConfig.tokenBudget = {
+        memManagerConfig.tokenBudget = {
           profile: 200,
           taskState: 300,
           recentEvents: 500,
@@ -370,7 +377,7 @@ export function createAgent(config: AgentConfig = {}): AgentInstance {
       }
 
       if (memoryConfig.writePolicy) {
-        memConfig.writePolicy = {
+        memManagerConfig.writePolicy = {
           minConfidence: 0.5,
           autoSummarize: true,
           summarizeEveryNEvents: 20,
@@ -384,7 +391,7 @@ export function createAgent(config: AgentConfig = {}): AgentInstance {
       }
 
       if (memoryConfig.retrieval) {
-        memConfig.retrieval = {
+        memManagerConfig.retrieval = {
           maxRecentEvents: 10,
           maxSemanticChunks: 5,
           recentEventsWindowMs: 30 * 60 * 1000,
@@ -395,7 +402,7 @@ export function createAgent(config: AgentConfig = {}): AgentInstance {
         };
       }
 
-      memoryManager = createMemoryManager(memConfig);
+      memoryManager = createMemoryManager(stores, memManagerConfig);
       await memoryManager.initialize();
     },
 

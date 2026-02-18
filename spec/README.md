@@ -55,7 +55,8 @@ agent-stack/
 │   │   ├── mcp/                # @agent-stack/mcp - MCP 协议支持
 │   │   ├── skill/              # @agent-stack/skill - Skill 系统
 │   │   ├── memory/             # @agent-stack/memory - Memory 策略层
-│   │   ├── memory-store/       # @agent-stack/memory-store - Memory 存储层
+│   │   ├── memory-store-sqlite/# @agent-stack/memory-store-sqlite - SQLite 存储
+│   │   ├── memory-store-json/  # @agent-stack/memory-store-json - JSON 存储
 │   │   └── index/              # @agent-stack/index - Agent 实现 + CLI
 │   │
 │   ├── skills/                 # 自定义 Skills (@agent-stack-skill/*)
@@ -98,18 +99,22 @@ agent-stack/
         │
         └── (无外部依赖)
 
-@agent-stack/memory-store (存储层)
+@agent-stack/memory-store-sqlite (SQLite 存储层)
         │
         ├── better-sqlite3 (^11.7.0)
         └── sqlite-vec (^0.1.6)
 
-@agent-stack/memory    (策略层)
+@agent-stack/memory-store-json (JSON 存储层)
         │
-        └── @agent-stack/memory-store (workspace:*)
+        └── @agent-stack/memory-store-sqlite (workspace:*) - 类型定义
+
+@agent-stack/memory    (策略层 - 接受注入的 stores)
+        │
+        └── @agent-stack/memory-store-sqlite (workspace:*) - 类型定义
 
 @agent-stack-skill/memory (Memory Skill)
         │
-        └── @agent-stack/memory-store (workspace:*)
+        └── @agent-stack/memory-store-sqlite (workspace:*)
 
 @agent-stack/index     (Agent 实现 + CLI，内置 MCP、Skill 和 Memory 支持)
         │

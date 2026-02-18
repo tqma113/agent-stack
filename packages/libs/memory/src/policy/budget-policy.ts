@@ -4,7 +4,7 @@
  * Token budget management for memory injection.
  */
 
-import type { TokenCount } from '@agent-stack/memory-store';
+import type { TokenCount } from '@agent-stack/memory-store-sqlite';
 import type { TokenBudget, BudgetAllocation } from './types.js';
 
 /**

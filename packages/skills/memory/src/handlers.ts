@@ -23,7 +23,7 @@ import type {
   SummaryInput,
   TaskState,
   TaskStateUpdate,
-} from '@agent-stack/memory-store';
+} from '@agent-stack/memory-store-sqlite';
 
 /**
  * Search memory across multiple layers

@@ -9,7 +9,7 @@ import type {
   ProfileItem,
   Confidence,
   ProfileKey,
-} from '@agent-stack/memory-store';
+} from '@agent-stack/memory-store-sqlite';
 import type { WritePolicyConfig } from './types.js';
 import { ProfileKeyNotAllowedError } from './errors.js';
 

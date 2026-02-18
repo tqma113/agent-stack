@@ -10,7 +10,7 @@ import type {
   MemoryEvent,
   Summary,
   SemanticSearchResult,
-} from '@agent-stack/memory-store';
+} from '@agent-stack/memory-store-sqlite';
 import type { MemoryBundle, TokenBudget } from './types.js';
 
 /**

@@ -4,7 +4,7 @@
  * Main orchestrator that combines retrieval, write, and budget policies.
  */
 
-import type { ProfileItem, MemoryEvent } from '@agent-stack/memory-store';
+import type { ProfileItem, MemoryEvent } from '@agent-stack/memory-store-sqlite';
 import type {
   IMemoryPolicy,
   RetrievalContext,

@@ -39,6 +39,7 @@
     "@agent-stack/mcp": "workspace:*",
     "@agent-stack/skill": "workspace:*",
     "@agent-stack/memory": "workspace:*",
+    "@agent-stack/memory-store-sqlite": "workspace:*",
     "boxen": "^8.0.1",
     "chalk": "^5.4.0",
     "cli-truncate": "^4.0.0",

@@ -15,6 +15,7 @@ import * as path from 'node:path';
 import * as os from 'node:os';
 import { createMemoryManager, type MemoryManagerInstance } from '../../src/manager.js';
 import type { IMemoryObserver } from '../../src/observer.js';
+import { createSqliteStores } from '@agent-stack/memory-store-sqlite';
 
 describe('Regression Tests', () => {
   let manager: MemoryManagerInstance;
@@ -26,8 +27,10 @@ describe('Regression Tests', () => {
     const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'memory-test-'));
     dbPath = path.join(tempDir, 'test.db');
 
-    manager = createMemoryManager({
-      dbPath,
+    // Create stores first
+    const stores = await createSqliteStores({ dbPath });
+
+    manager = createMemoryManager(stores, {
       debug: false,
       writePolicy: {
         minConfidence: 0.5,
@@ -199,12 +202,12 @@ describe('Regression Tests', () => {
     });
 
     it('should handle multiple profile keys independently', async () => {
-      await manager.setProfile({ key: 'language', value: 'English' });
-      await manager.setProfile({ key: 'tone', value: 'casual' });
-      await manager.setProfile({ key: 'verbosity', value: 'concise' });
+      await manager.setProfile({ key: 'language', value: 'English', confidence: 1, explicit: true });
+      await manager.setProfile({ key: 'tone', value: 'casual', confidence: 1, explicit: true });
+      await manager.setProfile({ key: 'verbosity', value: 'concise', confidence: 1, explicit: true });
 
       // Update one key
-      await manager.setProfile({ key: 'language', value: 'Chinese' });
+      await manager.setProfile({ key: 'language', value: 'Chinese', confidence: 1, explicit: true });
 
       // Others should remain unchanged
       expect((await manager.getProfile('tone'))!.value).toBe('casual');

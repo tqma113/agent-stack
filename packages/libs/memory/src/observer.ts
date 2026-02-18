@@ -10,7 +10,7 @@ import type {
   EventType,
   EventEntity,
   EventLink,
-} from '@agent-stack/memory-store';
+} from '@agent-stack/memory-store-sqlite';
 import type { ObserverCallback } from './types.js';
 
 /**

@@ -357,8 +357,12 @@
       "projectFolder": "packages/libs/memory"
     },
     {
-      "packageName": "@agent-stack/memory-store",
-      "projectFolder": "packages/libs/memory-store"
+      "packageName": "@agent-stack/memory-store-sqlite",
+      "projectFolder": "packages/libs/memory-store-sqlite"
+    },
+    {
+      "packageName": "@agent-stack/memory-store-json",
+      "projectFolder": "packages/libs/memory-store-json"
     },
     {
       "packageName": "@agent-stack-skill/memory",

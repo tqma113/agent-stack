@@ -42,7 +42,7 @@
   "author": "",
   "license": "MIT",
   "dependencies": {
-    "@agent-stack/memory-store": "workspace:*",
+    "@agent-stack/memory-store-sqlite": "workspace:*",
     "better-sqlite3": "^11.7.0"
   },
   "devDependencies": {
