@@ -391,6 +391,10 @@
     {
       "packageName": "@ai-stack-mcp/git",
       "projectFolder": "packages/mcp-servers/git"
+    },
+    {
+      "packageName": "@ai-stack-mcp/bash",
+      "projectFolder": "packages/mcp-servers/bash"
     }
   ]
 }

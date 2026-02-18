@@ -923,6 +923,125 @@ packages/mcp-servers/git/
 }
 ```
 
+### 9.4 @ai-stack-mcp/bash
+
+Bash/Shell 命令执行 MCP 服务器，提供安全的命令执行和后台进程管理。
+
+```
+packages/mcp-servers/bash/
+├── src/
+│   ├── index.ts               # 包入口
+│   ├── types.ts               # 类型定义
+│   ├── bash-operations.ts     # Bash 操作实现
+│   ├── server.ts              # MCP Server 实现
+│   └── cli.ts                 # CLI 入口
+├── dist/                      # 构建输出
+├── package.json
+├── tsconfig.json
+└── tsup.config.ts
+```
+
+**提供的工具**：
+
+| 工具名 | 描述 |
+|--------|------|
+| `bash_execute` | 执行单条 bash 命令 |
+| `bash_script` | 执行多行 bash 脚本 |
+| `bash_background` | 启动后台进程 |
+| `bash_kill` | 终止后台进程 |
+| `bash_processes` | 列出后台进程 |
+| `bash_read_output` | 读取后台进程输出 |
+| `bash_which` | 查找可执行文件位置 |
+| `bash_env` | 获取环境变量 |
+| `bash_pwd` | 获取当前工作目录 |
+| `bash_cd` | 切换工作目录 |
+
+**bash_execute 返回格式**：
+```
+<stdout 输出>
+
+--- STDERR ---
+<stderr 输出>
+
+--- EXECUTION INFO ---
+Exit code: 0
+Duration: 123ms
+```
+
+**安全特性**：
+- 内置危险命令拦截 (rm -rf /, fork bomb 等)
+- 支持命令白名单模式
+- 支持自定义黑名单
+- 可配置超时时间
+- 输出缓冲区大小限制
+
+**package.json 关键配置**：
+
+```json
+{
+  "name": "@ai-stack-mcp/bash",
+  "version": "0.0.1",
+  "bin": {
+    "mcp-bash": "./dist/cli.js"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.0.0",
+    "zod": "^3.24.0"
+  }
+}
+```
+
+**MCP 配置示例**：
+
+```json
+{
+  "mcpServers": {
+    "bash": {
+      "command": "npx",
+      "args": ["-y", "@ai-stack-mcp/bash"]
+    }
+  }
+}
+```
+
+**自定义配置**：
+
+```json
+{
+  "mcpServers": {
+    "bash": {
+      "command": "npx",
+      "args": ["-y", "@ai-stack-mcp/bash", "--working-dir=/home/user", "--timeout=60000"],
+      "env": {
+        "MCP_BASH_ALLOWED_COMMANDS": "ls,cat,grep,find,echo"
+      }
+    }
+  }
+}
+```
+
+**CLI 参数**：
+
+| 参数 | 描述 |
+|------|------|
+| `-w, --working-dir=PATH` | 默认工作目录 |
+| `-t, --timeout=MS` | 默认超时时间 (毫秒) |
+| `--no-background` | 禁用后台进程工具 |
+| `--max-processes=N` | 最大后台进程数 |
+| `--blocked=CMD1,CMD2` | 额外的黑名单命令 |
+| `--allowed=CMD1,CMD2` | 白名单命令 (启用白名单模式) |
+
+**环境变量**：
+
+| 变量 | 描述 |
+|------|------|
+| `MCP_BASH_WORKING_DIR` | 默认工作目录 |
+| `MCP_BASH_DEFAULT_TIMEOUT` | 默认超时时间 |
+| `MCP_BASH_MAX_BUFFER_SIZE` | 最大输出缓冲区 |
+| `MCP_BASH_ALLOW_BACKGROUND` | 是否允许后台进程 |
+| `MCP_BASH_BLOCKED_COMMANDS` | 黑名单命令 (逗号分隔) |
+| `MCP_BASH_ALLOWED_COMMANDS` | 白名单命令 (逗号分隔) |
+
 ---
 
 ## 10. Rush 配置目录

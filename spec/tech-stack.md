@@ -66,7 +66,8 @@ Rush 是微软开源的 Monorepo 管理工具，主要特点：
     { "packageName": "@ai-stack-skill/memory", "projectFolder": "packages/skills/memory" },
     { "packageName": "@ai-stack-mcp/fetch", "projectFolder": "packages/mcp-servers/fetch" },
     { "packageName": "@ai-stack-mcp/time", "projectFolder": "packages/mcp-servers/time" },
-    { "packageName": "@ai-stack-mcp/git", "projectFolder": "packages/mcp-servers/git" }
+    { "packageName": "@ai-stack-mcp/git", "projectFolder": "packages/mcp-servers/git" },
+    { "packageName": "@ai-stack-mcp/bash", "projectFolder": "packages/mcp-servers/bash" }
   ]
 }
 ```

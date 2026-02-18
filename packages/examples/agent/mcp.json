@@ -2,22 +2,35 @@
   "mcpServers": {
     "filesystem": {
       "command": "npx",
-      "args": ["-y", "@modelcontextprotocol/server-filesystem", "."],
+      "args": [
+        "-y",
+        "@modelcontextprotocol/server-filesystem",
+        "."
+      ],
       "env": {}
     },
     "fetch": {
       "command": "npx",
-      "args": ["-y", "@ai-stack-mcp/fetch"],
+      "args": [
+        "-y",
+        "@ai-stack-mcp/fetch"
+      ],
       "env": {}
     },
     "time": {
       "command": "npx",
-      "args": ["-y", "@ai-stack-mcp/time"],
+      "args": [
+        "-y",
+        "@ai-stack-mcp/time"
+      ],
       "env": {}
     },
     "git": {
       "command": "npx",
-      "args": ["-y", "@ai-stack-mcp/git"],
+      "args": [
+        "-y",
+        "@ai-stack-mcp/git"
+      ],
       "env": {}
     },
     // "brave-search": {
@@ -34,11 +47,23 @@
     // },
     "chrome-devtools": {
       "command": "npx",
-      "args": ["-y", "chrome-devtools-mcp@latest", "--no-usage-statistics", "--no-performance-crux"]
+      "args": [
+        "-y",
+        "chrome-devtools-mcp@latest",
+        "--no-usage-statistics",
+        "--no-performance-crux"
+      ]
     },
     // "github": {
     //   "type": "http",
     //   "url": "https://api.githubcopilot.com/mcp"
     // }
+    "bash": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@ai-stack-mcp/bash"
+      ]
+    },
   }
 }

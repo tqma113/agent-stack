@@ -67,7 +67,8 @@ ai-stack/
 │   └── mcp-servers/            # 自定义 MCP 服务器 (@ai-stack-mcp/*)
 │       ├── fetch/              # @ai-stack-mcp/fetch - Web 内容获取
 │       ├── time/               # @ai-stack-mcp/time - 时间和时区转换
-│       └── git/                # @ai-stack-mcp/git - Git 仓库操作
+│       ├── git/                # @ai-stack-mcp/git - Git 仓库操作
+│       └── bash/               # @ai-stack-mcp/bash - Bash 命令执行
 │
 ├── example/                     # 示例项目
 │   ├── .ai-stack.json       # Agent 配置示例
