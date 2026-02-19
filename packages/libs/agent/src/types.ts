@@ -2,7 +2,7 @@
  * Agent Types
  */
 
-import type { ChatCompletionMessageParam } from '@ai-stack/provider';
+import type { ChatCompletionMessageParam, ProviderConfig, ProviderInstance } from '@ai-stack/provider';
 import type { MCPToolBridgeOptions } from '@ai-stack/mcp';
 import type { SkillToolBridgeOptions, SkillEntry } from '@ai-stack/skill';
 import type { MemoryConfig, TokenBudget, WritePolicyConfig, RetrievalConfig } from '@ai-stack/memory';
@@ -127,7 +127,7 @@ export interface AgentConfig {
   name?: string;
   /** System prompt that defines the agent's behavior */
   systemPrompt?: string;
-  /** OpenAI model to use */
+  /** Model to use (defaults to gpt-4o for OpenAI) */
   model?: string;
   /** Temperature for response generation (0-2) */
   temperature?: number;
@@ -145,9 +145,42 @@ export interface AgentConfig {
   memory?: AgentMemoryConfig | boolean;
   /** Knowledge configuration for code and document indexing */
   knowledge?: AgentKnowledgeConfig | boolean;
-
   /** Permission configuration for tool execution control */
   permission?: AgentPermissionConfig | boolean;
+  /** Tool execution configuration for parallel execution */
+  toolExecution?: ToolExecutionConfig;
+  /** Telemetry configuration for observability */
+  telemetry?: TelemetryConfig;
+
+  /**
+   * Multi-model provider configuration (optional)
+   *
+   * When specified, uses the new unified provider interface instead of
+   * the default OpenAI client. Supports OpenAI, Anthropic, Google Gemini,
+   * and OpenAI-compatible APIs.
+   *
+   * @example
+   * ```typescript
+   * // Use Anthropic Claude
+   * const agent = createAgent({
+   *   provider: {
+   *     provider: 'anthropic',
+   *     apiKey: process.env.ANTHROPIC_API_KEY,
+   *   },
+   *   model: 'claude-3-5-sonnet-20241022',
+   * });
+   *
+   * // Use Ollama locally
+   * const agent = createAgent({
+   *   provider: {
+   *     provider: 'openai-compatible',
+   *     baseURL: 'http://localhost:11434/v1',
+   *   },
+   *   model: 'llama3.2',
+   * });
+   * ```
+   */
+  provider?: ProviderConfig;
 }
 
 /**
@@ -249,4 +282,180 @@ export interface ConversationOptions {
    * If not provided, an error will be thrown when max iterations is reached.
    */
   onMaxIterations?: OnMaxIterationsCallback;
+}
+
+// =============================================================================
+// Tool Execution Configuration
+// =============================================================================
+
+/**
+ * Configuration for parallel tool execution
+ */
+export interface ToolExecutionConfig {
+  /**
+   * Maximum number of tools to execute concurrently
+   * @default Infinity (no limit)
+   */
+  maxConcurrentTools?: number;
+
+  /**
+   * Timeout for individual tool execution (in milliseconds)
+   * @default 30000 (30 seconds)
+   */
+  toolTimeout?: number;
+
+  /**
+   * Whether to execute tools in parallel when possible
+   * @default true
+   */
+  parallelExecution?: boolean;
+}
+
+/**
+ * Default tool execution configuration
+ */
+export const DEFAULT_TOOL_EXECUTION_CONFIG: Required<ToolExecutionConfig> = {
+  maxConcurrentTools: Infinity,
+  toolTimeout: 30000,
+  parallelExecution: true,
+};
+
+// =============================================================================
+// Observability / Events
+// =============================================================================
+
+/**
+ * Agent event types
+ */
+export type AgentEventType =
+  | 'tool:start'
+  | 'tool:end'
+  | 'tool:error'
+  | 'llm:request'
+  | 'llm:response'
+  | 'llm:stream:start'
+  | 'llm:stream:token'
+  | 'llm:stream:end'
+  | 'memory:retrieve'
+  | 'memory:record'
+  | 'iteration:start'
+  | 'iteration:end';
+
+/**
+ * Base event data
+ */
+export interface AgentEventBase {
+  /** Event type */
+  type: AgentEventType;
+  /** Timestamp when event occurred */
+  timestamp: number;
+  /** Session ID if memory is enabled */
+  sessionId?: string;
+}
+
+/**
+ * Tool execution started
+ */
+export interface ToolStartEvent extends AgentEventBase {
+  type: 'tool:start';
+  toolName: string;
+  args: Record<string, unknown>;
+  toolCallId: string;
+}
+
+/**
+ * Tool execution completed
+ */
+export interface ToolEndEvent extends AgentEventBase {
+  type: 'tool:end';
+  toolName: string;
+  result: string;
+  toolCallId: string;
+  durationMs: number;
+}
+
+/**
+ * Tool execution error
+ */
+export interface ToolErrorEvent extends AgentEventBase {
+  type: 'tool:error';
+  toolName: string;
+  error: string;
+  toolCallId: string;
+  durationMs: number;
+}
+
+/**
+ * LLM request started
+ */
+export interface LLMRequestEvent extends AgentEventBase {
+  type: 'llm:request';
+  model: string;
+  messageCount: number;
+  toolCount: number;
+}
+
+/**
+ * LLM response received
+ */
+export interface LLMResponseEvent extends AgentEventBase {
+  type: 'llm:response';
+  model: string;
+  hasToolCalls: boolean;
+  toolCallCount: number;
+  contentLength: number;
+  usage?: {
+    promptTokens: number;
+    completionTokens: number;
+    totalTokens: number;
+  };
+  durationMs: number;
+}
+
+/**
+ * Iteration started
+ */
+export interface IterationStartEvent extends AgentEventBase {
+  type: 'iteration:start';
+  iteration: number;
+  maxIterations: number;
+}
+
+/**
+ * Iteration completed
+ */
+export interface IterationEndEvent extends AgentEventBase {
+  type: 'iteration:end';
+  iteration: number;
+  toolCallCount: number;
+  durationMs: number;
+}
+
+/**
+ * Union of all agent events
+ */
+export type AgentEvent =
+  | ToolStartEvent
+  | ToolEndEvent
+  | ToolErrorEvent
+  | LLMRequestEvent
+  | LLMResponseEvent
+  | IterationStartEvent
+  | IterationEndEvent;
+
+/**
+ * Event listener function
+ */
+export type AgentEventListener = (event: AgentEvent) => void;
+
+/**
+ * Telemetry configuration
+ */
+export interface TelemetryConfig {
+  /** Enable event emission (default: false) */
+  enabled?: boolean;
+  /** Event listener function */
+  onEvent?: AgentEventListener;
+  /** Log level for built-in console logging */
+  logLevel?: 'none' | 'error' | 'warn' | 'info' | 'debug';
 }

@@ -10,6 +10,7 @@ import type {
   SemanticChunk,
   SemanticChunkInput,
   SemanticSearchResult,
+  MetadataFilter,
   UUID,
 } from '@ai-stack/memory-store-sqlite';
 import {
@@ -319,6 +320,61 @@ export function createJsonSemanticStore(config: JsonSemanticStoreConfig): ISeman
 
       // Remove from chunks
       const remaining = chunks.filter(c => c.sessionId !== sessionId);
+      writeChunks(remaining);
+
+      return toDelete.length;
+    },
+
+    async deleteByMetadata(filters: MetadataFilter[]): Promise<number> {
+      if (filters.length === 0) return 0;
+
+      const chunks = readChunks();
+      const toDelete = chunks.filter(chunk => {
+        const metadata = chunk.metadata as Record<string, unknown> | undefined;
+        if (!metadata) return false;
+
+        // All filters must match
+        return filters.every(filter => metadata[filter.key] === filter.value);
+      });
+
+      if (toDelete.length === 0) return 0;
+
+      // Remove from index
+      const index = readIndex();
+      for (const chunk of toDelete) {
+        removeFromIndex(chunk.id, index);
+      }
+      writeIndex(index);
+
+      // Remove from chunks
+      const toDeleteIds = new Set(toDelete.map(c => c.id));
+      const remaining = chunks.filter(c => !toDeleteIds.has(c.id));
+      writeChunks(remaining);
+
+      return toDelete.length;
+    },
+
+    async deleteByTags(tags: string[]): Promise<number> {
+      if (tags.length === 0) return 0;
+
+      const chunks = readChunks();
+      const toDelete = chunks.filter(chunk => {
+        // Chunk must have ALL specified tags
+        return tags.every(tag => chunk.tags.includes(tag));
+      });
+
+      if (toDelete.length === 0) return 0;
+
+      // Remove from index
+      const index = readIndex();
+      for (const chunk of toDelete) {
+        removeFromIndex(chunk.id, index);
+      }
+      writeIndex(index);
+
+      // Remove from chunks
+      const toDeleteIds = new Set(toDelete.map(c => c.id));
+      const remaining = chunks.filter(c => !toDeleteIds.has(c.id));
       writeChunks(remaining);
 
       return toDelete.length;

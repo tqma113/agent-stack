@@ -517,6 +517,16 @@ export interface IProfileStore extends BaseStore {
 }
 
 /**
+ * Metadata filter for deleteByMetadata
+ */
+export interface MetadataFilter {
+  /** Key to match in metadata JSON */
+  key: string;
+  /** Value to match (exact match) */
+  value: unknown;
+}
+
+/**
  * Semantic store interface
  */
 export interface ISemanticStore extends BaseStore {
@@ -559,4 +569,10 @@ export interface ISemanticStore extends BaseStore {
 
   /** Delete chunks by session */
   deleteBySession(sessionId: string): Promise<number>;
+
+  /** Delete chunks by metadata filter */
+  deleteByMetadata(filters: MetadataFilter[]): Promise<number>;
+
+  /** Delete chunks by tags */
+  deleteByTags(tags: string[]): Promise<number>;
 }

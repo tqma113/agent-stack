@@ -5,6 +5,12 @@
 import { existsSync, readFileSync } from 'fs';
 import { resolve, dirname, join } from 'path';
 import type { AgentConfig, AgentMCPConfig, AgentSkillConfig, AgentMemoryConfig } from './types';
+import { validateConfig, formatValidationErrors } from './config-schema.js';
+
+// Re-export validation utilities
+export { validateConfig, formatValidationErrors } from './config-schema.js';
+export type { ValidationError, ValidationResult } from './config-schema.js';
+import { ConfigValidationError } from './errors.js';
 
 /**
  * Configuration file names to search for (in order of priority)
@@ -156,23 +162,49 @@ export function findConfigFile(startDir: string = process.cwd()): string | undef
 }
 
 /**
- * Load configuration from a file
+ * Options for loading configuration
  */
-export function loadConfigFile(configPath: string): AgentStackConfig {
+export interface LoadConfigFileOptions {
+  /** Skip schema validation (default: false) */
+  skipValidation?: boolean;
+}
+
+/**
+ * Load configuration from a file
+ *
+ * @param configPath - Path to the configuration file
+ * @param options - Loading options
+ * @returns Validated configuration object
+ * @throws ConfigValidationError if validation fails
+ */
+export function loadConfigFile(
+  configPath: string,
+  options: LoadConfigFileOptions = {}
+): AgentStackConfig {
   if (!existsSync(configPath)) {
     throw new Error(`Configuration file not found: ${configPath}`);
   }
 
+  let rawConfig: unknown;
   try {
     const content = readFileSync(configPath, 'utf-8');
-    const config = JSON.parse(content) as AgentStackConfig;
-    return config;
+    rawConfig = JSON.parse(content);
   } catch (error) {
     if (error instanceof SyntaxError) {
       throw new Error(`Invalid JSON in configuration file: ${configPath}`);
     }
     throw error;
   }
+
+  // Validate configuration if not skipped
+  if (!options.skipValidation) {
+    const validationResult = validateConfig(rawConfig);
+    if (!validationResult.success && validationResult.errors) {
+      throw new ConfigValidationError(validationResult.errors);
+    }
+  }
+
+  return rawConfig as AgentStackConfig;
 }
 
 /**

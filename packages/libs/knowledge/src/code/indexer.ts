@@ -8,11 +8,11 @@ import { glob } from 'glob';
 import { createHash } from 'crypto';
 import { readFile, stat } from 'fs/promises';
 import { resolve, relative } from 'path';
-import type Database from 'better-sqlite3';
 import type {
   SemanticStoreInstance,
   SemanticChunkInput,
   EmbedFunction,
+  DatabaseType,
 } from '@ai-stack/memory-store-sqlite';
 
 import type {
@@ -83,7 +83,7 @@ export interface CodeIndexerInstance {
   setEmbedFunction(fn: EmbedFunction): void;
 
   /** Set database for persistent storage */
-  setDatabase(db: Database.Database): void;
+  setDatabase(db: DatabaseType): void;
 }
 
 /**
@@ -200,10 +200,9 @@ export function createCodeIndexer(
       // Remove old chunks if re-indexing
       let chunksRemoved = 0;
       if (existingStatus) {
-        // Delete old chunks by file path tag
-        // Note: SemanticStore doesn't have deleteByTag, so we use a workaround
-        // We'll add the file path as a unique identifier in metadata
-        chunksRemoved = existingStatus.chunkCount;
+        // Delete old chunks by file path metadata
+        const relativePath = relative(cfg.rootDir, filePath);
+        chunksRemoved = await store.deleteByMetadata([{ key: 'filePath', value: relativePath }]);
       }
 
       // Parse and chunk the file
@@ -411,12 +410,18 @@ export function createCodeIndexer(
    * Remove file from index
    */
   async function removeFile(filePath: string): Promise<void> {
+    // Remove from index status store
     if (dbSet) {
       indexStore.delete(filePath);
     }
-    // Note: Chunks are not actually deleted from SemanticStore
-    // as we don't have a way to delete by metadata
-    // This would require extending SemanticStore interface
+
+    // Delete chunks from SemanticStore using metadata filter
+    if (store) {
+      const relativePath = relative(cfg.rootDir, filePath);
+      // Delete by both relative and absolute path to be safe
+      await store.deleteByMetadata([{ key: 'filePath', value: relativePath }]);
+      await store.deleteByMetadata([{ key: 'absolutePath', value: filePath }]);
+    }
   }
 
   /**
@@ -646,7 +651,7 @@ export function createCodeIndexer(
   /**
    * Set database for persistent storage
    */
-  function setDatabase(db: Database.Database): void {
+  function setDatabase(db: DatabaseType): void {
     indexStore.setDatabase(db);
     dbSet = true;
   }

@@ -2,7 +2,206 @@
 
 ## 1. @ai-stack/provider
 
-### 1.1 createOpenAIClient() 工厂函数
+### 1.1 createProvider() 统一工厂函数 (推荐)
+
+创建统一的多模型 Provider 实例，支持 OpenAI、Anthropic、Google Gemini 和 OpenAI 兼容 API。
+
+#### 创建实例
+
+```typescript
+const provider = createProvider(config: ProviderConfig): ProviderInstance
+```
+
+**ProviderConfig** (联合类型):
+
+```typescript
+// OpenAI 配置
+interface OpenAIProviderConfig {
+  provider: 'openai';
+  apiKey?: string;          // 默认 process.env.OPENAI_API_KEY
+  baseURL?: string;
+  organization?: string;
+  project?: string;
+  timeout?: number;         // 默认 60000ms
+  maxRetries?: number;      // 默认 2
+}
+
+// Anthropic 配置
+interface AnthropicProviderConfig {
+  provider: 'anthropic';
+  apiKey?: string;          // 默认 process.env.ANTHROPIC_API_KEY
+  baseURL?: string;
+  timeout?: number;
+  maxRetries?: number;
+  defaultMaxTokens?: number; // 默认 4096
+}
+
+// Google Gemini 配置
+interface GoogleProviderConfig {
+  provider: 'google';
+  apiKey?: string;          // 默认 process.env.GOOGLE_API_KEY
+  timeout?: number;
+}
+
+// OpenAI 兼容配置 (Ollama, Groq, Together.ai 等)
+interface OpenAICompatibleProviderConfig {
+  provider: 'openai-compatible';
+  apiKey?: string;          // 默认 'ollama' (用于本地)
+  baseURL?: string;         // 必需 (如 http://localhost:11434/v1)
+  name?: string;            // 提供商标识
+  timeout?: number;
+  maxRetries?: number;
+}
+```
+
+---
+
+#### ProviderInstance 接口
+
+```typescript
+interface ProviderInstance {
+  readonly type: ProviderType;
+  readonly capabilities: ProviderCapabilities;
+
+  setDefaultModel(model: string): void;
+  getDefaultModel(): string;
+
+  chat(messages: UnifiedMessage[], options?: UnifiedChatOptions): Promise<UnifiedChatResult>;
+  chatStream(messages: UnifiedMessage[], options?: UnifiedStreamOptions): AsyncGenerator<string, UnifiedChatResult>;
+  embed?(input: string | string[], options?: UnifiedEmbeddingOptions): Promise<UnifiedEmbeddingResult[]>;
+  getNativeClient(): unknown;
+}
+```
+
+---
+
+#### chat()
+
+创建聊天补全 (所有提供商)。
+
+```typescript
+async chat(
+  messages: UnifiedMessage[],
+  options?: UnifiedChatOptions
+): Promise<UnifiedChatResult>
+```
+
+**UnifiedMessage**:
+
+```typescript
+type UnifiedMessage =
+  | { role: 'system'; content: string }
+  | { role: 'user'; content: string | ContentPart[] }
+  | { role: 'assistant'; content: string | null; tool_calls?: UnifiedToolCall[] }
+  | { role: 'tool'; content: string; tool_call_id: string };
+```
+
+**UnifiedChatOptions**:
+
+| 参数 | 类型 | 描述 |
+|------|------|------|
+| `model` | `string` | 使用的模型 |
+| `temperature` | `number` | 温度 (0-2) |
+| `maxTokens` | `number` | 最大输出 token |
+| `topP` | `number` | Top-p 采样 |
+| `stop` | `string \| string[]` | 停止序列 |
+| `tools` | `UnifiedTool[]` | 可用工具 |
+| `toolChoice` | `'none' \| 'auto' \| 'required' \| {...}` | 工具选择策略 |
+| `responseFormat` | `{ type: 'text' \| 'json_object' }` | 响应格式 |
+| `seed` | `number` | 随机种子 |
+| `user` | `string` | 用户标识 |
+
+**UnifiedChatResult**:
+
+```typescript
+{
+  id: string;
+  content: string | null;
+  toolCalls?: UnifiedToolCall[];
+  finishReason: string | null;
+  usage?: {
+    promptTokens: number;
+    completionTokens: number;
+    totalTokens: number;
+  };
+}
+```
+
+---
+
+#### chatStream()
+
+流式聊天补全 (所有提供商)。
+
+```typescript
+async *chatStream(
+  messages: UnifiedMessage[],
+  options?: UnifiedStreamOptions
+): AsyncGenerator<string, UnifiedChatResult, unknown>
+```
+
+**UnifiedStreamOptions** (继承 UnifiedChatOptions):
+
+| 参数 | 类型 | 描述 |
+|------|------|------|
+| `onToken` | `(token: string) => void` | 每个 token 的回调 |
+| `onToolCall` | `(toolCall: Partial<UnifiedToolCall>) => void` | 工具调用回调 |
+| `signal` | `AbortSignal` | 取消信号 |
+
+---
+
+#### embed()
+
+创建文本嵌入 (仅 OpenAI 和 Google 支持)。
+
+```typescript
+async embed?(
+  input: string | string[],
+  options?: UnifiedEmbeddingOptions
+): Promise<UnifiedEmbeddingResult[]>
+```
+
+---
+
+#### 使用示例
+
+```typescript
+import { createProvider } from '@ai-stack/provider';
+
+// OpenAI
+const openai = createProvider({ provider: 'openai' });
+openai.setDefaultModel('gpt-4o');
+
+// Anthropic
+const claude = createProvider({
+  provider: 'anthropic',
+  apiKey: process.env.ANTHROPIC_API_KEY,
+});
+claude.setDefaultModel('claude-3-5-sonnet-20241022');
+
+// Google Gemini
+const gemini = createProvider({
+  provider: 'google',
+  apiKey: process.env.GOOGLE_API_KEY,
+});
+gemini.setDefaultModel('gemini-1.5-pro');
+
+// Ollama (本地)
+const ollama = createProvider({
+  provider: 'openai-compatible',
+  baseURL: 'http://localhost:11434/v1',
+});
+ollama.setDefaultModel('llama3.2');
+
+// 统一调用
+const result = await provider.chat([
+  { role: 'user', content: 'Hello!' }
+], { temperature: 0.7 });
+```
+
+---
+
+### 1.2 createOpenAIClient() 工厂函数 (传统 API)
 
 #### 创建实例
 
@@ -276,6 +475,24 @@ const agent = createAgent(config?: AgentConfig): AgentInstance
 | `baseURL` | `string` | - | 自定义端点 |
 | `mcp` | `AgentMCPConfig` | - | MCP 配置 |
 | `skill` | `AgentSkillConfig` | - | Skill 配置 |
+| `toolExecution` | `ToolExecutionConfig` | - | 工具执行配置 (并行/超时) |
+| `telemetry` | `TelemetryConfig` | - | 遥测/可观测性配置 |
+
+**ToolExecutionConfig** (新增):
+
+| 参数 | 类型 | 默认值 | 描述 |
+|------|------|--------|------|
+| `maxConcurrentTools` | `number` | `Infinity` | 最大并发工具数 |
+| `toolTimeout` | `number` | `30000` | 单个工具超时 (ms) |
+| `parallelExecution` | `boolean` | `true` | 是否并行执行工具 |
+
+**TelemetryConfig** (新增):
+
+| 参数 | 类型 | 默认值 | 描述 |
+|------|------|--------|------|
+| `enabled` | `boolean` | `false` | 是否启用事件发射 |
+| `onEvent` | `AgentEventListener` | - | 事件监听回调 |
+| `logLevel` | `'none' \| 'error' \| 'warn' \| 'info' \| 'debug'` | `'none'` | 日志级别 |
 
 **AgentMCPConfig**:
 
@@ -1499,7 +1716,9 @@ class RetrievalError extends MemoryError {}
 ```typescript
 export {
   // 工厂函数
+  createProvider,
   createOpenAIClient,
+  type ProviderInstance,
   type OpenAIClientInstance,
 
   // 辅助函数
@@ -1515,7 +1734,18 @@ export {
   chunkText,
   toFile,
 
+  // 错误类
+  ProviderError,
+  AuthenticationError,
+  RateLimitError,
+  InvalidRequestError,
+  ModelNotFoundError,
+  ContentFilterError,
+  APIConnectionError,
+  StreamError,
+
   // 类型
+  type ProviderConfig,
   type OpenAIClientConfig,
   type ChatModel,
   type EmbeddingModel,
@@ -1554,6 +1784,23 @@ export {
   toAgentConfig,
   generateConfigTemplate,
   serializeConfig,
+  validateConfig,
+  formatValidationErrors,
+
+  // 错误类
+  AIStackError,
+  AgentInitError,
+  AgentNotInitializedError,
+  AgentIterationLimitError,
+  ProviderAuthError,
+  ProviderRateLimitError,
+  ProviderAPIError,
+  ProviderTimeoutError,
+  ToolNotFoundError,
+  ToolExecutionError,
+  ToolPermissionDeniedError,
+  ConfigNotFoundError,
+  ConfigValidationError,
 
   // 类型
   type AgentConfig,
@@ -1568,6 +1815,11 @@ export {
   type StreamCallbacks,
   type ConversationOptions,
   type Message,
+  type ToolExecutionConfig,
+  type TelemetryConfig,
+  type AgentEvent,
+  type AgentEventType,
+  type AgentEventListener,
 
   // 从 provider re-export
   createOpenAIClient,

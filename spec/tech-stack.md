@@ -110,6 +110,41 @@ export default defineConfig({
 
 ## 4. AI/LLM 集成
 
+### 多模型抽象层
+
+`@ai-stack/provider` 提供统一的多模型抽象接口，支持以下 LLM 提供商：
+
+| 提供商 | 依赖包 | 安装方式 |
+|--------|--------|---------|
+| OpenAI | openai ^4.77.0 | 默认安装 |
+| Anthropic | @anthropic-ai/sdk ^0.39.0 | 可选依赖 |
+| Google Gemini | @google/generative-ai ^0.21.0 | 可选依赖 |
+| OpenAI 兼容 | openai ^4.77.0 | 复用 OpenAI SDK |
+
+**统一接口**：
+```typescript
+// 统一工厂函数
+const provider = createProvider({
+  provider: 'openai' | 'anthropic' | 'google' | 'openai-compatible',
+  apiKey: '...',
+  baseURL: '...',  // 可选
+});
+
+// 统一调用方式
+const result = await provider.chat(messages, options);
+const stream = provider.chatStream(messages, options);
+```
+
+**支持的能力**：
+| 能力 | OpenAI | Anthropic | Google | OpenAI 兼容 |
+|------|--------|-----------|--------|------------|
+| 聊天 | ✓ | ✓ | ✓ | ✓ |
+| 流式 | ✓ | ✓ | ✓ | ✓ |
+| 工具调用 | ✓ | ✓ | ✓ | 取决于提供商 |
+| 视觉 | ✓ | ✓ | ✓ | 取决于提供商 |
+| 嵌入 | ✓ | ✗ | ✓ | 取决于提供商 |
+| JSON 模式 | ✓ | ✗ | ✓ | 取决于提供商 |
+
 ### OpenAI SDK (^4.77.0)
 
 官方 OpenAI Node.js SDK，支持：
@@ -127,6 +162,73 @@ export default defineConfig({
 | 嵌入 | text-embedding-3-small, text-embedding-3-large |
 | 图像 | dall-e-3, dall-e-2 |
 | 语音 | tts-1, tts-1-hd, whisper-1 |
+
+### Anthropic SDK (^0.39.0) [可选]
+
+Anthropic Claude API SDK，支持：
+
+- Messages API (Claude 3.5, Claude 3)
+- 流式响应
+- 工具调用 (Function Calling)
+- 视觉能力 (图像输入)
+
+**支持的模型**:
+| 类型 | 模型 |
+|------|------|
+| 聊天 | claude-3-5-sonnet-20241022, claude-3-opus-20240229, claude-3-haiku-20240307 |
+
+### Google Generative AI SDK (^0.21.0) [可选]
+
+Google Gemini API SDK，支持：
+
+- GenerateContent API (Gemini 1.5, Gemini 2.0)
+- 流式响应
+- 函数调用 (Function Calling)
+- 多模态输入 (文本、图像)
+- 嵌入 API
+
+**支持的模型**:
+| 类型 | 模型 |
+|------|------|
+| 聊天 | gemini-1.5-pro, gemini-1.5-flash, gemini-2.0-flash-exp |
+| 嵌入 | text-embedding-004 |
+
+### OpenAI 兼容 API
+
+支持任何兼容 OpenAI API 的提供商：
+
+| 提供商 | baseURL | 说明 |
+|--------|---------|------|
+| Ollama | http://localhost:11434/v1 | 本地模型 |
+| Groq | https://api.groq.com/openai/v1 | 高速推理 |
+| Together.ai | https://api.together.xyz/v1 | 开源模型 |
+| Azure OpenAI | https://{endpoint}.openai.azure.com | 企业部署 |
+
+### Zod (^3.24.0)
+
+TypeScript-first 的 schema 验证库，用于配置校验：
+
+```typescript
+// 配置 Schema 定义
+const AgentStackConfigSchema = z.object({
+  model: z.string().optional(),
+  temperature: z.number().min(0).max(2).optional(),
+  maxTokens: z.number().int().positive().optional(),
+  // ... 其他字段
+}).strict();
+
+// 校验并获取友好错误消息
+const result = validateConfig(rawConfig);
+if (!result.success) {
+  console.error(formatValidationErrors(result.errors));
+}
+```
+
+**特点**：
+- 类型安全的 Schema 定义
+- 自动 TypeScript 类型推断
+- 友好的错误消息
+- 支持嵌套对象和严格模式
 
 ### Commander (^12.1.0)
 

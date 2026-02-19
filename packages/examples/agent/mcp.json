@@ -27,31 +27,16 @@
     "bash": {
       "command": "npx",
       "args": ["mcp-bash"]
+    },
+    "github": {
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-github"],
+      "env": {}
+    },
+    "chrome-devtools": {
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-chrome-devtools"],
+      "env": {}
     }
-    // "brave-search": {
-    //   "command": "npx",
-    //   "args": ["-y", "@brave/brave-search-mcp-server", "--transport", "http"],
-    //   "env": {}
-    // }
-    // "sequential-thinking": {
-    //   "command": "npx",
-    //   "args": [
-    //     "-y",
-    //     "@modelcontextprotocol/server-sequential-thinking"
-    //   ]
-    // },
-    // "chrome-devtools": {
-    //   "command": "npx",
-    //   "args": [
-    //     "-y",
-    //     "chrome-devtools-mcp@latest",
-    //     "--no-usage-statistics",
-    //     "--no-performance-crux"
-    //   ]
-    // },
-    // "github": {
-    //   "type": "http",
-    //   "url": "https://api.githubcopilot.com/mcp"
-    // }
   }
 }

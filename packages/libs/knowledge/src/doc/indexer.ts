@@ -4,11 +4,11 @@
  * Indexes external documents into semantic chunks for search.
  */
 
-import type Database from 'better-sqlite3';
 import type {
   SemanticStoreInstance,
   SemanticChunkInput,
   EmbedFunction,
+  DatabaseType,
 } from '@ai-stack/memory-store-sqlite';
 
 import type {
@@ -145,7 +145,7 @@ export interface DocIndexerInstance {
   setEmbedFunction(fn: EmbedFunction): void;
 
   /** Set database for persistent storage */
-  setDatabase(db: Database.Database): void;
+  setDatabase(db: DatabaseType): void;
 }
 
 /**
@@ -679,7 +679,7 @@ export function createDocIndexer(
   /**
    * Set database for persistent storage
    */
-  function setDatabase(db: Database.Database): void {
+  function setDatabase(db: DatabaseType): void {
     registryStore.setDatabase(db);
     dbSet = true;
   }

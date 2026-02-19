@@ -10,6 +10,7 @@ import type {
   SemanticChunk,
   SemanticChunkInput,
   SemanticSearchResult,
+  MetadataFilter,
   UUID,
 } from '../types.js';
 import { createDbOperations, type DbOperationsInstance } from './db-operations.js';
@@ -125,6 +126,10 @@ export interface SemanticStoreInstance extends ISemanticStore {
   ): Promise<SemanticSearchResult[]>;
   /** Delete a chunk by ID */
   delete(id: UUID): Promise<boolean>;
+  /** Delete chunks by metadata filter (e.g., { key: 'filePath', value: '/path/to/file.ts' }) */
+  deleteByMetadata(filters: MetadataFilter[]): Promise<number>;
+  /** Delete chunks by tags (any matching tag) */
+  deleteByTags(tags: string[]): Promise<number>;
   /** Get chunk count */
   count(sessionId?: string): Promise<number>;
   /** Get embedding cache instance (if enabled) */
@@ -886,6 +891,95 @@ export function createSemanticStore(
     }
   }
 
+  /**
+   * Delete chunks by metadata filter
+   * Uses json_extract to query metadata JSON field
+   */
+  async function deleteByMetadataImpl(filters: MetadataFilter[]): Promise<number> {
+    const db = dbOps.getDb();
+
+    if (filters.length === 0) {
+      return 0;
+    }
+
+    try {
+      // Build WHERE clause with json_extract for each filter
+      const conditions: string[] = [];
+      const params: unknown[] = [];
+
+      for (const filter of filters) {
+        // Use json_extract to get the value at the key path
+        conditions.push(`json_extract(metadata, ?) = ?`);
+        params.push(`$.${filter.key}`);
+        params.push(
+          typeof filter.value === 'string' ? filter.value : JSON.stringify(filter.value)
+        );
+      }
+
+      // Get matching chunk IDs first (for vec table cleanup)
+      const selectSql = `SELECT id FROM semantic_chunks WHERE ${conditions.join(' AND ')}`;
+      const matchingChunks = db.prepare(selectSql).all(...params) as Array<{ id: string }>;
+
+      if (matchingChunks.length === 0) {
+        return 0;
+      }
+
+      // Delete from vec table
+      if (vecEnabled) {
+        for (const chunk of matchingChunks) {
+          db.prepare('DELETE FROM semantic_chunks_vec WHERE chunk_id = ?').run(chunk.id);
+        }
+      }
+
+      // Delete from main table
+      const deleteSql = `DELETE FROM semantic_chunks WHERE ${conditions.join(' AND ')}`;
+      const result = db.prepare(deleteSql).run(...params);
+      return result.changes;
+    } catch (error) {
+      throw new DatabaseError('deleteByMetadata', (error as Error).message, error as Error);
+    }
+  }
+
+  /**
+   * Delete chunks by tags (any matching tag)
+   */
+  async function deleteByTagsImpl(tags: string[]): Promise<number> {
+    const db = dbOps.getDb();
+
+    if (tags.length === 0) {
+      return 0;
+    }
+
+    try {
+      // Build WHERE clause with LIKE for each tag (tags stored as JSON array)
+      const tagConditions = tags.map(() => 'tags LIKE ?');
+      const whereClause = `(${tagConditions.join(' OR ')})`;
+      const params = tags.map((tag) => `%"${tag}"%`);
+
+      // Get matching chunk IDs first (for vec table cleanup)
+      const selectSql = `SELECT id FROM semantic_chunks WHERE ${whereClause}`;
+      const matchingChunks = db.prepare(selectSql).all(...params) as Array<{ id: string }>;
+
+      if (matchingChunks.length === 0) {
+        return 0;
+      }
+
+      // Delete from vec table
+      if (vecEnabled) {
+        for (const chunk of matchingChunks) {
+          db.prepare('DELETE FROM semantic_chunks_vec WHERE chunk_id = ?').run(chunk.id);
+        }
+      }
+
+      // Delete from main table
+      const deleteSql = `DELETE FROM semantic_chunks WHERE ${whereClause}`;
+      const result = db.prepare(deleteSql).run(...params);
+      return result.changes;
+    } catch (error) {
+      throw new DatabaseError('deleteByTags', (error as Error).message, error as Error);
+    }
+  }
+
   async function count(sessionId?: string): Promise<number> {
     const db = dbOps.getDb();
 
@@ -942,6 +1036,8 @@ export function createSemanticStore(
     searchText,
     searchSimilar,
     delete: deleteChunk,
+    deleteByMetadata: deleteByMetadataImpl,
+    deleteByTags: deleteByTagsImpl,
     count,
 
     // Embedding cache methods

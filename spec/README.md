@@ -2,7 +2,7 @@
 
 ## 项目概述
 
-AI Stack 是一个基于 TypeScript 的 AI Agent 开发框架，采用 Rush monorepo 架构管理多个包。项目旨在提供一个简洁、易用的 OpenAI API 封装、MCP 协议支持、Skill 系统、Memory 系统、Knowledge 知识库系统、权限管控系统和 AI Agent 实现。
+AI Stack 是一个基于 TypeScript 的 AI Agent 开发框架，采用 Rush monorepo 架构管理多个包。项目旨在提供一个简洁、易用的多模型 LLM 抽象层（支持 OpenAI、Anthropic Claude、Google Gemini 和 OpenAI 兼容 API）、MCP 协议支持、Skill 系统、Memory 系统、Knowledge 知识库系统、权限管控系统和 AI Agent 实现。
 
 ### 设计理念
 
@@ -27,9 +27,12 @@ AI Stack 是一个基于 TypeScript 的 AI Agent 开发框架，采用 Rush mono
 | Monorepo 工具 | Rush | 5.165.0 |
 | 构建工具 | tsup | ^8.3.5 |
 | AI SDK | openai | ^4.77.0 |
+| AI SDK (可选) | @anthropic-ai/sdk | ^0.39.0 |
+| AI SDK (可选) | @google/generative-ai | ^0.21.0 |
 | MCP SDK | @modelcontextprotocol/sdk | ^1.0.0 |
 | 数据库 | better-sqlite3 | ^11.7.0 |
 | 向量搜索 | sqlite-vec | ^0.1.6 |
+| 配置校验 | zod | ^3.24.0 |
 
 ### 开发依赖
 
@@ -51,7 +54,7 @@ AI Stack 是一个基于 TypeScript 的 AI Agent 开发框架，采用 Rush mono
 ai-stack/
 ├── packages/                    # 所有包目录
 │   ├── libs/                   # 核心业务库 (@ai-stack/*)
-│   │   ├── provider/           # @ai-stack/provider - OpenAI API 封装
+│   │   ├── provider/           # @ai-stack/provider - 多模型 LLM 抽象层
 │   │   ├── mcp/                # @ai-stack/mcp - MCP 协议支持
 │   │   ├── skill/              # @ai-stack/skill - Skill 系统
 │   │   ├── memory/             # @ai-stack/memory - Memory 策略层
@@ -93,9 +96,11 @@ ai-stack/
 ## 包依赖关系
 
 ```
-@ai-stack/provider  (OpenAI API 封装)
+@ai-stack/provider  (多模型 LLM 抽象层)
         │
-        └── openai (^4.77.0)
+        ├── openai (^4.77.0)
+        ├── @anthropic-ai/sdk (^0.39.0) [可选]
+        └── @google/generative-ai (^0.21.0) [可选]
 
 @ai-stack/mcp       (MCP 协议支持)
         │
@@ -122,9 +127,9 @@ ai-stack/
         │
         └── @ai-stack/memory-store-sqlite (workspace:*)
 
-@ai-stack/knowledge (代码和文档索引)
+@ai-stack/knowledge (代码和文档索引，复用 memory-store-sqlite 的 SQLite/sqlite-vec)
         │
-        ├── @ai-stack/memory-store-sqlite (workspace:*)
+        ├── @ai-stack/memory-store-sqlite (workspace:*) - 提供 createDatabase(), SemanticStore
         ├── @ai-stack/memory (workspace:*)
         ├── node-html-markdown (^1.3.0)
         ├── glob (^11.0.0)
@@ -142,7 +147,8 @@ ai-stack/
         ├── @ai-stack/skill (workspace:*)
         ├── @ai-stack/memory (workspace:*)
         ├── @ai-stack/knowledge (workspace:*)
-        └── commander (^12.1.0) - CLI 框架
+        ├── commander (^12.1.0) - CLI 框架
+        └── zod (^3.24.0) - 配置校验
 
 @ai-stack/assistant (个人 AI 助手，Markdown 记忆 + 多通道 + 调度)
         │
@@ -167,13 +173,17 @@ ai-stack/
 
 | 功能 | 描述 |
 |------|------|
-| **Provider** | OpenAI API 封装，支持 Chat/Embedding/Image/TTS/STT |
+| **Provider** | 多模型 LLM 封装，支持 OpenAI、Anthropic、Google Gemini 和 OpenAI 兼容 API |
 | **MCP** | Model Context Protocol 支持，连接外部工具服务器 |
 | **Skill** | 本地技能系统，动态加载和执行工具 |
 | **Memory** | 五层记忆架构，持久化对话和任务状态 |
 | **Knowledge** | 代码库和文档索引，混合搜索 (FTS + Vector) |
 | **Permission** | 权限管控系统，工具执行前确认和审计 |
 | **Assistant** | 个人 AI 助手，Markdown 记忆 + 多通道网关 + 调度器 |
+| **Error Handling** | 统一错误处理系统，可恢复错误自动重试 |
+| **Telemetry** | 可观测性系统，工具/LLM 调用事件追踪 |
+| **Parallel Tools** | 并行工具执行，可配置并发数和超时 |
+| **Config Validation** | Zod Schema 配置校验，友好错误提示 |
 
 ---
 

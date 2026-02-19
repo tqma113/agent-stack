@@ -47,7 +47,8 @@
     "commander": "^12.1.0",
     "ora": "^8.1.0",
     "strip-ansi": "^7.1.0",
-    "terminal-size": "^4.0.0"
+    "terminal-size": "^4.0.0",
+    "zod": "^3.24.0"
   },
   "devDependencies": {
     "@types/node": "^22.10.0",

@@ -5,11 +5,13 @@
  * Uses its own SQLite database with SemanticStore for independent operation.
  */
 
-import Database from 'better-sqlite3';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import {
+  createDatabase,
+  loadVecExtension,
   createSemanticStore,
+  type DatabaseInstance,
   type SemanticStoreInstance,
   type EmbedFunction,
   type SemanticStoreConfig,
@@ -101,7 +103,7 @@ export function createKnowledgeManager(
 ): KnowledgeManagerInstance {
   // Private state
   let semanticStore: SemanticStoreInstance | null = null;
-  let database: Database.Database | null = null;
+  let databaseInstance: DatabaseInstance | null = null;
   let codeIndexer: CodeIndexerInstance | null = null;
   let docIndexer: DocIndexerInstance | null = null;
   let hybridSearch: HybridSearchInstance | null = null;
@@ -137,18 +139,23 @@ export function createKnowledgeManager(
   async function initialize(): Promise<void> {
     if (initialized) return;
 
-    // Create database
+    // Create database using the factory from memory-store-sqlite
     const dbDir = path.dirname(dbPath);
     if (!fs.existsSync(dbDir)) {
       fs.mkdirSync(dbDir, { recursive: true });
     }
-    database = new Database(dbPath);
-    database.pragma('journal_mode = WAL');
-    database.pragma('foreign_keys = ON');
+    databaseInstance = createDatabase({
+      path: dbPath,
+      wal: true,
+      foreignKeys: true,
+    });
+
+    // Load sqlite-vec extension for vector search
+    await loadVecExtension(databaseInstance.db);
 
     // Create SemanticStore for chunks and vector search
     semanticStore = createSemanticStore(config.semantic);
-    semanticStore.setDatabase(database);
+    semanticStore.setDatabase(databaseInstance.db);
     await semanticStore.initialize();
 
     if (embedFunction) {
@@ -158,7 +165,7 @@ export function createKnowledgeManager(
     // Create code indexer
     if (codeEnabled) {
       codeIndexer = createCodeIndexer(codeConfig);
-      codeIndexer.setDatabase(database);
+      codeIndexer.setDatabase(databaseInstance.db);
       codeIndexer.setStore(semanticStore);
       if (embedFunction) {
         codeIndexer.setEmbedFunction(embedFunction);
@@ -169,7 +176,7 @@ export function createKnowledgeManager(
     // Create document indexer
     if (docEnabled) {
       docIndexer = createDocIndexer(docConfig);
-      docIndexer.setDatabase(database);
+      docIndexer.setDatabase(databaseInstance.db);
       docIndexer.setStore(semanticStore);
       if (embedFunction) {
         docIndexer.setEmbedFunction(embedFunction);
@@ -210,9 +217,9 @@ export function createKnowledgeManager(
       await semanticStore.close();
       semanticStore = null;
     }
-    if (database) {
-      database.close();
-      database = null;
+    if (databaseInstance) {
+      databaseInstance.close();
+      databaseInstance = null;
     }
 
     initialized = false;

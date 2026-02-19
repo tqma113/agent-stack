@@ -4,7 +4,7 @@
  * Persistent store for code index status using SQLite.
  */
 
-import type Database from 'better-sqlite3';
+import type { DatabaseType } from '@ai-stack/memory-store-sqlite';
 import { randomUUID } from 'crypto';
 import type { IndexStatus, IndexStatusSummary } from '../types.js';
 
@@ -28,7 +28,7 @@ export interface CodeIndexStatusRow {
  */
 export interface CodeIndexStoreInstance {
   /** Set the database instance */
-  setDatabase(db: Database.Database): void;
+  setDatabase(db: DatabaseType): void;
 
   /** Initialize the store (create tables) */
   initialize(): Promise<void>;
@@ -65,10 +65,10 @@ export interface CodeIndexStoreInstance {
  * Create a code index store
  */
 export function createCodeIndexStore(): CodeIndexStoreInstance {
-  let db: Database.Database | null = null;
+  let db: DatabaseType | null = null;
   let initialized = false;
 
-  function getDb(): Database.Database {
+  function getDb(): DatabaseType {
     if (!db) {
       throw new Error('Database not set for CodeIndexStore');
     }
@@ -87,7 +87,7 @@ export function createCodeIndexStore(): CodeIndexStoreInstance {
   }
 
   return {
-    setDatabase(database: Database.Database): void {
+    setDatabase(database: DatabaseType): void {
       db = database;
     },
 

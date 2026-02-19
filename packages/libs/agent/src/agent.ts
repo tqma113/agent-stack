@@ -4,6 +4,7 @@
 
 import {
   createOpenAIClient,
+  createProvider,
   systemMessage,
   userMessage,
   assistantMessage,
@@ -11,6 +12,8 @@ import {
   defineTool,
   type ChatCompletionMessageParam,
   type OpenAIClientInstance,
+  type ProviderInstance,
+  type UnifiedMessage,
 } from '@ai-stack/provider';
 import {
   createMCPClientManager,
@@ -65,7 +68,13 @@ import type {
   ToolCallResult,
   StreamCallbacks,
   ConversationOptions,
+  ToolExecutionConfig,
+  TelemetryConfig,
+  AgentEvent,
+  AgentEventType,
+  AgentEventListener,
 } from './types.js';
+import { DEFAULT_TOOL_EXECUTION_CONFIG } from './types.js';
 import {
   createPermissionPolicy,
   type PermissionPolicyInstance,
@@ -74,6 +83,7 @@ import {
   type PermissionRule,
   type PermissionAuditEntry,
 } from './permission/index.js';
+import type { AgentEventListener as AgentEventListenerType } from './types.js';
 
 const DEFAULT_SYSTEM_PROMPT = `You are a helpful AI assistant. Be concise and helpful in your responses.`;
 
@@ -168,6 +178,9 @@ export interface AgentInstance {
   chat(input: string, options?: ConversationOptions): Promise<AgentResponse>;
   stream(input: string, callbacks?: StreamCallbacks, options?: ConversationOptions): Promise<AgentResponse>;
   complete(prompt: string, systemPromptOverride?: string): Promise<string>;
+
+  // Telemetry
+  setEventListener(listener: AgentEventListenerType | null): void;
 }
 
 /**
@@ -175,10 +188,23 @@ export interface AgentInstance {
  */
 export function createAgent(config: AgentConfig = {}): AgentInstance {
   // Private state via closure
-  const client: OpenAIClientInstance = createOpenAIClient({
-    apiKey: config.apiKey,
-    baseURL: config.baseURL,
-  });
+  // Support both legacy OpenAI client and new unified provider
+  let client: OpenAIClientInstance | null = null;
+  let provider: ProviderInstance | null = null;
+
+  if (config.provider) {
+    // Use new unified provider
+    provider = createProvider(config.provider);
+    if (config.model) {
+      provider.setDefaultModel(config.model);
+    }
+  } else {
+    // Use legacy OpenAI client (backward compatible)
+    client = createOpenAIClient({
+      apiKey: config.apiKey,
+      baseURL: config.baseURL,
+    });
+  }
 
   const agentConfig = {
     name: config.name ?? 'Agent',
@@ -225,6 +251,39 @@ export function createAgent(config: AgentConfig = {}): AgentInstance {
       ? { enabled: true }
       : { enabled: true, ...config.permission }
     : null;
+
+  // Tool execution configuration
+  const toolExecConfig: Required<ToolExecutionConfig> = {
+    ...DEFAULT_TOOL_EXECUTION_CONFIG,
+    ...config.toolExecution,
+  };
+
+  // Telemetry configuration
+  const telemetryConfig: TelemetryConfig = config.telemetry ?? {};
+  let eventListener: AgentEventListener | undefined = telemetryConfig.onEvent;
+
+  /**
+   * Emit an agent event
+   */
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  function emitEvent(eventData: { type: AgentEventType } & Record<string, any>): void {
+    if (!telemetryConfig.enabled || !eventListener) return;
+
+    const fullEvent = {
+      ...eventData,
+      timestamp: Date.now(),
+      sessionId: memoryManager?.getSessionId() ?? undefined,
+    } as AgentEvent;
+
+    try {
+      eventListener(fullEvent);
+    } catch (error) {
+      // Don't let event listener errors break the agent
+      if (telemetryConfig.logLevel === 'error' || telemetryConfig.logLevel === 'warn') {
+        console.warn('[Agent] Event listener error:', error);
+      }
+    }
+  }
 
   // Initialize permission policy if configured
   if (permissionConfig?.enabled) {
@@ -320,6 +379,101 @@ export function createAgent(config: AgentConfig = {}): AgentInstance {
       });
       throw error;
     }
+  }
+
+  /**
+   * Execute multiple async functions with concurrency limit
+   */
+  async function executeWithConcurrencyLimit<T>(
+    tasks: Array<() => Promise<T>>,
+    limit: number
+  ): Promise<T[]> {
+    if (limit === Infinity || tasks.length <= limit) {
+      // No limit needed, execute all in parallel
+      return Promise.all(tasks.map(task => task()));
+    }
+
+    const results: T[] = [];
+    const executing = new Set<Promise<void>>();
+
+    for (const task of tasks) {
+      const promise = task().then(result => {
+        results.push(result);
+        executing.delete(promise);
+      });
+      executing.add(promise);
+
+      if (executing.size >= limit) {
+        await Promise.race(executing);
+      }
+    }
+
+    await Promise.all(executing);
+    return results;
+  }
+
+  /**
+   * Execute a task with timeout
+   */
+  async function withTimeout<T>(
+    promise: Promise<T>,
+    timeoutMs: number,
+    errorMessage: string
+  ): Promise<T> {
+    let timeoutHandle: NodeJS.Timeout;
+    const timeoutPromise = new Promise<never>((_, reject) => {
+      timeoutHandle = setTimeout(() => reject(new Error(errorMessage)), timeoutMs);
+    });
+
+    return Promise.race([promise, timeoutPromise]).finally(() => {
+      clearTimeout(timeoutHandle);
+    });
+  }
+
+  // Helper function to call chat on either client or provider
+  async function doChat(
+    messages: ChatCompletionMessageParam[],
+    options: {
+      model?: string;
+      temperature?: number;
+      maxTokens?: number;
+      tools?: ReturnType<typeof defineTool>[];
+    }
+  ) {
+    if (provider) {
+      return provider.chat(messages as UnifiedMessage[], {
+        model: options.model,
+        temperature: options.temperature,
+        maxTokens: options.maxTokens,
+        tools: options.tools,
+      });
+    }
+    return client!.chat(messages, options);
+  }
+
+  // Helper function to call chatStream on either client or provider
+  function doChatStream(
+    messages: ChatCompletionMessageParam[],
+    options: {
+      model?: string;
+      temperature?: number;
+      maxTokens?: number;
+      tools?: ReturnType<typeof defineTool>[];
+      signal?: AbortSignal;
+      onToken?: (token: string) => void;
+    }
+  ) {
+    if (provider) {
+      return provider.chatStream(messages as UnifiedMessage[], {
+        model: options.model,
+        temperature: options.temperature,
+        maxTokens: options.maxTokens,
+        tools: options.tools,
+        signal: options.signal,
+        onToken: options.onToken,
+      });
+    }
+    return client!.chatStream(messages, options);
   }
 
   // Return the instance object
@@ -1189,12 +1343,40 @@ export function createAgent(config: AgentConfig = {}): AgentInstance {
         }
 
         iterations++;
+        const iterationStartTime = Date.now();
 
-        const response = await client.chat(messages, {
+        // Emit iteration start event
+        emitEvent({
+          type: 'iteration:start',
+          iteration: iterations,
+          maxIterations,
+        });
+
+        // Emit LLM request event
+        emitEvent({
+          type: 'llm:request',
+          model: agentConfig.model,
+          messageCount: messages.length,
+          toolCount: toolsArray?.length ?? 0,
+        });
+
+        const llmStartTime = Date.now();
+        const response = await doChat(messages, {
           model: agentConfig.model,
           temperature: agentConfig.temperature,
           maxTokens: agentConfig.maxTokens,
           tools: toolsArray,
+        });
+
+        // Emit LLM response event
+        emitEvent({
+          type: 'llm:response',
+          model: agentConfig.model,
+          hasToolCalls: !!(response.toolCalls && response.toolCalls.length > 0),
+          toolCallCount: response.toolCalls?.length ?? 0,
+          contentLength: response.content?.length ?? 0,
+          usage: response.usage,
+          durationMs: Date.now() - llmStartTime,
         });
 
         // If no tool calls, we're done
@@ -1226,17 +1408,33 @@ export function createAgent(config: AgentConfig = {}): AgentInstance {
           tool_calls: response.toolCalls,
         });
 
-        // Execute tool calls
-        for (const toolCall of response.toolCalls) {
+        // Execute tool calls (parallel if enabled)
+        const toolTasks = response.toolCalls.map((toolCall) => async () => {
           const tool = tools.get(toolCall.function.name);
+          const toolStartTime = Date.now();
+
           if (!tool) {
             const errorResult = `Error: Unknown tool "${toolCall.function.name}"`;
-            messages.push(toolMessage(toolCall.id, errorResult));
-            continue;
+            emitEvent({
+              type: 'tool:error',
+              toolName: toolCall.function.name,
+              error: errorResult,
+              toolCallId: toolCall.id,
+              durationMs: Date.now() - toolStartTime,
+            });
+            return { toolCall, result: errorResult, args: {}, error: true };
           }
 
           try {
             const args = JSON.parse(toolCall.function.arguments);
+
+            // Emit tool start event
+            emitEvent({
+              type: 'tool:start',
+              toolName: toolCall.function.name,
+              args,
+              toolCallId: toolCall.id,
+            });
 
             // Record tool call to memory
             let toolCallEventId: string | undefined;
@@ -1248,12 +1446,20 @@ export function createAgent(config: AgentConfig = {}): AgentInstance {
               toolCallEventId = event.id;
             }
 
-            // Execute with permission check
-            const { result, denied } = await executeToolWithPermission(
+            // Execute with permission check and timeout
+            const executePromise = executeToolWithPermission(
               tool,
               args,
               toolCall.function.name
             );
+
+            const { result } = toolExecConfig.toolTimeout > 0
+              ? await withTimeout(
+                  executePromise,
+                  toolExecConfig.toolTimeout,
+                  `Tool "${toolCall.function.name}" timed out after ${toolExecConfig.toolTimeout}ms`
+                )
+              : await executePromise;
 
             // Record tool result to memory
             if (memoryManager) {
@@ -1263,28 +1469,65 @@ export function createAgent(config: AgentConfig = {}): AgentInstance {
               );
             }
 
+            // Emit tool end event
+            emitEvent({
+              type: 'tool:end',
+              toolName: toolCall.function.name,
+              result,
+              toolCallId: toolCall.id,
+              durationMs: Date.now() - toolStartTime,
+            });
+
+            return { toolCall, result, args, error: false };
+          } catch (error) {
+            const errorMessage = error instanceof Error ? error.message : String(error);
+            const errorResult = `Error executing tool: ${errorMessage}`;
+
+            // Emit tool error event
+            emitEvent({
+              type: 'tool:error',
+              toolName: toolCall.function.name,
+              error: errorResult,
+              toolCallId: toolCall.id,
+              durationMs: Date.now() - toolStartTime,
+            });
+
+            return { toolCall, result: errorResult, args: {}, error: true };
+          }
+        });
+
+        // Execute tools with concurrency limit (parallel or serial based on config)
+        const toolResults = toolExecConfig.parallelExecution
+          ? await executeWithConcurrencyLimit(toolTasks, toolExecConfig.maxConcurrentTools)
+          : await Promise.all(toolTasks.map(task => task())); // Serial execution
+
+        // Process results in order
+        for (const { toolCall, result, args, error } of toolResults) {
+          if (!error) {
             toolCallResults.push({
               name: toolCall.function.name,
               args,
               result,
             });
-
-            messages.push(toolMessage(toolCall.id, result));
-          } catch (error) {
-            const errorMessage = error instanceof Error ? error.message : String(error);
-            const errorResult = `Error executing tool: ${errorMessage}`;
-            messages.push(toolMessage(toolCall.id, errorResult));
-
+          } else {
             toolCallResults.push({
               name: toolCall.function.name,
               args: {},
-              result: errorResult,
+              result,
             });
           }
+          messages.push(toolMessage(toolCall.id, result));
         }
-      }
 
-      throw new Error(`Max iterations (${maxIterations}) reached`);
+        // Emit iteration end event
+        emitEvent({
+          type: 'iteration:end',
+          iteration: iterations,
+          toolCallCount: toolResults.length,
+          durationMs: Date.now() - iterationStartTime,
+        });
+      }
+      // Note: Loop exits via return statements or throw inside
     },
 
     async stream(
@@ -1401,7 +1644,7 @@ export function createAgent(config: AgentConfig = {}): AgentInstance {
 
           iterations++;
 
-          const stream = client.chatStream(messages, {
+          const stream = doChatStream(messages, {
             model: agentConfig.model,
             temperature: agentConfig.temperature,
             maxTokens: agentConfig.maxTokens,
@@ -1454,8 +1697,8 @@ export function createAgent(config: AgentConfig = {}): AgentInstance {
             tool_calls: finalResult.toolCalls,
           });
 
-          // Execute tool calls
-          for (const toolCall of finalResult.toolCalls) {
+          // Execute tool calls (parallel if enabled)
+          const toolTasks = finalResult.toolCalls.map((toolCall) => async () => {
             const tool = tools.get(toolCall.function.name);
 
             let args: Record<string, unknown> = {};
@@ -1479,18 +1722,25 @@ export function createAgent(config: AgentConfig = {}): AgentInstance {
 
             if (!tool) {
               const errorResult = `Error: Unknown tool "${toolCall.function.name}"`;
-              messages.push(toolMessage(toolCall.id, errorResult));
               onToolResult?.(toolCall.function.name, errorResult);
-              continue;
+              return { toolCall, result: errorResult, args, error: true };
             }
 
             try {
-              // Execute with permission check
-              const { result, denied } = await executeToolWithPermission(
+              // Execute with permission check and timeout
+              const executePromise = executeToolWithPermission(
                 tool,
                 args,
                 toolCall.function.name
               );
+
+              const { result } = toolExecConfig.toolTimeout > 0
+                ? await withTimeout(
+                    executePromise,
+                    toolExecConfig.toolTimeout,
+                    `Tool "${toolCall.function.name}" timed out after ${toolExecConfig.toolTimeout}ms`
+                  )
+                : await executePromise;
 
               // Record tool result to memory
               if (memoryManager) {
@@ -1500,30 +1750,40 @@ export function createAgent(config: AgentConfig = {}): AgentInstance {
                 );
               }
 
+              onToolResult?.(toolCall.function.name, result);
+              return { toolCall, result, args, error: false };
+            } catch (error) {
+              const errorMessage = error instanceof Error ? error.message : String(error);
+              const errorResult = `Error executing tool: ${errorMessage}`;
+              onToolResult?.(toolCall.function.name, errorResult);
+              return { toolCall, result: errorResult, args, error: true };
+            }
+          });
+
+          // Execute tools with concurrency limit
+          const toolResults = toolExecConfig.parallelExecution
+            ? await executeWithConcurrencyLimit(toolTasks, toolExecConfig.maxConcurrentTools)
+            : await Promise.all(toolTasks.map(task => task()));
+
+          // Process results in order
+          for (const { toolCall, result, args, error } of toolResults) {
+            if (!error) {
               toolCallResults.push({
                 name: toolCall.function.name,
                 args,
                 result,
               });
-
-              messages.push(toolMessage(toolCall.id, result));
-              onToolResult?.(toolCall.function.name, result);
-            } catch (error) {
-              const errorMessage = error instanceof Error ? error.message : String(error);
-              const errorResult = `Error executing tool: ${errorMessage}`;
-              messages.push(toolMessage(toolCall.id, errorResult));
-              onToolResult?.(toolCall.function.name, errorResult);
-
+            } else {
               toolCallResults.push({
                 name: toolCall.function.name,
                 args,
-                result: errorResult,
+                result,
               });
             }
+            messages.push(toolMessage(toolCall.id, result));
           }
         }
-
-        throw new Error(`Max iterations (${maxIterations}) reached`);
+        // Note: Loop exits via return statements or throw inside
       } catch (error) {
         const err = error instanceof Error ? error : new Error(String(error));
         onError?.(err);
@@ -1535,7 +1795,7 @@ export function createAgent(config: AgentConfig = {}): AgentInstance {
       prompt: string,
       systemPromptOverride?: string
     ): Promise<string> {
-      const response = await client.chat(
+      const response = await doChat(
         [
           systemMessage(systemPromptOverride ?? agentConfig.systemPrompt),
           userMessage(prompt),
@@ -1548,6 +1808,14 @@ export function createAgent(config: AgentConfig = {}): AgentInstance {
       );
 
       return response.content ?? '';
+    },
+
+    // ============================================
+    // Telemetry
+    // ============================================
+
+    setEventListener(listener: AgentEventListener | null): void {
+      eventListener = listener ?? undefined;
     },
   };
 

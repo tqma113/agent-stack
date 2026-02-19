@@ -2,9 +2,10 @@
  * OpenAI Provider Module
  */
 
-export { createOpenAIClient, type OpenAIClientInstance } from './client';
+export { createOpenAIClient, type OpenAIClientInstance } from './client.js';
+export { createOpenAIAdapter } from './adapter.js';
 
-export * from './types';
+export * from './types.js';
 
 export {
   systemMessage,
@@ -17,4 +18,4 @@ export {
   estimateTokens,
   truncateToTokens,
   chunkText,
-} from './helpers';
+} from './helpers.js';

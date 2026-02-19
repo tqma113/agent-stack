@@ -4,7 +4,7 @@
  * Persistent store for document sources and pages using SQLite.
  */
 
-import type Database from 'better-sqlite3';
+import type { DatabaseType } from '@ai-stack/memory-store-sqlite';
 import { randomUUID } from 'crypto';
 import type { DocSource, DocSourceInput, DocPage, UUID, CrawlOptions, DocSection } from '../types.js';
 
@@ -52,7 +52,7 @@ export interface DocRegistrySummary {
  */
 export interface DocRegistryStoreInstance {
   /** Set the database instance */
-  setDatabase(db: Database.Database): void;
+  setDatabase(db: DatabaseType): void;
 
   /** Initialize the store (create tables) */
   initialize(): Promise<void>;
@@ -122,10 +122,10 @@ export interface DocRegistryStoreInstance {
  * Create a doc registry store
  */
 export function createDocRegistryStore(): DocRegistryStoreInstance {
-  let db: Database.Database | null = null;
+  let db: DatabaseType | null = null;
   let initialized = false;
 
-  function getDb(): Database.Database {
+  function getDb(): DatabaseType {
     if (!db) {
       throw new Error('Database not set for DocRegistryStore');
     }
@@ -162,7 +162,7 @@ export function createDocRegistryStore(): DocRegistryStoreInstance {
   }
 
   return {
-    setDatabase(database: Database.Database): void {
+    setDatabase(database: DatabaseType): void {
       db = database;
     },
 

@@ -52,8 +52,8 @@
     "code": {
       "enabled": false,
       "rootDir": ".",
-      "extensions": [".ts", ".js", ".json", ".md"],
-      "excludePatterns": ["node_modules/**", "dist/**", ".git/**", "*.db*"]
+      "include": ["**/*.ts", "**/*.js", "**/*.json", "**/*.md"],
+      "exclude": ["node_modules/**", "dist/**", ".git/**", "**/*.db*"]
     },
     "doc": {
       "enabled": true,

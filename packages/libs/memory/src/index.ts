@@ -219,14 +219,22 @@ export {
 
 // =============================================================================
 // Legacy Manager (deprecated, kept for backward compatibility)
+// These exports will be removed in v1.0.0
 // =============================================================================
 
+/**
+ * @deprecated Use `createMemoryPolicy` instead. Will be removed in v1.0.0.
+ * Migration: Replace createMemoryManager with createMemoryPolicy for policy-based memory management.
+ */
 export {
   createMemoryManager,
   type MemoryManagerInstance,
   type MemoryManagerConfig,
 } from './manager.js';
 
+/**
+ * @deprecated Use `SqliteMemoryStores` from `@ai-stack/memory-store-sqlite` instead. Will be removed in v1.0.0.
+ */
 export type { MemoryStores } from './stores-interface.js';
 
 // =============================================================================
@@ -315,29 +323,44 @@ export { PROFILE_KEYS } from '@ai-stack/memory-store-sqlite';
 
 // =============================================================================
 // Legacy Errors (aliases for backward compatibility)
+// These exports will be removed in v1.0.0
 // =============================================================================
 
+/**
+ * @deprecated Use `MemoryStoreError` directly. Will be removed in v1.0.0.
+ */
 export {
   MemoryStoreError as MemoryError,
 } from '@ai-stack/memory-store-sqlite';
 
-// Legacy error re-exports
+/**
+ * @deprecated Use `ProfileError` directly. Will be removed in v1.0.0.
+ */
 export {
   ProfileError as ProfileKeyNotAllowedError,
 } from '@ai-stack/memory-store-sqlite';
 
 // =============================================================================
 // Legacy Types (aliases for backward compatibility)
+// These exports will be removed in v1.0.0
 // =============================================================================
 
-// Re-export types that were in the old types.ts
+/**
+ * @deprecated Use `TokenBudget` from `./policy/types.js`. Will be removed in v1.0.0.
+ */
 export type {
   TokenBudget as TokenBudgetConfig,
 } from './policy/types.js';
 
-// Legacy interfaces from old index
+/**
+ * @deprecated These types are for legacy MemoryManager only. Will be removed in v1.0.0.
+ * Migration: Use the new policy-based types instead.
+ */
 export type { MemoryBundle, MemoryWarning, MemoryConfig } from './types.js';
 
+/**
+ * @deprecated Use `WritePolicyConfig` from `./policy/index.js`. Will be removed in v1.0.0.
+ */
 export type {
   WritePolicyConfig as LegacyWritePolicyConfig,
   RetrievalConfig,
@@ -345,28 +368,46 @@ export type {
   ObserverCallback,
 } from './types.js';
 
+/**
+ * @deprecated Use `DEFAULT_WRITE_POLICY_CONFIG` from `./policy/index.js`. Will be removed in v1.0.0.
+ */
 export {
   DEFAULT_WRITE_POLICY,
   DEFAULT_RETRIEVAL_CONFIG as DEFAULT_RETRIEVAL_CONFIG_LEGACY,
   DEFAULT_MEMORY_CONFIG,
 } from './types.js';
 
-// Legacy write-policy exports
+/**
+ * @deprecated Use `createWritePolicy` from `./policy/index.js`. Will be removed in v1.0.0.
+ * Migration: Replace createWritePolicyEngine with createWritePolicy for policy-based writes.
+ */
 export {
   createWritePolicyEngine,
   type IWritePolicyEngine,
 } from './write-policy.js';
 
-// Legacy retriever exports
+/**
+ * @deprecated Use `createRetrievalPolicy` from `./policy/index.js`. Will be removed in v1.0.0.
+ * Migration: Replace createMemoryRetriever with createRetrievalPolicy for policy-based retrieval.
+ */
 export {
   createMemoryRetriever,
   type IMemoryRetriever,
 } from './retriever.js';
+/**
+ * @deprecated These types are for legacy retriever only. Will be removed in v1.0.0.
+ */
 export type { RetrievalOptions, RetrieverStores } from './retriever.js';
 
-// Legacy budgeter exports
+/**
+ * @deprecated Use `createBudgetPolicy` from `./policy/index.js`. Will be removed in v1.0.0.
+ * Migration: Replace createMemoryBudgeter with createBudgetPolicy for policy-based budgeting.
+ */
 export {
   createMemoryBudgeter,
   type IMemoryBudgeter,
 } from './budgeter.js';
+/**
+ * @deprecated Use `BudgetAllocation` from `./policy/types.js`. Will be removed in v1.0.0.
+ */
 export type { BudgetAllocation as LegacyBudgetAllocation } from './budgeter.js';

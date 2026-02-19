@@ -13,6 +13,15 @@
  * @packageDocumentation
  */
 
+// Database Factory
+export {
+  createDatabase,
+  loadVecExtension,
+  type DatabaseConfig,
+  type DatabaseInstance,
+  type DatabaseType,
+} from './database.js';
+
 // Factory
 export {
   createSqliteStores,
@@ -110,6 +119,7 @@ export type {
   SemanticChunkInput,
   SemanticSearchResult,
   SemanticMatchType,
+  MetadataFilter,
 
   // Store interfaces
   BaseStore,

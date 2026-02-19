@@ -1,7 +1,7 @@
 {
   "name": "@ai-stack/provider",
   "version": "0.0.1",
-  "description": "OpenAI API provider for ai-stack monorepo",
+  "description": "Multi-model LLM provider for ai-stack monorepo (OpenAI, Anthropic, Google Gemini, and more)",
   "main": "./dist/index.js",
   "module": "./dist/index.mjs",
   "types": "./dist/index.d.ts",
@@ -26,6 +26,11 @@
     "agent",
     "provider",
     "openai",
+    "anthropic",
+    "claude",
+    "gemini",
+    "google",
+    "ollama",
     "llm",
     "ai"
   ],
@@ -33,6 +38,10 @@
   "license": "MIT",
   "dependencies": {
     "openai": "^4.77.0"
+  },
+  "optionalDependencies": {
+    "@anthropic-ai/sdk": "^0.39.0",
+    "@google/generative-ai": "^0.21.0"
   },
   "devDependencies": {
     "@types/node": "^22.10.0",
