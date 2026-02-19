@@ -366,6 +366,9 @@ export function createCodeAgent(config?: CodeConfig | string): CodeAgentInstance
             }
 
             try {
+              // Track tool calls for displaying args in results
+              const toolCalls = new Map<string, { name: string; args: Record<string, unknown>; startTime: number }>();
+
               if (streamRenderer) {
                 streamRenderer.startThinking();
                 await instance.stream(trimmed, {
@@ -373,6 +376,8 @@ export function createCodeAgent(config?: CodeConfig | string): CodeAgentInstance
                     streamRenderer.addToken(token);
                   },
                   onToolCall: (name, args) => {
+                    const callId = `${name}-${Date.now()}`;
+                    toolCalls.set(callId, { name, args, startTime: Date.now() });
                     streamRenderer.pauseForTool({
                       name,
                       args,
@@ -380,11 +385,22 @@ export function createCodeAgent(config?: CodeConfig | string): CodeAgentInstance
                     });
                   },
                   onToolResult: (name, result) => {
+                    // Find and remove the matching tool call
+                    let callInfo: { name: string; args: Record<string, unknown>; startTime: number } | undefined;
+                    for (const [id, info] of toolCalls) {
+                      if (info.name === name) {
+                        callInfo = info;
+                        toolCalls.delete(id);
+                        break;
+                      }
+                    }
+                    const duration = callInfo ? Date.now() - callInfo.startTime : undefined;
                     streamRenderer.resumeAfterTool({
                       name,
-                      args: {},
+                      args: callInfo?.args || {},
                       status: result.startsWith('Error') ? 'error' : 'completed',
                       result: result.length > 200 ? result.slice(0, 200) + '...' : result,
+                      duration,
                     });
                   },
                 });
@@ -395,8 +411,14 @@ export function createCodeAgent(config?: CodeConfig | string): CodeAgentInstance
                   onToken: (token) => {
                     process.stdout.write(token);
                   },
-                  onToolCall: (name, _args) => {
+                  onToolCall: (name, args) => {
+                    const callId = `${name}-${Date.now()}`;
+                    toolCalls.set(callId, { name, args, startTime: Date.now() });
                     console.log(theme.tool(`\n[${icons.tool} Calling: ${name}]`));
+                    if (Object.keys(args).length > 0) {
+                      const argsStr = JSON.stringify(args, null, 2).split('\n').map(l => '  ' + l).join('\n');
+                      console.log(theme.muted(argsStr));
+                    }
                   },
                   onToolResult: (name, result) => {
                     const status = result.startsWith('Error') ? theme.error('✗') : theme.success('✓');

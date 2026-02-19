@@ -235,6 +235,7 @@ async function runInteractive(prompt: string | undefined, options: InteractiveOp
     // If prompt provided, execute and exit
     if (prompt) {
       const streamRenderer = ttyMode ? createStreamRenderer() : null;
+      const toolCalls = new Map<string, { name: string; args: Record<string, unknown>; startTime: number }>();
 
       if (streamRenderer) {
         streamRenderer.startThinking();
@@ -243,14 +244,26 @@ async function runInteractive(prompt: string | undefined, options: InteractiveOp
             streamRenderer.addToken(token);
           },
           onToolCall: (name, args) => {
+            const callId = `${name}-${Date.now()}`;
+            toolCalls.set(callId, { name, args, startTime: Date.now() });
             streamRenderer.pauseForTool({ name, args, status: 'running' });
           },
           onToolResult: (name, result) => {
+            let callInfo: { name: string; args: Record<string, unknown>; startTime: number } | undefined;
+            for (const [id, info] of toolCalls) {
+              if (info.name === name) {
+                callInfo = info;
+                toolCalls.delete(id);
+                break;
+              }
+            }
+            const duration = callInfo ? Date.now() - callInfo.startTime : undefined;
             streamRenderer.resumeAfterTool({
               name,
-              args: {},
+              args: callInfo?.args || {},
               status: result.startsWith('Error') ? 'error' : 'completed',
               result: result.length > 200 ? result.slice(0, 200) + '...' : result,
+              duration,
             });
           },
         });
@@ -261,10 +274,13 @@ async function runInteractive(prompt: string | undefined, options: InteractiveOp
           onToken: (token: string) => {
             process.stdout.write(token);
           },
-          onToolCall: (name) => {
+          onToolCall: (name, args) => {
             console.log(`\n[Tool: ${name}]`);
+            if (Object.keys(args).length > 0) {
+              console.log(JSON.stringify(args, null, 2));
+            }
           },
-          onToolResult: (name, result) => {
+          onToolResult: (name) => {
             console.log(`[${name} completed]\n`);
           },
         });
