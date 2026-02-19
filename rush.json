@@ -377,6 +377,10 @@
       "projectFolder": "packages/libs/code"
     },
     {
+      "packageName": "@ai-stack/tui",
+      "projectFolder": "packages/libs/tui"
+    },
+    {
       "packageName": "@ai-stack-skill/memory",
       "projectFolder": "packages/skills/memory"
     },

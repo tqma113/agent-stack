@@ -9,6 +9,51 @@ export { createAgent, type AgentInstance } from './agent.js';
 export * from './types.js';
 export * from './config.js';
 
+// Re-export TUI for convenience
+export {
+  // Theme and colors
+  theme,
+  icons,
+  borders,
+  legacyColors,
+  // Terminal utilities
+  getTerminalWidth,
+  getTerminalHeight,
+  isTTY,
+  supportsColor,
+  // Spinners
+  createThinkingSpinner,
+  createLoadingSpinner,
+  createToolSpinner,
+  createSpinner,
+  createLegacySpinner,
+  // Render utilities
+  renderMessage,
+  renderStatusBox,
+  renderToolCall,
+  renderToolCallInline,
+  renderHeader,
+  renderHeaderLine,
+  renderFooter,
+  renderWelcome,
+  renderDivider,
+  renderPrompt,
+  renderAgentPrefix,
+  // Stream renderer
+  StreamRenderer,
+  createStreamRenderer,
+  // Adapters
+  showConfirm,
+  showSelect,
+  showDiffView,
+  // Types
+  type Role,
+  type Message,
+  type ToolCallInfo,
+  type StreamState,
+  type RenderOptions,
+} from '@ai-stack/tui';
+
 // Permission system
 export {
   createPermissionPolicy,

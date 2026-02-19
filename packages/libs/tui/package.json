@@ -1,0 +1,63 @@
+{
+  "name": "@ai-stack/tui",
+  "version": "0.0.1",
+  "description": "Terminal UI components for AI Stack agents using Ink",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./core": {
+      "types": "./dist/core/index.d.ts",
+      "import": "./dist/core/index.js"
+    },
+    "./components": {
+      "types": "./dist/components/index.d.ts",
+      "import": "./dist/components/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "clean": "rimraf dist",
+    "typecheck": "tsc --noEmit"
+  },
+  "keywords": [
+    "tui",
+    "terminal",
+    "ui",
+    "ink",
+    "react",
+    "cli",
+    "agent",
+    "ai"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "ink": "^5.0.1",
+    "ink-spinner": "^5.0.0",
+    "@inkjs/ui": "^2.0.0",
+    "chalk": "^5.4.0",
+    "boxen": "^8.0.1",
+    "cli-truncate": "^4.0.0",
+    "strip-ansi": "^7.1.0",
+    "ora": "^8.1.0",
+    "diff": "^7.0.0",
+    "react": "^18.3.1"
+  },
+  "devDependencies": {
+    "@types/diff": "^6.0.0",
+    "@types/node": "^22.10.0",
+    "@types/react": "^18.3.0",
+    "rimraf": "^6.0.1",
+    "tsup": "^8.3.5",
+    "typescript": "~5.7.2"
+  }
+}

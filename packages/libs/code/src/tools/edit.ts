@@ -12,6 +12,7 @@ import type { EditParams, ToolContext } from '../types.js';
 import { EditError, FileNotFoundError, FileNotReadError, PathError } from '../errors.js';
 import { createContentValidator } from '../safety/content-validator.js';
 import { getDiffSummary } from '../file-history/diff-engine.js';
+import { showDiffView } from '@ai-stack/tui';
 
 /**
  * Create the Edit tool
@@ -101,6 +102,14 @@ IMPORTANT:
 
       // Validate new content for secrets
       contentValidator.validateOrThrow(afterContent, file_path);
+
+      // Show diff preview if confirmDestructive is enabled
+      if (context.safety.confirmDestructive) {
+        const confirmed = await showDiffView(relativePath, beforeContent, afterContent);
+        if (!confirmed) {
+          return `Edit operation cancelled by user: ${relativePath}`;
+        }
+      }
 
       // Write the file
       writeFileSync(normalizedPath, afterContent, 'utf-8');

@@ -15,15 +15,23 @@ import {
   serializeConfig,
   findConfigFile,
 } from './config';
-import { theme, icons, legacyColors } from './ui/colors.js';
-import { createLegacySpinner, createLoadingSpinner } from './ui/spinner.js';
-import { createStreamRenderer } from './ui/stream.js';
-import { renderHeader, renderWelcome, renderPrompt } from './ui/layout.js';
+import {
+  theme,
+  icons,
+  legacyColors,
+  createLegacySpinner,
+  createLoadingSpinner,
+  createStreamRenderer,
+  renderHeader,
+  renderWelcome,
+  renderPrompt,
+  isTTY as checkTTY,
+} from '@ai-stack/tui';
 
 const VERSION = '0.0.1';
 
 // Detect if running in TTY mode
-const isTTY = process.stdout.isTTY ?? false;
+const isTTY = checkTTY();
 
 /**
  * Load .env file and set environment variables

@@ -11,6 +11,7 @@ import type { Tool } from '@ai-stack/agent';
 import type { WriteParams, ToolContext } from '../types.js';
 import { FileNotReadError, PathError } from '../errors.js';
 import { createContentValidator } from '../safety/content-validator.js';
+import { showDiffView } from '@ai-stack/tui';
 
 /**
  * Create the Write tool
@@ -61,6 +62,14 @@ New files can be created without reading first.`,
 
       // Get old content for history
       const beforeContent = fileExists ? readFileSync(normalizedPath, 'utf-8') : null;
+
+      // Show diff preview if confirmDestructive is enabled and file exists
+      if (context.safety.confirmDestructive && fileExists && beforeContent !== null) {
+        const confirmed = await showDiffView(relativePath, beforeContent, content);
+        if (!confirmed) {
+          return `Write operation cancelled by user: ${relativePath}`;
+        }
+      }
 
       // Create parent directories if needed
       const dir = dirname(normalizedPath);

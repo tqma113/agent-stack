@@ -13,6 +13,7 @@ ai-stack/
 │   │   ├── memory-store-sqlite/# @ai-stack/memory-store-sqlite (SQLite 存储)
 │   │   ├── memory-store-json/  # @ai-stack/memory-store-json (JSON 存储)
 │   │   ├── knowledge/          # @ai-stack/knowledge (代码和文档索引)
+│   │   ├── tui/                # @ai-stack/tui (终端 UI 组件库)
 │   │   ├── agent/              # @ai-stack/agent (Agent + Permission)
 │   │   ├── assistant/          # @ai-stack/assistant (个人 AI 助手)
 │   │   └── code/               # @ai-stack/code (代码编辑 Agent)
@@ -106,18 +107,10 @@ packages/libs/agent/
 │   ├── types.ts               # 类型定义
 │   ├── config.ts              # 配置文件加载
 │   ├── cli.ts                 # 命令式 CLI
-│   ├── permission/            # 权限管控模块
-│   │   ├── index.ts           # 权限模块导出
-│   │   ├── types.ts           # 权限类型定义
-│   │   └── policy.ts          # 权限策略实现
-│   └── ui/                    # 终端 UI 模块
-│       ├── index.ts           # UI 模块导出
-│       ├── types.ts           # UI 类型定义
-│       ├── colors.ts          # 主题和颜色
-│       ├── spinner.ts         # Ora spinner 封装
-│       ├── box.ts             # 消息框渲染
-│       ├── layout.ts          # 布局组件
-│       └── stream.ts          # 流式输出管理
+│   └── permission/            # 权限管控模块
+│       ├── index.ts           # 权限模块导出
+│       ├── types.ts           # 权限类型定义
+│       └── policy.ts          # 权限策略实现
 ├── dist/                      # 构建输出
 ├── package.json
 └── tsup.config.ts
@@ -127,13 +120,12 @@ packages/libs/agent/
 
 | 文件 | 职责 |
 |------|------|
-| `src/index.ts` | 统一导出入口，re-export agent、config 和 provider |
+| `src/index.ts` | 统一导出入口，re-export agent、config、provider 和 TUI |
 | `src/agent.ts` | `createAgent()` 工厂函数，实现对话和工具调用 |
 | `src/types.ts` | Agent 相关类型定义 |
 | `src/config.ts` | 配置文件加载和解析 (agent.json) |
 | `src/cli.ts` | 命令式 CLI，支持 chat/run/tools/config 命令 |
 | `src/permission/` | 权限管控模块，实现工具执行前的权限检查和确认 |
-| `src/ui/` | 终端 UI 模块，提供现代化界面组件 |
 
 ### 3.3 package.json 关键配置
 
@@ -149,13 +141,9 @@ packages/libs/agent/
     "@ai-stack/mcp": "workspace:*",
     "@ai-stack/skill": "workspace:*",
     "@ai-stack/memory": "workspace:*",
-    "boxen": "^8.0.1",
-    "chalk": "^5.4.0",
-    "cli-truncate": "^4.0.0",
+    "@ai-stack/tui": "workspace:*",
     "commander": "^12.1.0",
-    "ora": "^8.1.0",
-    "strip-ansi": "^7.1.0",
-    "terminal-size": "^4.0.0"
+    "zod": "^3.24.0"
   }
 }
 ```
@@ -593,7 +581,157 @@ knowledgeDb.close();
 
 ---
 
-## 8. Skills 目录 (@ai-stack-skill/*)
+## 8. @ai-stack/tui 包 (终端 UI)
+
+终端 UI 组件库，采用 Ink (React-based TUI) + 直接输出混合架构。
+
+### 8.1 目录结构
+
+```
+packages/libs/tui/
+├── src/
+│   ├── index.ts                # 包入口
+│   ├── core/                   # 非 React 核心工具
+│   │   ├── index.ts            # Core 模块导出
+│   │   ├── types.ts            # 类型定义
+│   │   ├── colors.ts           # 主题颜色和图标
+│   │   ├── terminal.ts         # 终端尺寸、能力检测
+│   │   ├── spinner.ts          # 加载动画
+│   │   ├── diff.ts             # Diff 计算
+│   │   ├── render.ts           # 渲染工具
+│   │   └── stream.ts           # 流式输出管理
+│   │
+│   ├── components/             # Ink 组件
+│   │   ├── index.ts            # 组件导出
+│   │   ├── layout/
+│   │   │   ├── Panel.tsx       # 面板组件
+│   │   │   ├── Header.tsx      # 头部组件
+│   │   │   ├── Footer.tsx      # 底部组件
+│   │   │   └── Divider.tsx     # 分隔线
+│   │   ├── display/
+│   │   │   ├── Message.tsx     # 聊天消息
+│   │   │   ├── ToolCall.tsx    # 工具调用可视化
+│   │   │   ├── Badge.tsx       # 状态标签
+│   │   │   └── StatusSpinner.tsx # 状态加载
+│   │   ├── input/
+│   │   │   ├── Confirm.tsx     # 确认对话框
+│   │   │   ├── Select.tsx      # 选择菜单
+│   │   │   ├── TextInput.tsx   # 文本输入 + 历史
+│   │   │   └── CommandPalette.tsx # 命令面板
+│   │   └── code/
+│   │       ├── DiffView.tsx    # Diff 预览
+│   │       ├── TaskBoard.tsx   # 任务看板
+│   │       └── HistoryBrowser.tsx # 历史浏览
+│   │
+│   ├── hooks/
+│   │   ├── index.ts            # Hooks 导出
+│   │   ├── useTheme.ts         # 主题 Hook
+│   │   ├── useInput.ts         # 输入状态 Hook
+│   │   └── useStreaming.ts     # 流式状态 Hook
+│   │
+│   ├── theme/
+│   │   ├── types.ts            # 主题类型
+│   │   ├── default.ts          # 默认主题
+│   │   └── provider.tsx        # ThemeProvider
+│   │
+│   └── adapters/               # 环境适配
+│       ├── index.ts            # 适配器导出
+│       ├── detect.ts           # 环境检测
+│       ├── tty.ts              # 完整 TTY 支持
+│       └── classic.ts          # non-TTY 回退
+│
+├── dist/
+├── package.json
+├── tsconfig.json
+└── tsup.config.ts
+```
+
+### 8.2 核心功能
+
+| 模块 | 功能 | 说明 |
+|------|------|------|
+| Core | 非 React 工具 | 颜色、终端检测、流式输出、Diff |
+| Layout | 布局组件 | Panel、Header、Footer、Divider |
+| Display | 展示组件 | Message、ToolCall、Badge、Spinner |
+| Input | 输入组件 | Confirm、Select、TextInput、CommandPalette |
+| Code | 代码组件 | DiffView、TaskBoard、HistoryBrowser |
+| Adapters | 环境适配 | TTY/Classic 自动切换 |
+
+### 8.3 package.json
+
+```json
+{
+  "name": "@ai-stack/tui",
+  "version": "0.0.1",
+  "dependencies": {
+    "ink": "^5.0.1",
+    "@inkjs/ui": "^2.0.0",
+    "chalk": "^5.4.0",
+    "boxen": "^8.0.1",
+    "cli-truncate": "^4.0.0",
+    "terminal-size": "^4.0.0",
+    "strip-ansi": "^7.1.0",
+    "ora": "^8.1.0",
+    "diff": "^7.0.0",
+    "react": "^18.3.1"
+  }
+}
+```
+
+### 8.4 混合架构
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                      @ai-stack/tui                           │
+├─────────────────────────────────────────────────────────────┤
+│  ┌─────────────────┐    ┌─────────────────────────────────┐ │
+│  │   Ink 组件      │    │   Core 模块 (直接 stdout)       │ │
+│  │  (React TUI)    │    │                                 │ │
+│  │                 │    │  - StreamRenderer (token 流)    │ │
+│  │  - Confirm      │    │  - 颜色/图标                    │ │
+│  │  - Select       │    │  - 终端检测                     │ │
+│  │  - DiffView     │    │  - Spinner                     │ │
+│  │  - TaskBoard    │    │                                 │ │
+│  └─────────────────┘    └─────────────────────────────────┘ │
+│          │                           │                       │
+│          │    ┌──────────────────────┘                       │
+│          │    │                                              │
+│          ▼    ▼                                              │
+│  ┌─────────────────────────────────────────────────────────┐ │
+│  │              Adapters (环境自动检测)                     │ │
+│  │  TTY Mode: Ink 组件  |  Classic Mode: 直接输出          │ │
+│  └─────────────────────────────────────────────────────────┘ │
+└─────────────────────────────────────────────────────────────┘
+```
+
+### 8.5 使用示例
+
+```typescript
+import {
+  // Core (non-React)
+  theme, icons, createStreamRenderer,
+  // Adapters (auto-detect)
+  showConfirm, showSelect, showDiffView,
+  // Components (Ink/React)
+  DiffView, Confirm, TaskBoard,
+} from '@ai-stack/tui';
+
+// 流式输出 (使用 core 模块，不需要 React)
+const renderer = createStreamRenderer();
+renderer.startThinking();
+renderer.addToken('Hello');
+renderer.complete();
+
+// 确认对话框 (自动选择 TTY/Classic 模式)
+const confirmed = await showConfirm('Apply changes?');
+
+// Diff 预览 (自动选择 TTY/Classic 模式)
+const apply = await showDiffView('file.ts', oldContent, newContent);
+```
+
+---
+
+## 9. Skills 目录 (@ai-stack-skill/*)
 
 自定义 Skills 使用独立的包前缀 `@ai-stack-skill/*`。
 
@@ -723,7 +861,7 @@ if (writeDecision.shouldWrite) {
 
 ---
 
-## 9. MCP 服务器 (packages/mcp-servers/)
+## 10. MCP 服务器 (packages/mcp-servers/)
 
 自定义 MCP 服务器使用独立的包前缀 `@ai-stack-mcp/*`。
 
@@ -1168,7 +1306,7 @@ mcp-lsp --server=rust:rust-analyzer --server=go:gopls
 
 ---
 
-## 10. @ai-stack/assistant 包 (个人 AI 助手)
+## 11. @ai-stack/assistant 包 (个人 AI 助手)
 
 ### 10.1 目录结构
 
@@ -1356,7 +1494,7 @@ assistant config init|show
 
 ---
 
-## 11. @ai-stack/code 包 (代码编辑 Agent)
+## 12. @ai-stack/code 包 (代码编辑 Agent)
 
 ### 11.1 目录结构
 
@@ -1512,7 +1650,7 @@ ai-code config show
 
 ---
 
-## 12. Rush 配置目录
+## 13. Rush 配置目录
 
 ### 11.1 common/config/rush/
 
@@ -1538,7 +1676,7 @@ common/scripts/
 
 ---
 
-## 12. 开发工具配置
+## 14. 开发工具配置
 
 ### 12.1 .claude/ 目录
 
@@ -1572,7 +1710,7 @@ common/scripts/
 
 ---
 
-## 13. 构建输出
+## 15. 构建输出
 
 ### 13.1 dist/ 目录结构
 
@@ -1602,7 +1740,7 @@ rush rebuild
 
 ---
 
-## 14. 示例项目 (packages/examples/)
+## 16. 示例项目 (packages/examples/)
 
 示例项目使用 `@ai-stack-example/*` 前缀，提供各个包的实际使用示例。
 

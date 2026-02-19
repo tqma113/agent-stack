@@ -31,6 +31,15 @@ import {
   performRedo,
 } from '../tools/index.js';
 import * as readline from 'readline';
+import {
+  theme,
+  icons,
+  createStreamRenderer,
+  renderPrompt,
+  isTTY,
+  showConfirm,
+  showDiffView,
+} from '@ai-stack/tui';
 
 /**
  * Create a Code Agent instance
@@ -89,6 +98,10 @@ export function createCodeAgent(config?: CodeConfig | string): CodeAgentInstance
     },
     wasFileRead: (filePath) => readFiles.has(filePath),
     markFileRead: (filePath) => readFiles.add(filePath),
+    // Implement onConfirm callback using TUI
+    onConfirm: async (message: string) => {
+      return showConfirm(message);
+    },
   };
 
   const instance: CodeAgentInstance = {
@@ -220,103 +233,162 @@ export function createCodeAgent(config?: CodeConfig | string): CodeAgentInstance
       }
     },
 
-    startCLI(): void {
-      const rl = readline.createInterface({
-        input: process.stdin,
-        output: process.stdout,
-      });
-
-      console.log(`\nCode Agent ready in: ${resolvedConfig.safety.workingDir}`);
-      console.log('Type "exit" to quit, "/undo" to undo, "/redo" to redo\n');
-
-      const prompt = () => {
-        rl.question('> ', async (input) => {
-          const trimmed = input.trim();
-
-          if (trimmed.toLowerCase() === 'exit' || trimmed.toLowerCase() === 'quit') {
-            console.log('\nGoodbye!');
-            rl.close();
-            return;
-          }
-
-          // Handle special commands
-          if (trimmed === '/undo') {
-            try {
-              const result = await instance.undo();
-              if (result) {
-                console.log(`Undone: ${result.file_path} -> ${result.restored_to}`);
-              } else {
-                console.log('Nothing to undo');
-              }
-            } catch (error) {
-              console.error(`Error: ${error instanceof Error ? error.message : error}`);
-            }
-            prompt();
-            return;
-          }
-
-          if (trimmed === '/redo') {
-            try {
-              const result = await instance.redo();
-              if (result) {
-                console.log(`Redone: ${result.file_path} -> ${result.action}`);
-              } else {
-                console.log('Nothing to redo');
-              }
-            } catch (error) {
-              console.error(`Error: ${error instanceof Error ? error.message : error}`);
-            }
-            prompt();
-            return;
-          }
-
-          if (trimmed === '/tools') {
-            const tools = instance.getTools();
-            console.log('\nAvailable tools:');
-            for (const tool of tools) {
-              console.log(`  - ${tool.name}: ${tool.description.split('\n')[0]}`);
-            }
-            console.log();
-            prompt();
-            return;
-          }
-
-          if (trimmed === '/help') {
-            console.log('\nCommands:');
-            console.log('  /undo   - Undo last file change');
-            console.log('  /redo   - Redo last undone change');
-            console.log('  /tools  - List available tools');
-            console.log('  /help   - Show this help');
-            console.log('  exit    - Exit the CLI\n');
-            prompt();
-            return;
-          }
-
-          if (!trimmed) {
-            prompt();
-            return;
-          }
-
-          try {
-            process.stdout.write('\n');
-            await instance.stream(trimmed, (token) => {
-              process.stdout.write(token);
-            });
-            console.log('\n');
-          } catch (error) {
-            console.error(`\nError: ${error instanceof Error ? error.message : error}\n`);
-          }
-
-          prompt();
+    startCLI(): Promise<void> {
+      return new Promise((resolve) => {
+        const ttyMode = isTTY();
+        const rl = readline.createInterface({
+          input: process.stdin,
+          output: process.stdout,
         });
-      };
 
-      rl.on('close', async () => {
-        await instance.close();
-        process.exit(0);
+        if (ttyMode) {
+          console.log(`\n${theme.accent('Working directory:')} ${resolvedConfig.safety.workingDir}`);
+          console.log(theme.muted('Type /help for commands, exit to quit\n'));
+        } else {
+          console.log(`\nCode Agent ready in: ${resolvedConfig.safety.workingDir}`);
+          console.log('Type "exit" to quit, "/undo" to undo, "/redo" to redo\n');
+        }
+
+        // Create stream renderer for TTY mode
+        const streamRenderer = ttyMode ? createStreamRenderer() : null;
+
+        const prompt = () => {
+          const promptText = ttyMode ? renderPrompt() : '> ';
+          rl.question(promptText, async (input) => {
+            const trimmed = input.trim();
+
+            if (trimmed.toLowerCase() === 'exit' || trimmed.toLowerCase() === 'quit') {
+              console.log(ttyMode ? theme.muted('\nGoodbye!') : '\nGoodbye!');
+              rl.close();
+              return;
+            }
+
+            // Handle special commands
+            if (trimmed === '/undo') {
+              try {
+                const result = await instance.undo();
+                if (result) {
+                  const msg = `${icons.undo} Undone: ${result.file_path} -> ${result.restored_to}`;
+                  console.log(ttyMode ? theme.success(msg) : msg);
+                } else {
+                  console.log(ttyMode ? theme.warning('Nothing to undo') : 'Nothing to undo');
+                }
+              } catch (error) {
+                const msg = error instanceof Error ? error.message : String(error);
+                console.error(ttyMode ? theme.error(`Error: ${msg}`) : `Error: ${msg}`);
+              }
+              prompt();
+              return;
+            }
+
+            if (trimmed === '/redo') {
+              try {
+                const result = await instance.redo();
+                if (result) {
+                  const msg = `${icons.redo} Redone: ${result.file_path} -> ${result.action}`;
+                  console.log(ttyMode ? theme.success(msg) : msg);
+                } else {
+                  console.log(ttyMode ? theme.warning('Nothing to redo') : 'Nothing to redo');
+                }
+              } catch (error) {
+                const msg = error instanceof Error ? error.message : String(error);
+                console.error(ttyMode ? theme.error(`Error: ${msg}`) : `Error: ${msg}`);
+              }
+              prompt();
+              return;
+            }
+
+            if (trimmed === '/tools') {
+              const tools = instance.getTools();
+              console.log(ttyMode ? theme.accent(`\n${icons.tool} Available tools:`) : '\nAvailable tools:');
+              for (const tool of tools) {
+                const desc = tool.description.split('\n')[0];
+                if (ttyMode) {
+                  console.log(`  ${theme.tool(tool.name)}: ${theme.muted(desc)}`);
+                } else {
+                  console.log(`  - ${tool.name}: ${desc}`);
+                }
+              }
+              console.log();
+              prompt();
+              return;
+            }
+
+            if (trimmed === '/history') {
+              if (historyStore) {
+                const changes = historyStore.getRecentChanges(10);
+                console.log(ttyMode ? theme.accent('\nRecent changes:') : '\nRecent changes:');
+                if (changes.length === 0) {
+                  console.log(ttyMode ? theme.muted('  No changes recorded') : '  No changes recorded');
+                } else {
+                  for (const change of changes) {
+                    const status = change.undone ? icons.undo : icons.success;
+                    const time = new Date(change.timestamp).toLocaleTimeString();
+                    if (ttyMode) {
+                      console.log(`  ${status} [${change.changeType}] ${change.filePath} ${theme.muted(`(${time})`)}`);
+                    } else {
+                      console.log(`  ${status} [${change.changeType}] ${change.filePath} (${time})`);
+                    }
+                  }
+                }
+              } else {
+                console.log(ttyMode ? theme.warning('History not enabled') : 'History not enabled');
+              }
+              console.log();
+              prompt();
+              return;
+            }
+
+            if (trimmed === '/help') {
+              console.log(ttyMode ? theme.accent('\nCommands:') : '\nCommands:');
+              console.log('  /undo    - Undo last file change');
+              console.log('  /redo    - Redo last undone change');
+              console.log('  /history - Show recent file changes');
+              console.log('  /tools   - List available tools');
+              console.log('  /help    - Show this help');
+              console.log('  exit     - Exit the CLI\n');
+              prompt();
+              return;
+            }
+
+            if (!trimmed) {
+              prompt();
+              return;
+            }
+
+            try {
+              if (streamRenderer) {
+                streamRenderer.startThinking();
+                await instance.stream(trimmed, (token) => {
+                  streamRenderer.addToken(token);
+                });
+                streamRenderer.complete();
+              } else {
+                process.stdout.write('\n');
+                await instance.stream(trimmed, (token) => {
+                  process.stdout.write(token);
+                });
+              }
+              console.log('\n');
+            } catch (error) {
+              if (streamRenderer) {
+                streamRenderer.showError(error instanceof Error ? error.message : String(error));
+              } else {
+                console.error(`\nError: ${error instanceof Error ? error.message : error}\n`);
+              }
+            }
+
+            prompt();
+          });
+        };
+
+        rl.on('close', async () => {
+          await instance.close();
+          resolve();
+        });
+
+        prompt();
       });
-
-      prompt();
     },
   };
 

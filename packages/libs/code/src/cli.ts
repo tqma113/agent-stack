@@ -5,10 +5,20 @@
 
 import { Command } from 'commander';
 import { existsSync, readFileSync, writeFileSync, mkdirSync } from 'fs';
-import { join, resolve } from 'path';
+import { join, resolve, dirname } from 'path';
 import { createCodeAgent, type CodeAgentInstance } from './code-agent/index.js';
 import { loadConfig, generateConfigTemplate, serializeConfig, DEFAULT_BASE_DIR } from './config.js';
 import { createFileHistoryStore } from './file-history/store.js';
+import {
+  theme,
+  icons,
+  createStreamRenderer,
+  createLoadingSpinner,
+  createLegacySpinner,
+  isTTY,
+  renderPrompt,
+  showDiffView,
+} from '@ai-stack/tui';
 
 const VERSION = '0.0.1';
 
@@ -65,14 +75,26 @@ program
   .version(VERSION);
 
 // ============================================
-// Default command (interactive chat)
+// Default command (one-shot prompt or interactive)
 // ============================================
 program
-  .argument('[prompt]', 'Initial prompt to send to the agent')
+  .argument('[prompt]', 'Initial prompt to send to the agent (one-shot mode)')
   .option('-c, --config <path>', 'Configuration file path')
   .option('-w, --working-dir <path>', 'Working directory (default: current directory)')
   .action(async (prompt, options) => {
     await runInteractive(prompt, options);
+  });
+
+// ============================================
+// chat command (explicit interactive mode)
+// ============================================
+program
+  .command('chat')
+  .description('Start interactive chat mode')
+  .option('-c, --config <path>', 'Configuration file path')
+  .option('-w, --working-dir <path>', 'Working directory (default: current directory)')
+  .action(async (options) => {
+    await runInteractive(undefined, options);
   });
 
 // ============================================
@@ -167,37 +189,74 @@ interface InteractiveOptions {
 }
 
 async function runInteractive(prompt: string | undefined, options: InteractiveOptions) {
-  console.log(`\n🔧 Code Agent v${VERSION}\n`);
+  const ttyMode = isTTY();
+
+  if (ttyMode) {
+    console.log(`\n${theme.highlight(`${icons.tool} Code Agent`)} ${theme.muted(`v${VERSION}`)}\n`);
+  } else {
+    console.log(`\nCode Agent v${VERSION}\n`);
+  }
 
   let agent: CodeAgentInstance | null = null;
 
-  try {
-    const workingDir = options.workingDir ? resolve(options.workingDir) : process.cwd();
+  const spinner = ttyMode
+    ? createLoadingSpinner('Initializing...')
+    : createLegacySpinner('Initializing...');
 
-    console.log('Initializing...');
+  try {
+    spinner.start();
+    const { config: loadedConfig, configPath } = loadConfig(options.config);
+
+    // Determine working directory:
+    // 1. Command line option takes precedence
+    // 2. Config file's workingDir (resolved relative to config file location)
+    // 3. Current working directory as fallback
+    let workingDir: string;
+    if (options.workingDir) {
+      workingDir = resolve(options.workingDir);
+    } else if (loadedConfig.safety?.workingDir) {
+      // Resolve config's workingDir relative to config file location
+      const configDir = configPath ? dirname(configPath) : process.cwd();
+      workingDir = resolve(configDir, loadedConfig.safety.workingDir);
+    } else {
+      workingDir = process.cwd();
+    }
+
     agent = createCodeAgent({
-      ...loadConfig(options.config).config,
+      ...loadedConfig,
       safety: {
+        ...loadedConfig.safety,
         workingDir,
       },
     });
     await agent.initialize();
+    spinner.succeed('Ready!');
 
     // If prompt provided, execute and exit
     if (prompt) {
-      console.log(`\n> ${prompt}\n`);
-      const response = await agent.stream(prompt, (token: string) => {
-        process.stdout.write(token);
-      });
+      const streamRenderer = ttyMode ? createStreamRenderer() : null;
+
+      if (streamRenderer) {
+        streamRenderer.startThinking();
+        await agent.stream(prompt, (token: string) => {
+          streamRenderer.addToken(token);
+        });
+        streamRenderer.complete();
+      } else {
+        console.log(`\n> ${prompt}\n`);
+        await agent.stream(prompt, (token: string) => {
+          process.stdout.write(token);
+        });
+      }
       console.log('\n');
       await agent.close();
       return;
     }
 
-    // Start interactive mode
-    agent.startCLI();
+    // Start interactive mode with TUI
+    await agent.startCLI();
   } catch (error) {
-    console.error(`Failed to initialize: ${error instanceof Error ? error.message : error}`);
+    spinner.fail(`Failed to initialize: ${error instanceof Error ? error.message : error}`);
     if (agent) await agent.close();
     process.exit(1);
   }

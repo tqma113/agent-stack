@@ -14,6 +14,15 @@ import {
   serializeConfig,
   DEFAULT_BASE_DIR,
 } from './config.js';
+import {
+  theme,
+  icons,
+  createStreamRenderer,
+  createLoadingSpinner,
+  createLegacySpinner,
+  renderPrompt,
+  isTTY,
+} from '@ai-stack/tui';
 
 const VERSION = '0.0.1';
 
@@ -209,17 +218,35 @@ interface ChatOptions {
 }
 
 async function runChat(options: ChatOptions) {
-  console.log(`\n🤖 Assistant v${VERSION}\n`);
+  const ttyMode = isTTY();
+
+  if (ttyMode) {
+    console.log(`\n${theme.highlight(`${icons.agent} Assistant`)} ${theme.muted(`v${VERSION}`)}\n`);
+  } else {
+    console.log(`\nAssistant v${VERSION}\n`);
+  }
 
   let assistant: AssistantInstance | null = null;
 
+  const spinner = ttyMode
+    ? createLoadingSpinner('Initializing...')
+    : createLegacySpinner('Initializing...');
+
   try {
-    console.log('Initializing...');
+    spinner.start();
     assistant = createAssistant(options.config);
     // Skip gateway in CLI mode to avoid readline conflicts
     await assistant.initialize({ skipGateway: true });
+    spinner.succeed('Ready!');
 
-    console.log(`Ready! Type "exit" to quit.\n`);
+    if (ttyMode) {
+      console.log(theme.muted('Type /help for commands, exit to quit.\n'));
+    } else {
+      console.log('Type "exit" to quit.\n');
+    }
+
+    // Create stream renderer for TTY mode
+    const streamRenderer = ttyMode ? createStreamRenderer() : null;
 
     // Interactive loop
     const rl = readline.createInterface({
@@ -228,11 +255,12 @@ async function runChat(options: ChatOptions) {
     });
 
     const prompt = () => {
-      rl.question('You: ', async (input) => {
+      const promptText = ttyMode ? renderPrompt() : 'You: ';
+      rl.question(promptText, async (input) => {
         const trimmed = input.trim();
 
         if (trimmed.toLowerCase() === 'exit' || trimmed.toLowerCase() === 'quit') {
-          console.log('\nGoodbye!');
+          console.log(ttyMode ? theme.muted('\nGoodbye!') : '\nGoodbye!');
           await cleanup(assistant);
           rl.close();
           process.exit(0);
@@ -242,11 +270,11 @@ async function runChat(options: ChatOptions) {
           const memory = assistant?.getMemory();
           if (memory) {
             const doc = memory.getDocument();
-            console.log('\n--- Memory ---');
+            console.log(ttyMode ? theme.accent('\n--- Memory ---') : '\n--- Memory ---');
             console.log(JSON.stringify(doc, null, 2));
-            console.log('--- End Memory ---\n');
+            console.log(ttyMode ? theme.accent('--- End Memory ---\n') : '--- End Memory ---\n');
           } else {
-            console.log('\nMemory not enabled.\n');
+            console.log(ttyMode ? theme.warning('\nMemory not enabled.\n') : '\nMemory not enabled.\n');
           }
           prompt();
           return;
@@ -256,26 +284,26 @@ async function runChat(options: ChatOptions) {
           const scheduler = assistant?.getScheduler();
           if (scheduler) {
             const jobs = scheduler.getAllJobs();
-            console.log('\n--- Scheduled Tasks ---');
+            console.log(ttyMode ? theme.accent('\n--- Scheduled Tasks ---') : '\n--- Scheduled Tasks ---');
             if (jobs.length === 0) {
               console.log('No scheduled tasks.');
             } else {
               for (const job of jobs) {
-                const status = job.enabled ? '✓' : '✗';
+                const status = job.enabled ? icons.success : icons.error;
                 const next = job.nextRunAt ? job.nextRunAt.toLocaleString() : 'N/A';
                 console.log(`[${status}] ${job.name} (${job.type}) - Next: ${next}`);
               }
             }
-            console.log('--- End Tasks ---\n');
+            console.log(ttyMode ? theme.accent('--- End Tasks ---\n') : '--- End Tasks ---\n');
           } else {
-            console.log('\nScheduler not enabled.\n');
+            console.log(ttyMode ? theme.warning('\nScheduler not enabled.\n') : '\nScheduler not enabled.\n');
           }
           prompt();
           return;
         }
 
         if (trimmed === '/help') {
-          console.log('\nCommands:');
+          console.log(ttyMode ? theme.accent('\nCommands:') : '\nCommands:');
           console.log('  /memory - Show memory document');
           console.log('  /tasks  - Show scheduled tasks');
           console.log('  /help   - Show this help');
@@ -290,15 +318,29 @@ async function runChat(options: ChatOptions) {
         }
 
         try {
-          process.stdout.write('\nAssistant: ');
+          if (streamRenderer) {
+            streamRenderer.startThinking();
 
-          await assistant?.stream(trimmed, (token) => {
-            process.stdout.write(token);
-          });
+            await assistant?.stream(trimmed, (token) => {
+              streamRenderer.addToken(token);
+            });
+
+            streamRenderer.complete();
+          } else {
+            process.stdout.write('\nAssistant: ');
+
+            await assistant?.stream(trimmed, (token) => {
+              process.stdout.write(token);
+            });
+          }
 
           console.log('\n');
         } catch (error) {
-          console.error(`\nError: ${error instanceof Error ? error.message : error}\n`);
+          if (streamRenderer) {
+            streamRenderer.showError(error instanceof Error ? error.message : String(error));
+          } else {
+            console.error(`\nError: ${error instanceof Error ? error.message : error}\n`);
+          }
         }
 
         prompt();
@@ -312,7 +354,7 @@ async function runChat(options: ChatOptions) {
 
     prompt();
   } catch (error) {
-    console.error(`Failed to initialize: ${error instanceof Error ? error.message : error}`);
+    spinner.fail(`Failed to initialize: ${error instanceof Error ? error.message : error}`);
     await cleanup(assistant);
     process.exit(1);
   }

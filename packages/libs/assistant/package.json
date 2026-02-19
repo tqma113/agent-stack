@@ -2,14 +2,13 @@
   "name": "@ai-stack/assistant",
   "version": "0.0.1",
   "description": "Personal AI assistant with Markdown memory, multi-channel gateway, and scheduled tasks",
+  "type": "module",
   "main": "./dist/index.js",
-  "module": "./dist/index.mjs",
   "types": "./dist/index.d.ts",
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
-      "import": "./dist/index.mjs",
-      "require": "./dist/index.js"
+      "import": "./dist/index.js"
     }
   },
   "bin": {
@@ -41,6 +40,7 @@
     "@ai-stack/agent": "workspace:*",
     "@ai-stack/memory": "workspace:*",
     "@ai-stack/memory-store-sqlite": "workspace:*",
+    "@ai-stack/tui": "workspace:*",
     "better-sqlite3": "^11.7.0",
     "chokidar": "^4.0.0",
     "commander": "^12.1.0",

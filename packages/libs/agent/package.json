@@ -2,14 +2,13 @@
   "name": "@ai-stack/agent",
   "version": "0.0.1",
   "description": "Main entry point for ai-stack AI agents",
+  "type": "module",
   "main": "./dist/index.js",
-  "module": "./dist/index.mjs",
   "types": "./dist/index.d.ts",
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
-      "import": "./dist/index.mjs",
-      "require": "./dist/index.js"
+      "import": "./dist/index.js"
     }
   },
   "bin": {
@@ -41,13 +40,8 @@
     "@ai-stack/memory": "workspace:*",
     "@ai-stack/memory-store-sqlite": "workspace:*",
     "@ai-stack/knowledge": "workspace:*",
-    "boxen": "^8.0.1",
-    "chalk": "^5.4.0",
-    "cli-truncate": "^4.0.0",
+    "@ai-stack/tui": "workspace:*",
     "commander": "^12.1.0",
-    "ora": "^8.1.0",
-    "strip-ansi": "^7.1.0",
-    "terminal-size": "^4.0.0",
     "zod": "^3.24.0"
   },
   "devDependencies": {

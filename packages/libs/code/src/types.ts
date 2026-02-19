@@ -326,7 +326,7 @@ export interface CodeAgentInstance {
   restoreCheckpoint(name: string): Promise<void>;
 
   /** Start interactive CLI mode */
-  startCLI(): void;
+  startCLI(): Promise<void>;
 }
 
 // =============================================================================

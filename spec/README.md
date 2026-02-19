@@ -61,6 +61,7 @@ ai-stack/
 │   │   ├── memory-store-sqlite/# @ai-stack/memory-store-sqlite - SQLite 存储
 │   │   ├── memory-store-json/  # @ai-stack/memory-store-json - JSON 存储
 │   │   ├── knowledge/          # @ai-stack/knowledge - 代码和文档索引
+│   │   ├── tui/                # @ai-stack/tui - 终端 UI 组件库
 │   │   ├── agent/              # @ai-stack/agent - Agent 实现 + CLI
 │   │   ├── assistant/          # @ai-stack/assistant - 个人 AI 助手
 │   │   └── code/               # @ai-stack/code - 代码编辑 Agent
@@ -145,6 +146,16 @@ ai-stack/
         ├── @ai-stack/knowledge (workspace:*)
         └── @ai-stack/memory-store-sqlite (workspace:*)
 
+@ai-stack/tui       (终端 UI 组件库)
+        │
+        ├── ink (^5.0.1) - React TUI 框架
+        ├── @inkjs/ui (^2.0.0) - Ink 组件库
+        ├── chalk (^5.4.0) - 终端颜色
+        ├── boxen (^8.0.1) - 终端框
+        ├── ora (^8.1.0) - 加载动画
+        ├── diff (^7.0.0) - Diff 计算
+        └── react (^18.3.1) - React 运行时
+
 @ai-stack/agent     (Agent 实现 + CLI，内置 MCP、Skill、Memory、Knowledge 和 Permission 支持)
         │
         ├── @ai-stack/provider (workspace:*)
@@ -152,6 +163,7 @@ ai-stack/
         ├── @ai-stack/skill (workspace:*)
         ├── @ai-stack/memory (workspace:*)
         ├── @ai-stack/knowledge (workspace:*)
+        ├── @ai-stack/tui (workspace:*) - 终端 UI
         ├── commander (^12.1.0) - CLI 框架
         └── zod (^3.24.0) - 配置校验
 
@@ -160,6 +172,7 @@ ai-stack/
         ├── @ai-stack/agent (workspace:*)
         ├── @ai-stack/memory (workspace:*)
         ├── @ai-stack/memory-store-sqlite (workspace:*)
+        ├── @ai-stack/tui (workspace:*) - 终端 UI
         ├── commander (^12.1.0) - CLI 框架
         ├── chokidar (^4.0.0) - 文件监听
         ├── cron-parser (^4.9.0) - Cron 表达式解析
@@ -171,9 +184,9 @@ ai-stack/
         ├── @ai-stack/agent (workspace:*)
         ├── @ai-stack/mcp (workspace:*)
         ├── @ai-stack/provider (workspace:*)
+        ├── @ai-stack/tui (workspace:*) - 终端 UI
         ├── better-sqlite3 (^11.7.0)
         ├── commander (^12.1.0) - CLI 框架
-        ├── diff (^7.0.0) - Diff 计算
         ├── glob (^11.0.0) - 文件模式匹配
         ├── picomatch (^4.0.0) - 路径匹配
         └── zod (^3.23.0) - 配置校验
@@ -203,6 +216,7 @@ ai-stack/
 | **Memory** | 五层记忆架构，持久化对话和任务状态 |
 | **Knowledge** | 代码库和文档索引，混合搜索 (FTS + Vector) |
 | **Permission** | 权限管控系统，工具执行前确认和审计 |
+| **TUI** | 终端 UI 组件库，Ink + 直接输出混合架构 |
 | **Assistant** | 个人 AI 助手，Markdown 记忆 + 多通道网关 + 调度器 |
 | **Code Agent** | 代码编辑 Agent，文件操作 + 搜索 + Undo/Redo + 任务管理 |
 | **Error Handling** | 统一错误处理系统，可恢复错误自动重试 |

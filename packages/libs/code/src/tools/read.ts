@@ -5,6 +5,8 @@
  */
 
 import { existsSync, readFileSync, statSync } from 'fs';
+import { resolve, relative, isAbsolute, normalize } from 'path';
+import picomatch from 'picomatch';
 import type { Tool } from '@ai-stack/agent';
 import type { ReadParams, ToolContext } from '../types.js';
 import { FileNotFoundError, FileTooLargeError } from '../errors.js';
@@ -116,10 +118,6 @@ function validatePath(
   filePath: string,
   context: ToolContext
 ): { normalizedPath: string } {
-  // Import path validator dynamically to avoid circular deps
-  const { resolve, relative, isAbsolute, normalize } = require('path');
-  const picomatch = require('picomatch');
-
   const workingDir = resolve(context.safety.workingDir);
 
   // Normalize the path
