@@ -238,14 +238,35 @@ async function runInteractive(prompt: string | undefined, options: InteractiveOp
 
       if (streamRenderer) {
         streamRenderer.startThinking();
-        await agent.stream(prompt, (token: string) => {
-          streamRenderer.addToken(token);
+        await agent.stream(prompt, {
+          onToken: (token: string) => {
+            streamRenderer.addToken(token);
+          },
+          onToolCall: (name, args) => {
+            streamRenderer.pauseForTool({ name, args, status: 'running' });
+          },
+          onToolResult: (name, result) => {
+            streamRenderer.resumeAfterTool({
+              name,
+              args: {},
+              status: result.startsWith('Error') ? 'error' : 'completed',
+              result: result.length > 200 ? result.slice(0, 200) + '...' : result,
+            });
+          },
         });
         streamRenderer.complete();
       } else {
         console.log(`\n> ${prompt}\n`);
-        await agent.stream(prompt, (token: string) => {
-          process.stdout.write(token);
+        await agent.stream(prompt, {
+          onToken: (token: string) => {
+            process.stdout.write(token);
+          },
+          onToolCall: (name) => {
+            console.log(`\n[Tool: ${name}]`);
+          },
+          onToolResult: (name, result) => {
+            console.log(`[${name} completed]\n`);
+          },
         });
       }
       console.log('\n');

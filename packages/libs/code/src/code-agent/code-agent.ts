@@ -171,13 +171,22 @@ export function createCodeAgent(config?: CodeConfig | string): CodeAgentInstance
       return response.content;
     },
 
-    async stream(input: string, onToken?: (token: string) => void): Promise<string> {
+    async stream(
+      input: string,
+      callbacks?: {
+        onToken?: (token: string) => void;
+        onToolCall?: (name: string, args: Record<string, unknown>) => void;
+        onToolResult?: (name: string, result: string) => void;
+      }
+    ): Promise<string> {
       let fullResponse = '';
       await agent.stream(input, {
         onToken: (token: string) => {
           fullResponse += token;
-          onToken?.(token);
+          callbacks?.onToken?.(token);
         },
+        onToolCall: callbacks?.onToolCall,
+        onToolResult: callbacks?.onToolResult,
       });
       return fullResponse;
     },
@@ -359,14 +368,40 @@ export function createCodeAgent(config?: CodeConfig | string): CodeAgentInstance
             try {
               if (streamRenderer) {
                 streamRenderer.startThinking();
-                await instance.stream(trimmed, (token) => {
-                  streamRenderer.addToken(token);
+                await instance.stream(trimmed, {
+                  onToken: (token) => {
+                    streamRenderer.addToken(token);
+                  },
+                  onToolCall: (name, args) => {
+                    streamRenderer.pauseForTool({
+                      name,
+                      args,
+                      status: 'running',
+                    });
+                  },
+                  onToolResult: (name, result) => {
+                    streamRenderer.resumeAfterTool({
+                      name,
+                      args: {},
+                      status: result.startsWith('Error') ? 'error' : 'completed',
+                      result: result.length > 200 ? result.slice(0, 200) + '...' : result,
+                    });
+                  },
                 });
                 streamRenderer.complete();
               } else {
                 process.stdout.write('\n');
-                await instance.stream(trimmed, (token) => {
-                  process.stdout.write(token);
+                await instance.stream(trimmed, {
+                  onToken: (token) => {
+                    process.stdout.write(token);
+                  },
+                  onToolCall: (name, _args) => {
+                    console.log(theme.tool(`\n[${icons.tool} Calling: ${name}]`));
+                  },
+                  onToolResult: (name, result) => {
+                    const status = result.startsWith('Error') ? theme.error('✗') : theme.success('✓');
+                    console.log(`${status} ${name} completed\n`);
+                  },
                 });
               }
               console.log('\n');

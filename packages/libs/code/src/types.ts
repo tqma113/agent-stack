@@ -2,7 +2,10 @@
  * @ai-stack/code - Type Definitions
  */
 
-import type { AgentInstance, Tool } from '@ai-stack/agent';
+import type { AgentInstance, Tool, StreamCallbacks } from '@ai-stack/agent';
+
+// Re-export for convenience
+export type { StreamCallbacks };
 
 // =============================================================================
 // Configuration Types
@@ -304,7 +307,7 @@ export interface CodeAgentInstance {
   /** Chat with the agent */
   chat(input: string): Promise<string>;
   /** Stream chat with the agent */
-  stream(input: string, onToken?: (token: string) => void): Promise<string>;
+  stream(input: string, callbacks?: StreamCallbacks): Promise<string>;
 
   /** Get the underlying agent */
   getAgent(): AgentInstance;
