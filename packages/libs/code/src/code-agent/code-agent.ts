@@ -1,0 +1,324 @@
+/**
+ * @ai-stack/code - Code Agent Factory
+ *
+ * Creates a Code Agent instance with file operations, search, and undo/redo capabilities.
+ */
+
+import { createAgent, type AgentInstance, type AgentConfig, type Tool } from '@ai-stack/agent';
+import type {
+  CodeConfig,
+  CodeAgentInstance,
+  ToolContext,
+  FileChange,
+  UndoResult,
+  RedoResult,
+  SafetyConfig,
+} from '../types.js';
+import { loadConfig, resolveConfig, getDefaultConfig } from '../config.js';
+import { buildCodePrompt } from '../prompts/code-prompt.js';
+import { createFileHistoryStore, type FileHistoryStore } from '../file-history/store.js';
+import { createTaskStore, type TaskStore } from '../task/store.js';
+import {
+  createReadTool,
+  createWriteTool,
+  createEditTool,
+  createGlobTool,
+  createGrepTool,
+  createUndoTool,
+  createRedoTool,
+  createTaskTools,
+  performUndo,
+  performRedo,
+} from '../tools/index.js';
+import * as readline from 'readline';
+
+/**
+ * Create a Code Agent instance
+ */
+export function createCodeAgent(config?: CodeConfig | string): CodeAgentInstance {
+  // Load and resolve config
+  let resolvedConfig: Required<CodeConfig>;
+
+  if (typeof config === 'string') {
+    const { config: loadedConfig } = loadConfig(config);
+    resolvedConfig = resolveConfig(loadedConfig);
+  } else if (config) {
+    resolvedConfig = resolveConfig(config);
+  } else {
+    resolvedConfig = resolveConfig(getDefaultConfig());
+  }
+
+  // Build agent config
+  const agentConfig: AgentConfig = {
+    name: 'Code Agent',
+    model: resolvedConfig.model,
+    temperature: resolvedConfig.temperature,
+    maxTokens: resolvedConfig.maxTokens,
+    apiKey: resolvedConfig.apiKey,
+    baseURL: resolvedConfig.baseURL || undefined,
+    systemPrompt: buildCodePrompt(resolvedConfig.safety.workingDir!),
+  };
+
+  // Add MCP config if present
+  if (resolvedConfig.mcp?.configPath) {
+    agentConfig.mcp = {
+      configPath: resolvedConfig.mcp.configPath,
+      autoConnect: resolvedConfig.mcp.autoConnect,
+    };
+  }
+
+  // Create underlying agent
+  const agent = createAgent(agentConfig);
+
+  // File read tracking for the session
+  const readFiles = new Set<string>();
+
+  // Initialize stores
+  let historyStore: FileHistoryStore | null = null;
+  let taskStore: TaskStore | null = null;
+
+  // Tool context
+  const toolContext: ToolContext = {
+    workingDir: resolvedConfig.safety.workingDir!,
+    safety: resolvedConfig.safety as Required<SafetyConfig>,
+    recordChange: async (change) => {
+      if (!historyStore) {
+        throw new Error('History store not initialized');
+      }
+      return historyStore.recordChange(change);
+    },
+    wasFileRead: (filePath) => readFiles.has(filePath),
+    markFileRead: (filePath) => readFiles.add(filePath),
+  };
+
+  const instance: CodeAgentInstance = {
+    async initialize(): Promise<void> {
+      // Initialize history store
+      if (resolvedConfig.history.enabled) {
+        historyStore = createFileHistoryStore({
+          dbPath: resolvedConfig.history.dbPath!,
+          maxChanges: resolvedConfig.history.maxChanges!,
+        });
+        historyStore.initialize();
+      }
+
+      // Initialize task store
+      if (resolvedConfig.tasks.enabled) {
+        taskStore = createTaskStore({
+          dbPath: resolvedConfig.tasks.dbPath!,
+        });
+        taskStore.initialize();
+      }
+
+      // Register file tools
+      agent.registerTool(createReadTool(toolContext));
+      agent.registerTool(createWriteTool(toolContext));
+      agent.registerTool(createEditTool(toolContext));
+      agent.registerTool(createGlobTool(toolContext));
+      agent.registerTool(createGrepTool(toolContext));
+
+      // Register undo/redo tools if history is enabled
+      if (historyStore) {
+        agent.registerTool(createUndoTool(toolContext, historyStore));
+        agent.registerTool(createRedoTool(toolContext, historyStore));
+      }
+
+      // Register task tools if tasks are enabled
+      if (taskStore) {
+        const taskTools = createTaskTools(taskStore);
+        for (const tool of taskTools) {
+          agent.registerTool(tool);
+        }
+      }
+
+      // Initialize MCP if configured
+      if (agentConfig.mcp) {
+        try {
+          await agent.initializeMCP();
+        } catch (error) {
+          console.error('Failed to initialize MCP:', error);
+        }
+      }
+    },
+
+    async close(): Promise<void> {
+      if (historyStore) {
+        historyStore.close();
+        historyStore = null;
+      }
+      if (taskStore) {
+        taskStore.close();
+        taskStore = null;
+      }
+      await agent.close();
+    },
+
+    async chat(input: string): Promise<string> {
+      const response = await agent.chat(input);
+      return response.content;
+    },
+
+    async stream(input: string, onToken?: (token: string) => void): Promise<string> {
+      let fullResponse = '';
+      await agent.stream(input, {
+        onToken: (token: string) => {
+          fullResponse += token;
+          onToken?.(token);
+        },
+      });
+      return fullResponse;
+    },
+
+    getAgent(): AgentInstance {
+      return agent;
+    },
+
+    getConfig(): CodeConfig {
+      return resolvedConfig;
+    },
+
+    getTools(): Tool[] {
+      return agent.getTools();
+    },
+
+    registerTool(tool: Tool): void {
+      agent.registerTool(tool);
+    },
+
+    async undo(): Promise<UndoResult | null> {
+      if (!historyStore) {
+        return null;
+      }
+      return performUndo(toolContext, historyStore);
+    },
+
+    async redo(): Promise<RedoResult | null> {
+      if (!historyStore) {
+        return null;
+      }
+      return performRedo(toolContext, historyStore);
+    },
+
+    async createCheckpoint(name: string): Promise<void> {
+      if (!historyStore) {
+        throw new Error('History not enabled');
+      }
+      historyStore.createCheckpoint(name);
+    },
+
+    async restoreCheckpoint(name: string): Promise<void> {
+      if (!historyStore) {
+        throw new Error('History not enabled');
+      }
+      const changes = historyStore.getChangesSinceCheckpoint(name);
+      // Undo all changes since checkpoint (in reverse order)
+      for (let i = changes.length - 1; i >= 0; i--) {
+        const change = changes[i];
+        if (!change.undone) {
+          await instance.undo();
+        }
+      }
+    },
+
+    startCLI(): void {
+      const rl = readline.createInterface({
+        input: process.stdin,
+        output: process.stdout,
+      });
+
+      console.log(`\nCode Agent ready in: ${resolvedConfig.safety.workingDir}`);
+      console.log('Type "exit" to quit, "/undo" to undo, "/redo" to redo\n');
+
+      const prompt = () => {
+        rl.question('> ', async (input) => {
+          const trimmed = input.trim();
+
+          if (trimmed.toLowerCase() === 'exit' || trimmed.toLowerCase() === 'quit') {
+            console.log('\nGoodbye!');
+            rl.close();
+            return;
+          }
+
+          // Handle special commands
+          if (trimmed === '/undo') {
+            try {
+              const result = await instance.undo();
+              if (result) {
+                console.log(`Undone: ${result.file_path} -> ${result.restored_to}`);
+              } else {
+                console.log('Nothing to undo');
+              }
+            } catch (error) {
+              console.error(`Error: ${error instanceof Error ? error.message : error}`);
+            }
+            prompt();
+            return;
+          }
+
+          if (trimmed === '/redo') {
+            try {
+              const result = await instance.redo();
+              if (result) {
+                console.log(`Redone: ${result.file_path} -> ${result.action}`);
+              } else {
+                console.log('Nothing to redo');
+              }
+            } catch (error) {
+              console.error(`Error: ${error instanceof Error ? error.message : error}`);
+            }
+            prompt();
+            return;
+          }
+
+          if (trimmed === '/tools') {
+            const tools = instance.getTools();
+            console.log('\nAvailable tools:');
+            for (const tool of tools) {
+              console.log(`  - ${tool.name}: ${tool.description.split('\n')[0]}`);
+            }
+            console.log();
+            prompt();
+            return;
+          }
+
+          if (trimmed === '/help') {
+            console.log('\nCommands:');
+            console.log('  /undo   - Undo last file change');
+            console.log('  /redo   - Redo last undone change');
+            console.log('  /tools  - List available tools');
+            console.log('  /help   - Show this help');
+            console.log('  exit    - Exit the CLI\n');
+            prompt();
+            return;
+          }
+
+          if (!trimmed) {
+            prompt();
+            return;
+          }
+
+          try {
+            process.stdout.write('\n');
+            await instance.stream(trimmed, (token) => {
+              process.stdout.write(token);
+            });
+            console.log('\n');
+          } catch (error) {
+            console.error(`\nError: ${error instanceof Error ? error.message : error}\n`);
+          }
+
+          prompt();
+        });
+      };
+
+      rl.on('close', async () => {
+        await instance.close();
+        process.exit(0);
+      });
+
+      prompt();
+    },
+  };
+
+  return instance;
+}

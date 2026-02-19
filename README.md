@@ -17,6 +17,10 @@
   [ ] Calander + Task 管理
   [ ] Corn Job
     [ ] AI 新闻、事件、仓库、论文、趋势
+[ ] code agent
+  [ ] LSP
+  [ ] undo redo
+  [ ] /init 自动分析项目
 [ ] OpenClaw
   [ ] Profile/Task/Summary/Episodic/Semantic 是什么？有什么用？最佳实践是什么？
   [ ] Markdown 文件 持久化
@@ -25,3 +29,14 @@
 [ ] multi agent X model provider X MCP/Skill
 [x] 我们支持了 maxIterations，目前达到限制之后任务会自动停止，我希望当达到限制之后中止然后询问用户是否继续，而不是直接终止
 [ ] 终端并行任务管理 tux
+[ ] TUI
+[ ] 用户交互 question
+
+* 常规 Agent
+  * chat gpt
+* 编码 Agent
+  * open code
+  * claude code
+  * codex
+* 个人助手
+  * openclaw

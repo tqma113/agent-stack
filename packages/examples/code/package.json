@@ -1,0 +1,25 @@
+{
+  "name": "@ai-stack-example/code",
+  "version": "0.0.1",
+  "type": "module",
+  "private": true,
+  "description": "Example project for @ai-stack/code - Code editing AI agent",
+  "scripts": {
+    "build": "echo 'No build needed'",
+    "start": "ai-code chat",
+    "chat": "ai-code chat",
+    "undo": "ai-code undo",
+    "redo": "ai-code redo",
+    "history": "ai-code history",
+    "tasks": "ai-code tasks"
+  },
+  "dependencies": {
+    "@ai-stack/code": "workspace:*",
+    "@ai-stack-mcp/fetch": "workspace:*",
+    "@ai-stack-mcp/bash": "workspace:*",
+    "@ai-stack-mcp/git": "workspace:*",
+    "@ai-stack-mcp/lsp": "workspace:*",
+    "typescript": "~5.7.2",
+    "typescript-language-server": "^4.3.3"
+  }
+}

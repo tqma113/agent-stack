@@ -1,7 +1,7 @@
 {
-  "name": "@ai-stack/agent",
+  "name": "@ai-stack-mcp/lsp",
   "version": "0.0.1",
-  "description": "Main entry point for ai-stack AI agents",
+  "description": "MCP server providing Language Server Protocol integration for code intelligence",
   "main": "./dist/index.js",
   "module": "./dist/index.mjs",
   "types": "./dist/index.d.ts",
@@ -13,7 +13,7 @@
     }
   },
   "bin": {
-    "ai-agent": "./dist/cli.js"
+    "mcp-lsp": "./dist/cli.js"
   },
   "files": [
     "dist"
@@ -26,28 +26,19 @@
     "typecheck": "tsc --noEmit"
   },
   "keywords": [
-    "agent",
-    "ai",
-    "openai",
-    "llm",
-    "mcp"
+    "mcp",
+    "lsp",
+    "language-server",
+    "typescript",
+    "diagnostics",
+    "code-intelligence"
   ],
   "author": "",
   "license": "MIT",
   "dependencies": {
-    "@ai-stack/provider": "workspace:*",
-    "@ai-stack/mcp": "workspace:*",
-    "@ai-stack/skill": "workspace:*",
-    "@ai-stack/memory": "workspace:*",
-    "@ai-stack/memory-store-sqlite": "workspace:*",
-    "@ai-stack/knowledge": "workspace:*",
-    "boxen": "^8.0.1",
-    "chalk": "^5.4.0",
-    "cli-truncate": "^4.0.0",
-    "commander": "^12.1.0",
-    "ora": "^8.1.0",
-    "strip-ansi": "^7.1.0",
-    "terminal-size": "^4.0.0",
+    "@modelcontextprotocol/sdk": "^1.0.0",
+    "vscode-jsonrpc": "^8.2.0",
+    "vscode-languageserver-protocol": "^3.17.5",
     "zod": "^3.24.0"
   },
   "devDependencies": {

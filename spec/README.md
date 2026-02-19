@@ -62,7 +62,8 @@ ai-stack/
 │   │   ├── memory-store-json/  # @ai-stack/memory-store-json - JSON 存储
 │   │   ├── knowledge/          # @ai-stack/knowledge - 代码和文档索引
 │   │   ├── agent/              # @ai-stack/agent - Agent 实现 + CLI
-│   │   └── assistant/          # @ai-stack/assistant - 个人 AI 助手
+│   │   ├── assistant/          # @ai-stack/assistant - 个人 AI 助手
+│   │   └── code/               # @ai-stack/code - 代码编辑 Agent
 │   │
 │   ├── skills/                 # 自定义 Skills (@ai-stack-skill/*)
 │   │   ├── memory/             # @ai-stack-skill/memory - Memory Skill
@@ -72,17 +73,21 @@ ai-stack/
 │       ├── fetch/              # @ai-stack-mcp/fetch - Web 内容获取
 │       ├── time/               # @ai-stack-mcp/time - 时间和时区转换
 │       ├── git/                # @ai-stack-mcp/git - Git 仓库操作
-│       └── bash/               # @ai-stack-mcp/bash - Bash 命令执行
+│       ├── bash/               # @ai-stack-mcp/bash - Bash 命令执行
+│       └── lsp/                # @ai-stack-mcp/lsp - LSP 代码智能
 │
 ├── packages/examples/           # 示例项目
 │   ├── agent/                  # @ai-stack-example/agent - Agent 示例
-│   │   ├── agent.json      # Agent 配置
-│   │   ├── mcp.json           # MCP 配置
-│   │   └── skills/            # 示例 Skills
-│   └── assistant/             # @ai-stack-example/assistant - Assistant 示例
-│       ├── assistant.json     # Assistant 配置
-│       ├── mcp.json           # MCP 配置
-│       └── MEMORY.md          # 记忆文件
+│   │   ├── agent.json          # Agent 配置
+│   │   ├── mcp.json            # MCP 配置
+│   │   └── skills/             # 示例 Skills
+│   ├── assistant/              # @ai-stack-example/assistant - Assistant 示例
+│   │   ├── assistant.json      # Assistant 配置
+│   │   ├── mcp.json            # MCP 配置
+│   │   └── MEMORY.md           # 记忆文件
+│   └── code/                   # @ai-stack-example/code - Code Agent 示例
+│       ├── code.json           # Code Agent 配置
+│       └── mcp.json            # MCP 配置 (bash, git, lsp)
 │
 ├── common/                      # Rush 公共配置
 ├── .github/workflows/           # CI/CD 配置
@@ -161,9 +166,28 @@ ai-stack/
         ├── gray-matter (^4.0.3) - Markdown frontmatter 解析
         └── (可选) telegraf, discord.js - 消息平台适配器
 
+@ai-stack/code      (代码编辑 Agent，文件操作 + 搜索 + Undo/Redo)
+        │
+        ├── @ai-stack/agent (workspace:*)
+        ├── @ai-stack/mcp (workspace:*)
+        ├── @ai-stack/provider (workspace:*)
+        ├── better-sqlite3 (^11.7.0)
+        ├── commander (^12.1.0) - CLI 框架
+        ├── diff (^7.0.0) - Diff 计算
+        ├── glob (^11.0.0) - 文件模式匹配
+        ├── picomatch (^4.0.0) - 路径匹配
+        └── zod (^3.23.0) - 配置校验
+
 @ai-stack-mcp/bash  (Bash 命令执行 MCP 服务器)
         │
         ├── @modelcontextprotocol/sdk (^1.0.0)
+        └── zod (^3.24.0)
+
+@ai-stack-mcp/lsp   (语言服务器协议 MCP 服务器)
+        │
+        ├── @modelcontextprotocol/sdk (^1.0.0)
+        ├── vscode-jsonrpc (^8.2.0)
+        ├── vscode-languageserver-protocol (^3.17.5)
         └── zod (^3.24.0)
 ```
 
@@ -180,6 +204,7 @@ ai-stack/
 | **Knowledge** | 代码库和文档索引，混合搜索 (FTS + Vector) |
 | **Permission** | 权限管控系统，工具执行前确认和审计 |
 | **Assistant** | 个人 AI 助手，Markdown 记忆 + 多通道网关 + 调度器 |
+| **Code Agent** | 代码编辑 Agent，文件操作 + 搜索 + Undo/Redo + 任务管理 |
 | **Error Handling** | 统一错误处理系统，可恢复错误自动重试 |
 | **Telemetry** | 可观测性系统，工具/LLM 调用事件追踪 |
 | **Parallel Tools** | 并行工具执行，可配置并发数和超时 |

@@ -14,7 +14,8 @@ ai-stack/
 │   │   ├── memory-store-json/  # @ai-stack/memory-store-json (JSON 存储)
 │   │   ├── knowledge/          # @ai-stack/knowledge (代码和文档索引)
 │   │   ├── agent/              # @ai-stack/agent (Agent + Permission)
-│   │   └── assistant/          # @ai-stack/assistant (个人 AI 助手)
+│   │   ├── assistant/          # @ai-stack/assistant (个人 AI 助手)
+│   │   └── code/               # @ai-stack/code (代码编辑 Agent)
 │   ├── skills/                 # 自定义 Skills (@ai-stack-skill/*)
 │   │   ├── memory/             # @ai-stack-skill/memory
 │   │   └── knowledge/          # @ai-stack-skill/knowledge
@@ -23,10 +24,10 @@ ai-stack/
 │       ├── time/               # @ai-stack-mcp/time
 │       ├── git/                # @ai-stack-mcp/git
 │       └── bash/               # @ai-stack-mcp/bash
-├── example/                    # 示例项目
-│   ├── .agent.json          # Agent 配置示例
-│   ├── .mcp.json               # MCP 配置示例
-│   └── skills/                 # 示例 Skills
+│   └── examples/               # 示例项目
+│       ├── agent/              # @ai-stack-example/agent
+│       ├── assistant/          # @ai-stack-example/assistant
+│       └── code/               # @ai-stack-example/code
 ├── common/                     # Rush 公共目录
 │   ├── config/rush/            # Rush 配置
 │   ├── scripts/                # Rush 脚本
@@ -1076,6 +1077,95 @@ Duration: 123ms
 | `MCP_BASH_BLOCKED_COMMANDS` | 黑名单命令 (逗号分隔) |
 | `MCP_BASH_ALLOWED_COMMANDS` | 白名单命令 (逗号分隔) |
 
+### 9.5 @ai-stack-mcp/lsp
+
+语言服务器协议 (LSP) MCP 服务器，提供代码智能功能。
+
+```
+packages/mcp-servers/lsp/
+├── src/
+│   ├── index.ts               # 包入口
+│   ├── types.ts               # 类型定义
+│   ├── language-client.ts     # 语言服务器客户端管理
+│   ├── server.ts              # MCP Server 实现
+│   └── cli.ts                 # CLI 入口
+├── dist/                      # 构建输出
+├── package.json
+├── tsconfig.json
+└── tsup.config.ts
+```
+
+**提供的工具**：
+
+| 工具名 | 描述 |
+|--------|------|
+| `lsp_get_diagnostics` | 获取文件诊断信息 (错误/警告) |
+| `lsp_go_to_definition` | 跳转到符号定义 |
+| `lsp_find_references` | 查找所有引用 |
+| `lsp_get_completions` | 获取代码补全建议 |
+| `lsp_get_hover` | 获取悬停信息 (类型/文档) |
+| `lsp_get_document_symbols` | 获取文档符号列表 |
+| `lsp_get_workspace_symbols` | 搜索工作区符号 |
+| `lsp_format_document` | 格式化文档 |
+| `lsp_rename_symbol` | 重命名符号 |
+| `lsp_get_code_actions` | 获取代码操作 (快速修复) |
+| `lsp_start_server` | 启动语言服务器 |
+| `lsp_stop_server` | 停止语言服务器 |
+| `lsp_list_servers` | 列出运行中的语言服务器 |
+
+**package.json 关键配置**：
+
+```json
+{
+  "name": "@ai-stack-mcp/lsp",
+  "version": "0.0.1",
+  "bin": {
+    "mcp-lsp": "./dist/cli.js"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.0.0",
+    "vscode-jsonrpc": "^8.2.0",
+    "vscode-languageserver-protocol": "^3.17.5",
+    "zod": "^3.24.0"
+  }
+}
+```
+
+**MCP 配置示例**：
+
+```json
+{
+  "mcpServers": {
+    "lsp": {
+      "command": "npx",
+      "args": ["-y", "@ai-stack-mcp/lsp", "--working-dir=/path/to/project"]
+    }
+  }
+}
+```
+
+**CLI 参数**：
+
+| 参数 | 描述 |
+|------|------|
+| `-w, --working-dir=PATH` | 工作目录 |
+| `--tsserver-path=PATH` | TypeScript 服务器路径 |
+| `--no-typescript` | 不自动启动 TypeScript 服务器 |
+| `--server=ID:CMD:ARGS` | 添加语言服务器 |
+
+**使用示例**：
+
+```bash
+# 基本使用 (自动启动 TypeScript 服务器)
+mcp-lsp
+
+# 添加 Python 语言服务器
+mcp-lsp --server=python:pyright-langserver:--stdio
+
+# 添加多个语言服务器
+mcp-lsp --server=rust:rust-analyzer --server=go:gopls
+```
+
 ---
 
 ## 10. @ai-stack/assistant 包 (个人 AI 助手)
@@ -1266,7 +1356,163 @@ assistant config init|show
 
 ---
 
-## 11. Rush 配置目录
+## 11. @ai-stack/code 包 (代码编辑 Agent)
+
+### 11.1 目录结构
+
+```
+packages/libs/code/
+├── src/
+│   ├── index.ts                    # 包入口
+│   ├── cli.ts                      # CLI 入口 (ai-code 命令)
+│   ├── types.ts                    # 核心类型定义
+│   ├── errors.ts                   # 错误类
+│   ├── config.ts                   # 配置加载
+│   ├── config-schema.ts            # Zod 配置校验
+│   │
+│   ├── code-agent/                 # 核心 Code Agent
+│   │   ├── index.ts
+│   │   └── code-agent.ts           # createCodeAgent() 工厂函数
+│   │
+│   ├── tools/                      # 内置工具
+│   │   ├── index.ts
+│   │   ├── read.ts                 # Read 工具 (带行号读取)
+│   │   ├── write.ts                # Write 工具 (创建/覆盖文件)
+│   │   ├── edit.ts                 # Edit 工具 (搜索替换)
+│   │   ├── glob.ts                 # Glob 工具 (文件模式匹配)
+│   │   ├── grep.ts                 # Grep 工具 (内容搜索)
+│   │   ├── undo.ts                 # Undo 工具 (撤销)
+│   │   ├── redo.ts                 # Redo 工具 (重做)
+│   │   └── task.ts                 # Task 工具 (任务管理)
+│   │
+│   ├── file-history/               # Undo/Redo 系统
+│   │   ├── index.ts
+│   │   ├── types.ts
+│   │   ├── store.ts                # SQLite 历史存储
+│   │   └── diff-engine.ts          # Diff 计算与应用
+│   │
+│   ├── task/                       # 任务管理
+│   │   ├── index.ts
+│   │   └── store.ts                # SQLite 任务存储
+│   │
+│   ├── safety/                     # 安全控制
+│   │   ├── index.ts
+│   │   ├── path-validator.ts       # 路径验证 (沙箱)
+│   │   └── content-validator.ts    # 内容验证 (密钥检测)
+│   │
+│   └── prompts/
+│       └── code-prompt.ts          # System Prompt
+│
+├── dist/                           # 构建输出
+├── package.json
+├── tsconfig.json
+└── tsup.config.ts
+```
+
+### 11.2 核心功能
+
+| 模块 | 功能 | 说明 |
+|------|------|------|
+| **Read** | 文件读取 | 带行号输出，支持分页 |
+| **Write** | 文件写入 | 自动创建目录，记录历史 |
+| **Edit** | 搜索替换 | 精确匹配，支持全局替换 |
+| **Glob** | 文件搜索 | 按模式匹配，按修改时间排序 |
+| **Grep** | 内容搜索 | 正则搜索，多种输出模式 |
+| **Undo/Redo** | 撤销重做 | SQLite 持久化历史，检查点支持 |
+| **Task** | 任务管理 | 创建/更新/列表/依赖关系 |
+| **Safety** | 安全控制 | 路径沙箱、密钥检测 |
+
+### 11.3 package.json
+
+```json
+{
+  "name": "@ai-stack/code",
+  "version": "0.0.1",
+  "bin": {
+    "ai-code": "./dist/cli.js"
+  },
+  "dependencies": {
+    "@ai-stack/agent": "workspace:*",
+    "@ai-stack/mcp": "workspace:*",
+    "@ai-stack/provider": "workspace:*",
+    "better-sqlite3": "^11.7.0",
+    "commander": "^12.1.0",
+    "diff": "^7.0.0",
+    "glob": "^11.0.0",
+    "picomatch": "^4.0.0",
+    "zod": "^3.23.0"
+  }
+}
+```
+
+### 11.4 CLI 命令
+
+```bash
+# 交互模式
+ai-code
+
+# 单次执行
+ai-code "读取 package.json 文件"
+
+# 指定配置和工作目录
+ai-code --config ./code.json --working-dir ./my-project
+
+# Undo/Redo
+ai-code undo
+ai-code redo
+
+# 历史记录
+ai-code history
+
+# 检查点
+ai-code checkpoint create my-checkpoint
+ai-code checkpoint restore my-checkpoint
+
+# 配置
+ai-code config init
+ai-code config show
+```
+
+### 11.5 配置文件示例
+
+**code.json**:
+```json
+{
+  "model": "gpt-4o",
+  "temperature": 0.7,
+  "maxTokens": 8192,
+  "maxIterations": 50,
+
+  "safety": {
+    "workingDir": ".",
+    "allowedPaths": ["**/*"],
+    "blockedPaths": ["**/node_modules/**", "**/.git/**"],
+    "maxFileSize": 1048576,
+    "blockSecrets": true,
+    "confirmDestructive": true
+  },
+
+  "history": {
+    "enabled": true,
+    "dbPath": ".ai-code/history.db",
+    "maxChanges": 1000
+  },
+
+  "tasks": {
+    "enabled": true,
+    "dbPath": ".ai-code/tasks.db"
+  },
+
+  "mcp": {
+    "configPath": "mcp.json",
+    "autoConnect": true
+  }
+}
+```
+
+---
+
+## 12. Rush 配置目录
 
 ### 11.1 common/config/rush/
 
@@ -1353,3 +1599,96 @@ rush build
 # 重新构建
 rush rebuild
 ```
+
+---
+
+## 14. 示例项目 (packages/examples/)
+
+示例项目使用 `@ai-stack-example/*` 前缀，提供各个包的实际使用示例。
+
+### 14.1 @ai-stack-example/agent
+
+Agent 功能的完整示例，包含 MCP、Skill、Memory、Knowledge 集成。
+
+```
+packages/examples/agent/
+├── package.json            # 包依赖配置
+├── agent.json              # Agent 配置
+├── mcp.json                # MCP 服务器配置
+├── skills/                 # 自定义 Skill 示例
+│   └── search-skill/
+│       ├── skill.json
+│       └── handlers.cjs
+├── memory/                 # Memory 数据目录
+│   └── sqlite.db
+├── knowledge/              # Knowledge 数据目录
+│   └── sqlite.db
+├── README.md
+└── .gitignore
+```
+
+**启动命令**:
+```bash
+pnpm start        # 启动交互对话
+pnpm run tools    # 列出可用工具
+```
+
+### 14.2 @ai-stack-example/assistant
+
+个人 AI 助手示例，包含 Markdown Memory、多通道网关、调度器。
+
+```
+packages/examples/assistant/
+├── package.json            # 包依赖配置
+├── assistant.json          # Assistant 配置
+├── mcp.json                # MCP 服务器配置
+├── MEMORY.md               # Markdown 记忆文件 (Source of Truth)
+├── README.md
+└── .gitignore
+```
+
+**启动命令**:
+```bash
+pnpm start              # 启动交互对话
+pnpm run daemon         # 启动守护进程
+pnpm run memory:sync    # 同步记忆
+pnpm run scheduler:list # 查看调度任务
+```
+
+### 14.3 @ai-stack-example/code
+
+代码编辑 Agent 示例，包含文件操作、搜索、Undo/Redo、任务管理。
+
+```
+packages/examples/code/
+├── package.json            # 包依赖配置
+├── code.json               # Code Agent 配置
+├── mcp.json                # MCP 服务器配置 (bash, git, lsp)
+├── .ai-code/               # 数据目录 (自动创建)
+│   ├── history.db          # 文件历史
+│   └── tasks.db            # 任务数据
+├── README.md
+└── .gitignore
+```
+
+**启动命令**:
+```bash
+pnpm start          # 启动交互对话
+pnpm run undo       # 撤销最近更改
+pnpm run redo       # 重做撤销
+pnpm run history    # 查看更改历史
+pnpm run tasks      # 查看任务列表
+```
+
+**配置说明**:
+
+| 配置文件 | 用途 |
+|----------|------|
+| `code.json` | Agent 模型、安全策略、历史/任务数据库路径 |
+| `mcp.json` | MCP 服务器配置 (fetch, bash, git, lsp) |
+
+**MCP 工具集成**:
+- `fetch` - Web 内容获取
+- `bash` - Shell 命令执行
+- `git` - Git 仓库操作
+- `lsp` - 代码智能 (定义跳转、引用查找等)

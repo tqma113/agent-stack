@@ -1,7 +1,7 @@
 {
-  "name": "@ai-stack/assistant",
+  "name": "@ai-stack/code",
   "version": "0.0.1",
-  "description": "Personal AI assistant with Markdown memory, multi-channel gateway, and scheduled tasks",
+  "description": "Code Agent with file operations, search, git integration, and undo/redo capabilities",
   "main": "./dist/index.js",
   "module": "./dist/index.mjs",
   "types": "./dist/index.d.ts",
@@ -13,7 +13,7 @@
     }
   },
   "bin": {
-    "ai-assistant": "./dist/cli.js"
+    "ai-code": "./dist/cli.js"
   },
   "files": [
     "dist"
@@ -26,36 +26,35 @@
     "typecheck": "tsc --noEmit"
   },
   "keywords": [
-    "assistant",
+    "code",
     "agent",
     "ai",
-    "memory",
-    "markdown",
-    "telegram",
-    "discord",
-    "scheduler"
+    "file-operations",
+    "edit",
+    "search",
+    "git",
+    "undo-redo"
   ],
   "author": "",
   "license": "MIT",
   "dependencies": {
     "@ai-stack/agent": "workspace:*",
-    "@ai-stack/memory": "workspace:*",
-    "@ai-stack/memory-store-sqlite": "workspace:*",
+    "@ai-stack/mcp": "workspace:*",
+    "@ai-stack/provider": "workspace:*",
     "better-sqlite3": "^11.7.0",
-    "chokidar": "^4.0.0",
     "commander": "^12.1.0",
-    "cron-parser": "^4.9.0",
-    "gray-matter": "^4.0.3"
+    "diff": "^7.0.0",
+    "glob": "^11.0.0",
+    "picomatch": "^4.0.0",
+    "zod": "^3.23.0"
   },
   "devDependencies": {
     "@types/better-sqlite3": "^7.6.0",
+    "@types/diff": "^6.0.0",
     "@types/node": "^22.10.0",
+    "@types/picomatch": "^3.0.0",
     "rimraf": "^6.0.1",
     "tsup": "^8.3.5",
     "typescript": "~5.7.2"
-  },
-  "optionalDependencies": {
-    "telegraf": "^4.16.0",
-    "discord.js": "^14.14.0"
   }
 }

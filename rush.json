@@ -373,6 +373,10 @@
       "projectFolder": "packages/libs/assistant"
     },
     {
+      "packageName": "@ai-stack/code",
+      "projectFolder": "packages/libs/code"
+    },
+    {
       "packageName": "@ai-stack-skill/memory",
       "projectFolder": "packages/skills/memory"
     },
@@ -389,6 +393,10 @@
       "projectFolder": "packages/examples/assistant"
     },
     {
+      "packageName": "@ai-stack-example/code",
+      "projectFolder": "packages/examples/code"
+    },
+    {
       "packageName": "@ai-stack-mcp/fetch",
       "projectFolder": "packages/mcp-servers/fetch"
     },
@@ -403,6 +411,14 @@
     {
       "packageName": "@ai-stack-mcp/bash",
       "projectFolder": "packages/mcp-servers/bash"
+    },
+    {
+      "packageName": "@ai-stack-mcp/electron-cdp",
+      "projectFolder": "packages/mcp-servers/electron-cdp"
+    },
+    {
+      "packageName": "@ai-stack-mcp/lsp",
+      "projectFolder": "packages/mcp-servers/lsp"
     }
   ]
 }

@@ -1,0 +1,23 @@
+{
+  "mcpServers": {
+    "fetch": {
+      "command": "node",
+      "args": ["./node_modules/@ai-stack-mcp/fetch/dist/cli.js"]
+    },
+    "bash": {
+      "command": "node",
+      "args": ["./node_modules/@ai-stack-mcp/bash/dist/cli.js", "--working-dir=."]
+    },
+    "git": {
+      "command": "node",
+      "args": ["./node_modules/@ai-stack-mcp/git/dist/cli.js", "--repo-path=."]
+    },
+    "lsp": {
+      "command": "node",
+      "args": [
+        "./node_modules/@ai-stack-mcp/lsp/dist/cli.js",
+        "--tsserver-path=./node_modules/.bin/typescript-language-server"
+      ]
+    }
+  }
+}

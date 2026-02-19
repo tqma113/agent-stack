@@ -1,0 +1,31 @@
+{
+  "model": "gpt-4o",
+  "temperature": 0.7,
+  "maxTokens": 8192,
+  "maxIterations": 50,
+
+  "safety": {
+    "workingDir": "../../..",
+    "allowedPaths": ["**/*"],
+    "blockedPaths": ["**/node_modules/**", "**/.git/**", "**/dist/**", "**/*.db*"],
+    "maxFileSize": 1048576,
+    "blockSecrets": true,
+    "confirmDestructive": true
+  },
+
+  "history": {
+    "enabled": true,
+    "dbPath": ".ai-code/history.db",
+    "maxChanges": 1000
+  },
+
+  "tasks": {
+    "enabled": true,
+    "dbPath": ".ai-code/tasks.db"
+  },
+
+  "mcp": {
+    "configPath": "./mcp.json",
+    "autoConnect": true
+  }
+}
