@@ -1,274 +1,141 @@
 # 项目结构详解
 
-## 1. 目录结构总览
+本文档详细说明 AI Stack 的目录结构、包组织和文件职责。
+
+---
+
+## 1. 目录总览
 
 ```
 ai-stack/
 ├── packages/                    # 所有包目录
-│   ├── libs/                   # 核心业务库 (@ai-stack/*)
-│   │   ├── provider/           # @ai-stack/provider
-│   │   ├── mcp/                # @ai-stack/mcp
-│   │   ├── skill/              # @ai-stack/skill
-│   │   ├── memory/             # @ai-stack/memory (策略层)
-│   │   ├── memory-store-sqlite/# @ai-stack/memory-store-sqlite (SQLite 存储)
-│   │   ├── memory-store-json/  # @ai-stack/memory-store-json (JSON 存储)
-│   │   ├── knowledge/          # @ai-stack/knowledge (代码和文档索引)
-│   │   ├── tui/                # @ai-stack/tui (终端 UI 组件库)
-│   │   ├── agent/              # @ai-stack/agent (Agent + Permission)
-│   │   ├── assistant/          # @ai-stack/assistant (个人 AI 助手)
-│   │   └── code/               # @ai-stack/code (代码编辑 Agent)
-│   ├── skills/                 # 自定义 Skills (@ai-stack-skill/*)
-│   │   ├── memory/             # @ai-stack-skill/memory
-│   │   └── knowledge/          # @ai-stack-skill/knowledge
-│   └── mcp-servers/            # 自定义 MCP 服务器 (@ai-stack-mcp/*)
-│       ├── fetch/              # @ai-stack-mcp/fetch
-│       ├── time/               # @ai-stack-mcp/time
-│       ├── git/                # @ai-stack-mcp/git
-│       └── bash/               # @ai-stack-mcp/bash
-│   └── examples/               # 示例项目
-│       ├── agent/              # @ai-stack-example/agent
-│       ├── assistant/          # @ai-stack-example/assistant
-│       └── code/               # @ai-stack-example/code
+│   ├── libs/                   # 核心库 (@ai-stack/*)
+│   ├── skills/                 # 技能包 (@ai-stack-skill/*)
+│   ├── mcp-servers/            # MCP 服务器 (@ai-stack-mcp/*)
+│   ├── examples/               # 示例项目 (@ai-stack-example/*)
+│   └── config/                 # 共享配置
+│
 ├── common/                     # Rush 公共目录
-│   ├── config/rush/            # Rush 配置
+│   ├── config/rush/            # Rush 配置文件
 │   ├── scripts/                # Rush 脚本
 │   └── temp/                   # 临时文件
+│
+├── spec/                       # 项目文档
 ├── .claude/                    # Claude Code 配置
 ├── .ttadk/                     # TTADK 插件
 ├── .github/                    # GitHub 配置
 ├── .mcp.json                   # MCP 服务器配置
-├── spec/                       # 项目文档
-└── rush.json                   # Rush 主配置
+├── rush.json                   # Rush 主配置
+└── CLAUDE.md                   # Claude Code 指令
 ```
 
 ---
 
-## 2. @ai-stack/provider 包
+## 2. 核心库 (packages/libs/)
 
-### 2.1 目录结构
+### 2.1 @ai-stack/provider
+
+多模型 LLM 抽象层。
 
 ```
 packages/libs/provider/
 ├── src/
-│   ├── index.ts               # 包入口
-│   └── openai/                # OpenAI 模块
-│       ├── index.ts           # 模块导出
-│       ├── client.ts          # OpenAIClient 类 (303 行)
-│       ├── types.ts           # 类型定义 (165 行)
-│       └── helpers.ts         # 辅助函数 (158 行)
-├── dist/                      # 构建输出
+│   ├── index.ts                # 包入口
+│   ├── types.ts                # 统一类型定义
+│   ├── factory.ts              # createProvider() 工厂
+│   ├── openai/                 # OpenAI 适配器
+│   │   ├── index.ts
+│   │   ├── client.ts           # OpenAI 客户端
+│   │   ├── types.ts
+│   │   └── helpers.ts          # 消息构建辅助函数
+│   ├── anthropic/              # Anthropic 适配器
+│   │   ├── index.ts
+│   │   ├── client.ts
+│   │   └── types.ts
+│   └── google/                 # Google 适配器
+│       ├── index.ts
+│       ├── client.ts
+│       └── types.ts
 ├── package.json
 ├── tsconfig.json
 └── tsup.config.ts
 ```
 
-### 2.2 文件职责
-
-| 文件 | 职责 |
-|------|------|
-| `src/index.ts` | 统一导出入口，re-export openai 模块 |
-| `src/openai/client.ts` | `createOpenAIClient()` 工厂函数 |
-| `src/openai/types.ts` | TypeScript 类型定义和接口 |
-| `src/openai/helpers.ts` | 消息构建、工具定义等辅助函数 |
-
-### 2.3 package.json 关键配置
-
-```json
-{
-  "name": "@ai-stack/provider",
-  "version": "0.0.1",
-  "main": "./dist/index.js",
-  "module": "./dist/index.mjs",
-  "types": "./dist/index.d.ts",
-  "exports": {
-    ".": {
-      "types": "./dist/index.d.ts",
-      "import": "./dist/index.mjs",
-      "require": "./dist/index.js"
-    }
-  },
-  "dependencies": {
-    "openai": "^4.77.0"
-  }
-}
-```
+**依赖**：
+- `openai` (默认)
+- `@anthropic-ai/sdk` (可选)
+- `@google/generative-ai` (可选)
 
 ---
 
-## 3. @ai-stack/agent 包
+### 2.2 @ai-stack/mcp
 
-### 3.1 目录结构
-
-```
-packages/libs/agent/
-├── src/
-│   ├── index.ts               # 包入口
-│   ├── agent.ts               # Agent 类实现
-│   ├── types.ts               # 类型定义
-│   ├── config.ts              # 配置文件加载
-│   ├── cli.ts                 # 命令式 CLI
-│   └── permission/            # 权限管控模块
-│       ├── index.ts           # 权限模块导出
-│       ├── types.ts           # 权限类型定义
-│       └── policy.ts          # 权限策略实现
-├── dist/                      # 构建输出
-├── package.json
-└── tsup.config.ts
-```
-
-### 3.2 文件职责
-
-| 文件 | 职责 |
-|------|------|
-| `src/index.ts` | 统一导出入口，re-export agent、config、provider 和 TUI |
-| `src/agent.ts` | `createAgent()` 工厂函数，实现对话和工具调用 |
-| `src/types.ts` | Agent 相关类型定义 |
-| `src/config.ts` | 配置文件加载和解析 (agent.json) |
-| `src/cli.ts` | 命令式 CLI，支持 chat/run/tools/config 命令 |
-| `src/permission/` | 权限管控模块，实现工具执行前的权限检查和确认 |
-
-### 3.3 package.json 关键配置
-
-```json
-{
-  "name": "@ai-stack/agent",
-  "version": "0.0.1",
-  "bin": {
-    "ai-stack": "./dist/cli.js"
-  },
-  "dependencies": {
-    "@ai-stack/provider": "workspace:*",
-    "@ai-stack/mcp": "workspace:*",
-    "@ai-stack/skill": "workspace:*",
-    "@ai-stack/memory": "workspace:*",
-    "@ai-stack/tui": "workspace:*",
-    "commander": "^12.1.0",
-    "zod": "^3.24.0"
-  }
-}
-```
-
----
-
-## 4. @ai-stack/mcp 包
-
-### 4.1 目录结构
+MCP 协议支持。
 
 ```
 packages/libs/mcp/
 ├── src/
-│   ├── index.ts               # 包入口
-│   ├── types.ts               # 类型定义
-│   ├── config.ts              # 配置加载
-│   ├── transport.ts           # 传输层工厂
-│   ├── client.ts              # MCPClientManager 类
-│   ├── bridge.ts              # 工具桥接
-│   └── helpers.ts             # 辅助函数
-├── dist/                      # 构建输出
+│   ├── index.ts                # 包入口
+│   ├── types.ts                # 类型定义
+│   ├── config.ts               # 配置加载
+│   ├── transport.ts            # 传输层工厂
+│   ├── client.ts               # MCPClientManager
+│   ├── bridge.ts               # MCPToolProvider
+│   └── helpers.ts              # 辅助函数
 ├── package.json
 ├── tsconfig.json
 └── tsup.config.ts
 ```
 
-### 4.2 文件职责
-
-| 文件 | 职责 |
-|------|------|
-| `src/index.ts` | 统一导出入口 |
-| `src/types.ts` | MCP 相关类型定义和错误类 |
-| `src/config.ts` | 配置文件加载和解析 |
-| `src/transport.ts` | 创建 stdio/http 传输 |
-| `src/client.ts` | `createMCPClientManager()` 工厂函数 |
-| `src/bridge.ts` | `createMCPToolProvider()` 工厂函数 |
-| `src/helpers.ts` | 工具名处理、超时控制等辅助函数 |
-
-### 4.3 package.json 关键配置
-
-```json
-{
-  "name": "@ai-stack/mcp",
-  "version": "0.0.1",
-  "dependencies": {
-    "@modelcontextprotocol/sdk": "^1.0.0"
-  }
-}
-```
+**依赖**：
+- `@modelcontextprotocol/sdk`
+- `json5`
 
 ---
 
-## 5. @ai-stack/skill 包
+### 2.3 @ai-stack/skill
 
-### 5.1 目录结构
+技能系统。
 
 ```
 packages/libs/skill/
 ├── src/
-│   ├── index.ts               # 包入口
-│   ├── types.ts               # 类型定义
-│   ├── config.ts              # 配置加载
-│   ├── loader.ts              # Skill 加载器
-│   ├── manager.ts             # SkillManager 类
-│   ├── bridge.ts              # 工具桥接
-│   └── helpers.ts             # 辅助函数
-├── dist/                      # 构建输出
+│   ├── index.ts                # 包入口
+│   ├── types.ts                # 类型定义
+│   ├── config.ts               # 配置加载
+│   ├── loader.ts               # Skill 加载器
+│   ├── manager.ts              # SkillManager
+│   ├── bridge.ts               # SkillToolProvider
+│   └── helpers.ts              # 辅助函数
 ├── package.json
 ├── tsconfig.json
 └── tsup.config.ts
 ```
 
-### 5.2 文件职责
-
-| 文件 | 职责 |
-|------|------|
-| `src/index.ts` | 统一导出入口 |
-| `src/types.ts` | Skill 相关类型定义和错误类 |
-| `src/config.ts` | 配置文件加载和目录发现 |
-| `src/loader.ts` | Skill 加载和处理函数解析 |
-| `src/manager.ts` | `createSkillManager()` 工厂函数 |
-| `src/bridge.ts` | `createSkillToolProvider()` 工厂函数 |
-| `src/helpers.ts` | 工具名处理、路径解析等辅助函数 |
-
-### 5.3 package.json 关键配置
-
-```json
-{
-  "name": "@ai-stack/skill",
-  "version": "0.0.1",
-  "dependencies": {}
-}
-```
-
-注：skill 包不需要外部运行时依赖，仅使用 Node.js 原生能力实现动态加载。
+**依赖**：无外部依赖
 
 ---
 
-## 6. Memory 系统包
+### 2.4 @ai-stack/memory-store-sqlite
 
-Memory 系统采用三层架构，分离关注点：
-
-- **@ai-stack/memory-store-sqlite**: SQLite 高性能存储层
-- **@ai-stack/memory-store-json**: JSON 轻量级存储层 (零 native 依赖)
-- **@ai-stack/memory**: 策略层 (何时读写、写什么)
-- **@ai-stack-skill/memory**: Skill 工具层 (Agent 可调用的工具)
-
-### 6.1 @ai-stack/memory-store-sqlite 包 (SQLite 存储层)
+SQLite 存储层。
 
 ```
 packages/libs/memory-store-sqlite/
 ├── src/
-│   ├── index.ts               # 包入口
-│   ├── types.ts               # 类型定义
-│   ├── errors.ts              # 错误类
-│   ├── factory.ts             # createSqliteStores() 工厂函数
-│   └── stores/                # 存储实现
-│       ├── index.ts           # 存储导出
-│       ├── db-operations.ts   # 数据库操作组合函数
-│       ├── event.ts           # createEventStore()
-│       ├── task-state.ts      # createTaskStateStore()
-│       ├── summary.ts         # createSummaryStore()
-│       ├── profile.ts         # createProfileStore()
-│       ├── semantic.ts        # createSemanticStore()
-│       └── embedding-cache.ts # createEmbeddingCache() - 嵌入向量缓存
+│   ├── index.ts                # 包入口
+│   ├── types.ts                # 类型定义
+│   ├── errors.ts               # 错误类
+│   ├── factory.ts              # createSqliteStores()
+│   └── stores/
+│       ├── index.ts
+│       ├── db-operations.ts    # 数据库操作
+│       ├── event.ts            # EventStore
+│       ├── task-state.ts       # TaskStateStore
+│       ├── summary.ts          # SummaryStore
+│       ├── profile.ts          # ProfileStore
+│       ├── semantic.ts         # SemanticStore
+│       └── embedding-cache.ts  # EmbeddingCache
 ├── tests/
 │   └── stores/
 │       ├── event.test.ts
@@ -277,47 +144,43 @@ packages/libs/memory-store-sqlite/
 │       ├── profile.test.ts
 │       ├── semantic.test.ts
 │       └── embedding-cache.test.ts
-├── dist/
 ├── package.json
-└── tsup.config.ts
+├── tsconfig.json
+├── tsup.config.ts
+└── vitest.config.ts
 ```
 
-**package.json**:
-```json
-{
-  "name": "@ai-stack/memory-store-sqlite",
-  "version": "0.0.1",
-  "dependencies": {
-    "better-sqlite3": "^11.7.0",
-    "sqlite-vec": "^0.1.6"
-  }
-}
-```
+**依赖**：
+- `better-sqlite3`
+- `sqlite-vec`
 
-### 6.2 @ai-stack/memory-store-json 包 (JSON 存储层)
+---
 
-轻量级 JSON/Markdown 存储实现，零 native 依赖，适用于开发环境和轻量部署。
+### 2.5 @ai-stack/memory-store-json
+
+JSON 轻量存储。
 
 ```
 packages/libs/memory-store-json/
 ├── src/
-│   ├── index.ts               # 包入口
-│   ├── factory.ts             # createJsonStores() 工厂函数
+│   ├── index.ts                # 包入口
+│   ├── factory.ts              # createJsonStores()
 │   ├── utils/
-│   │   └── file-ops.ts        # 文件操作工具
-│   └── stores/                # 存储实现
-│       ├── index.ts           # 存储导出
-│       ├── event.ts           # JSON 事件存储
-│       ├── task-state.ts      # JSON 任务状态存储
-│       ├── summary.ts         # JSON + Markdown 摘要存储
-│       ├── profile.ts         # JSON 配置存储
-│       └── semantic.ts        # JSON + 倒排索引语义存储
-├── dist/
+│   │   └── file-ops.ts         # 文件操作
+│   └── stores/
+│       ├── index.ts
+│       ├── event.ts            # JSON 事件存储
+│       ├── task-state.ts
+│       ├── summary.ts          # JSON + Markdown
+│       ├── profile.ts
+│       └── semantic.ts         # 倒排索引
+├── tests/
 ├── package.json
+├── tsconfig.json
 └── tsup.config.ts
 ```
 
-**存储格式**:
+**存储格式**：
 ```
 .ai-stack/memory/
 ├── events/{sessionId}/events.json
@@ -325,1508 +188,771 @@ packages/libs/memory-store-json/
 ├── profiles/profiles.json
 ├── summaries/{sessionId}/
 │   ├── summaries.json
-│   └── latest.md              # 人类可读的 Markdown
+│   └── latest.md
 └── semantic/
     ├── chunks.json
-    └── index.json             # 倒排索引 (简单 FTS)
+    └── index.json
 ```
 
-**package.json**:
-```json
-{
-  "name": "@ai-stack/memory-store-json",
-  "version": "0.0.1",
-  "dependencies": {
-    "@ai-stack/memory-store-sqlite": "workspace:*"
-  }
-}
-```
+**依赖**：
+- `@ai-stack/memory-store-sqlite` (仅类型)
 
-### 6.3 @ai-stack/memory 包 (策略层)
+---
 
-策略层不直接依赖任何存储实现，而是接受外部注入的 stores。
+### 2.6 @ai-stack/memory
+
+记忆策略层。
 
 ```
 packages/libs/memory/
 ├── src/
-│   ├── index.ts               # 包入口
-│   ├── types.ts               # Legacy 类型 (向后兼容)
-│   ├── errors.ts              # 错误类定义
-│   ├── stores-interface.ts    # MemoryStores 聚合接口
-│   ├── policy/                # 策略层
-│   │   ├── index.ts           # 策略导出
-│   │   ├── types.ts           # 策略类型定义
-│   │   ├── memory-policy.ts   # createMemoryPolicy() 主策略
-│   │   ├── retrieval-policy.ts# createRetrievalPolicy() 检索决策
-│   │   ├── write-policy.ts    # createWritePolicy() 写入决策
-│   │   └── budget-policy.ts   # createBudgetPolicy() Token 预算
-│   ├── rules/                 # 规则引擎
-│   │   ├── index.ts           # 规则导出
-│   │   ├── rule-engine.ts     # createRuleEngine()
-│   │   └── default-rules.ts   # 默认规则配置
-│   ├── ranking/               # 搜索结果排序 (NEW)
-│   │   ├── index.ts           # 排序模块导出
-│   │   ├── temporal-decay.ts  # applyTemporalDecay() 时间衰减
-│   │   ├── mmr.ts             # applyMMR() 多样性去重
-│   │   └── pipeline.ts        # createRankingPipeline() 组合管道
-│   ├── compaction/            # Context Compaction (NEW)
-│   │   ├── index.ts           # Compaction 模块导出
-│   │   ├── memory-flush.ts    # createMemoryFlush() Flush 触发
-│   │   └── compaction-manager.ts # createCompactionManager() 完整管理
-│   ├── transcript/            # 会话转录 (NEW)
-│   │   ├── index.ts           # Transcript 模块导出
-│   │   ├── session-transcript.ts # createSessionTranscript() JSONL 存储
-│   │   └── transcript-indexer.ts # createTranscriptIndexer() 索引器
-│   ├── pipeline/              # 统一读写管道 (NEW)
-│   │   ├── index.ts           # Pipeline 模块导出
-│   │   └── memory-pipeline.ts # createMemoryPipeline() 完整流程
-│   ├── observer.ts            # 事件创建辅助
-│   ├── injector.ts            # 模板注入
-│   ├── summarizer.ts          # 摘要生成
-│   ├── retriever.ts           # 检索器
-│   ├── budgeter.ts            # Token 预算管理
-│   ├── write-policy.ts        # 写入策略
-│   ├── state-reducer.ts       # 任务状态 Reducer
-│   └── manager.ts             # createMemoryManager() (接受注入的 stores)
+│   ├── index.ts                # 包入口
+│   ├── types.ts                # 类型定义
+│   ├── errors.ts               # 错误类
+│   ├── stores-interface.ts     # 聚合接口
+│   │
+│   ├── policy/                 # 策略层
+│   │   ├── index.ts
+│   │   ├── types.ts
+│   │   ├── memory-policy.ts    # 主策略
+│   │   ├── retrieval-policy.ts # 检索策略
+│   │   ├── write-policy.ts     # 写入策略
+│   │   └── budget-policy.ts    # Token 预算
+│   │
+│   ├── rules/                  # 规则引擎
+│   │   ├── index.ts
+│   │   ├── rule-engine.ts
+│   │   └── default-rules.ts
+│   │
+│   ├── ranking/                # 搜索排序
+│   │   ├── index.ts
+│   │   ├── temporal-decay.ts   # 时间衰减
+│   │   ├── mmr.ts              # MMR 去重
+│   │   └── pipeline.ts         # 组合管道
+│   │
+│   ├── compaction/             # 上下文压缩
+│   │   ├── index.ts
+│   │   ├── memory-flush.ts
+│   │   └── compaction-manager.ts
+│   │
+│   ├── transcript/             # 会话转录
+│   │   ├── index.ts
+│   │   ├── session-transcript.ts
+│   │   └── transcript-indexer.ts
+│   │
+│   ├── pipeline/               # 读写管道
+│   │   ├── index.ts
+│   │   └── memory-pipeline.ts
+│   │
+│   ├── observer.ts             # 事件观察
+│   ├── injector.ts             # 上下文注入
+│   ├── summarizer.ts           # 摘要生成
+│   ├── retriever.ts            # 检索器
+│   ├── budgeter.ts             # 预算管理
+│   └── state-reducer.ts        # 任务状态
+│
 ├── tests/
 │   ├── state-reducer.test.ts
 │   ├── write-policy.test.ts
 │   ├── ranking/
-│   │   ├── temporal-decay.test.ts
-│   │   ├── mmr.test.ts
-│   │   └── pipeline.test.ts
 │   ├── compaction/
-│   │   ├── memory-flush.test.ts
-│   │   └── compaction-manager.test.ts
 │   ├── transcript/
-│   │   ├── session-transcript.test.ts
-│   │   └── transcript-indexer.test.ts
 │   ├── pipeline/
-│   │   └── memory-pipeline.test.ts
 │   └── integration/
-│       └── regression.test.ts
-├── dist/
 ├── package.json
+├── tsconfig.json
+├── tsup.config.ts
 └── vitest.config.ts
 ```
 
-**package.json**:
-```json
-{
-  "name": "@ai-stack/memory",
-  "version": "0.0.1",
-  "dependencies": {
-    "@ai-stack/memory-store-sqlite": "workspace:*"
-  }
-}
-```
-
-**使用示例**:
-```typescript
-// 开发环境 - JSON store (零 native 依赖)
-import { createMemoryManager } from '@ai-stack/memory';
-import { createJsonStores } from '@ai-stack/memory-store-json';
-
-const stores = await createJsonStores({ basePath: './.agent-memory' });
-const memory = createMemoryManager(stores);
-await memory.initialize();
-
-// 生产环境 - SQLite store (高性能)
-import { createSqliteStores } from '@ai-stack/memory-store-sqlite';
-
-const stores = await createSqliteStores({ dbPath: './memory/sqlite.db' });
-const memory = createMemoryManager(stores);
-await memory.initialize();
-```
+**依赖**：
+- `@ai-stack/memory-store-sqlite` (类型)
 
 ---
 
-## 7. @ai-stack/knowledge 包 (知识索引)
+### 2.7 @ai-stack/knowledge
 
-Knowledge 包提供代码库和外部文档的索引能力，复用 Memory 系统的 SemanticStore 作为存储层。
-
-### 7.1 目录结构
+知识索引。
 
 ```
 packages/libs/knowledge/
 ├── src/
-│   ├── index.ts                    # 包入口
-│   ├── types.ts                    # 类型定义
-│   ├── errors.ts                   # 错误类
-│   ├── manager.ts                  # createKnowledgeManager() 统一管理
+│   ├── index.ts                # 包入口
+│   ├── types.ts                # 类型定义
+│   ├── errors.ts               # 错误类
+│   ├── manager.ts              # KnowledgeManager
 │   │
-│   ├── stores/                     # 持久化存储模块
-│   │   ├── index.ts                # Store 导出
-│   │   ├── code-index-store.ts     # createCodeIndexStore() 代码索引状态存储
-│   │   └── doc-registry-store.ts   # createDocRegistryStore() 文档源/页面存储
+│   ├── stores/                 # 持久化存储
+│   │   ├── index.ts
+│   │   ├── code-index-store.ts # 代码索引状态
+│   │   └── doc-registry-store.ts # 文档注册表
 │   │
-│   ├── code/                       # 代码索引模块
-│   │   ├── index.ts                # 模块导出
-│   │   ├── indexer.ts              # createCodeIndexer() 代码索引器
-│   │   ├── chunker.ts              # 代码切分策略
-│   │   ├── watcher.ts              # 文件监听 + 增量更新
-│   │   └── languages/              # 语言特定解析器
-│   │       ├── index.ts            # 解析器注册表
-│   │       ├── typescript.ts       # TypeScript/JavaScript 解析
-│   │       └── generic.ts          # 通用文本/Markdown/JSON 解析
+│   ├── code/                   # 代码索引
+│   │   ├── index.ts
+│   │   ├── indexer.ts          # CodeIndexer
+│   │   ├── chunker.ts          # 代码切分
+│   │   ├── watcher.ts          # 文件监听
+│   │   └── languages/
+│   │       ├── index.ts
+│   │       ├── typescript.ts
+│   │       └── generic.ts
 │   │
-│   ├── doc/                        # 文档索引模块
-│   │   ├── index.ts                # 模块导出
-│   │   ├── indexer.ts              # createDocIndexer() 文档索引器
-│   │   ├── crawler.ts              # URL 爬取
-│   │   ├── parser.ts               # HTML → Markdown
-│   │   └── registry.ts             # 文档源管理 (in-memory, 用于兼容)
+│   ├── doc/                    # 文档索引
+│   │   ├── index.ts
+│   │   ├── indexer.ts          # DocIndexer
+│   │   ├── crawler.ts          # URL 爬取
+│   │   ├── parser.ts           # HTML 解析
+│   │   └── registry.ts         # 文档源管理
 │   │
-│   └── retriever/                  # 统一检索
-│       ├── index.ts                # 模块导出
-│       └── hybrid-search.ts        # 混合搜索 + Reranking
+│   └── retriever/              # 统一检索
+│       ├── index.ts
+│       └── hybrid-search.ts
 │
 ├── tests/
-├── dist/
 ├── package.json
 ├── tsconfig.json
 └── tsup.config.ts
 ```
 
-### 7.2 核心功能
-
-| 模块 | 功能 | 说明 |
-|------|------|------|
-| CodeIndexStore | 代码索引状态 | 持久化文件索引状态到 SQLite |
-| DocRegistryStore | 文档注册表 | 持久化文档源和页面到 SQLite |
-| CodeIndexer | 代码索引 | AST 解析、智能切分、文件监听 |
-| DocIndexer | 文档索引 | URL 爬取、HTML 解析、章节提取 |
-| HybridSearch | 混合搜索 | FTS + Vector + 时间衰减 + MMR |
-| KnowledgeManager | 统一管理 | 协调代码和文档索引、数据库管理 |
-
-### 7.3 package.json
-
-```json
-{
-  "name": "@ai-stack/knowledge",
-  "version": "0.0.1",
-  "dependencies": {
-    "@ai-stack/memory-store-sqlite": "workspace:*",
-    "@ai-stack/memory": "workspace:*",
-    "better-sqlite3": "^11.7.0",
-    "sqlite-vec": "^0.1.6",
-    "node-html-markdown": "^1.3.0",
-    "glob": "^11.0.0",
-    "chokidar": "^4.0.0"
-  }
-}
-```
-
-### 7.4 使用示例
-
-```typescript
-import { createKnowledgeManager } from '@ai-stack/knowledge';
-import { createSqliteStores } from '@ai-stack/memory-store-sqlite';
-
-// 创建 Memory 存储 (用于 SemanticStore)
-const stores = await createSqliteStores({ dbPath: 'memory/sqlite.db' });
-
-// 创建知识管理器，配置数据库路径和用户交互回调
-const knowledge = createKnowledgeManager({
-  dbPath: 'knowledge/sqlite.db', // 索引数据库路径，会自动创建
-  code: {
-    enabled: true,
-    rootDir: './src',
-    include: ['**/*.ts', '**/*.tsx'],
-    watch: true,
-    // 检测到已有索引时的回调
-    onExistingIndex: async (info) => {
-      console.log(`Found existing code index: ${info.summary.totalItems} files`);
-      // 使用 inquirer 或其他方式询问用户
-      const answer = await prompt('Re-index all / Update incrementally / Skip');
-      return answer; // 'reindex_all' | 'incremental' | 'skip'
-    },
-    defaultAction: 'incremental', // 无回调时的默认行为
-  },
-  doc: {
-    enabled: true,
-    onExistingIndex: async (info) => {
-      console.log(`Found existing doc index: ${info.summary.totalItems} sources`);
-      return 'incremental';
-    },
-  },
-});
-
-// 初始化 (自动创建数据库和 SemanticStore)
-await knowledge.initialize();
-
-// 索引代码
-await knowledge.indexCode();
-
-// 添加文档源并抓取
-await knowledge.addDocSource({
-  name: 'React Docs',
-  type: 'url',
-  url: 'https://react.dev/reference/react',
-  tags: ['react'],
-  enabled: true,
-});
-await knowledge.crawlDocs();
-
-// 统一搜索
-const results = await knowledge.search('useEffect cleanup', {
-  sources: ['code', 'doc'],
-  limit: 10,
-});
-
-// 清理
-await knowledge.close();
-knowledgeDb.close();
-```
+**依赖**：
+- `@ai-stack/memory-store-sqlite`
+- `@ai-stack/memory`
+- `node-html-markdown`
+- `glob`
+- `chokidar`
 
 ---
 
-## 8. @ai-stack/tui 包 (终端 UI)
+### 2.8 @ai-stack/tui
 
-终端 UI 组件库，采用 Ink (React-based TUI) + 直接输出混合架构。
-
-### 8.1 目录结构
+终端 UI 组件。
 
 ```
 packages/libs/tui/
 ├── src/
 │   ├── index.ts                # 包入口
-│   ├── core/                   # 非 React 核心工具
-│   │   ├── index.ts            # Core 模块导出
-│   │   ├── types.ts            # 类型定义
-│   │   ├── colors.ts           # 主题颜色和图标
-│   │   ├── terminal.ts         # 终端尺寸、能力检测
+│   │
+│   ├── core/                   # 非 React 核心
+│   │   ├── index.ts
+│   │   ├── types.ts
+│   │   ├── colors.ts           # 主题颜色
+│   │   ├── terminal.ts         # 终端检测
 │   │   ├── spinner.ts          # 加载动画
 │   │   ├── diff.ts             # Diff 计算
 │   │   ├── render.ts           # 渲染工具
-│   │   └── stream.ts           # 流式输出管理
+│   │   └── stream.ts           # 流式输出
 │   │
 │   ├── components/             # Ink 组件
-│   │   ├── index.ts            # 组件导出
+│   │   ├── index.ts
 │   │   ├── layout/
-│   │   │   ├── Panel.tsx       # 面板组件
-│   │   │   ├── Header.tsx      # 头部组件
-│   │   │   ├── Footer.tsx      # 底部组件
-│   │   │   └── Divider.tsx     # 分隔线
+│   │   │   ├── Panel.tsx
+│   │   │   ├── Header.tsx
+│   │   │   ├── Footer.tsx
+│   │   │   └── Divider.tsx
 │   │   ├── display/
-│   │   │   ├── Message.tsx     # 聊天消息
-│   │   │   ├── ToolCall.tsx    # 工具调用可视化
-│   │   │   ├── Badge.tsx       # 状态标签
-│   │   │   └── StatusSpinner.tsx # 状态加载
+│   │   │   ├── Message.tsx
+│   │   │   ├── ToolCall.tsx
+│   │   │   ├── Badge.tsx
+│   │   │   └── StatusSpinner.tsx
 │   │   ├── input/
-│   │   │   ├── Confirm.tsx     # 确认对话框
-│   │   │   ├── Select.tsx      # 选择菜单
-│   │   │   ├── TextInput.tsx   # 文本输入 + 历史
-│   │   │   └── CommandPalette.tsx # 命令面板
+│   │   │   ├── Confirm.tsx
+│   │   │   ├── Select.tsx
+│   │   │   ├── TextInput.tsx
+│   │   │   └── CommandPalette.tsx
 │   │   └── code/
-│   │       ├── DiffView.tsx    # Diff 预览
-│   │       ├── TaskBoard.tsx   # 任务看板
-│   │       └── HistoryBrowser.tsx # 历史浏览
+│   │       ├── DiffView.tsx
+│   │       ├── TaskBoard.tsx
+│   │       └── HistoryBrowser.tsx
 │   │
 │   ├── hooks/
-│   │   ├── index.ts            # Hooks 导出
-│   │   ├── useTheme.ts         # 主题 Hook
-│   │   ├── useInput.ts         # 输入状态 Hook
-│   │   └── useStreaming.ts     # 流式状态 Hook
+│   │   ├── index.ts
+│   │   ├── useTheme.ts
+│   │   ├── useInput.ts
+│   │   └── useStreaming.ts
 │   │
 │   ├── theme/
-│   │   ├── types.ts            # 主题类型
-│   │   ├── default.ts          # 默认主题
-│   │   └── provider.tsx        # ThemeProvider
+│   │   ├── types.ts
+│   │   ├── default.ts
+│   │   └── provider.tsx
 │   │
 │   └── adapters/               # 环境适配
-│       ├── index.ts            # 适配器导出
-│       ├── detect.ts           # 环境检测
-│       ├── tty.ts              # 完整 TTY 支持
-│       └── classic.ts          # non-TTY 回退
+│       ├── index.ts
+│       ├── detect.ts
+│       ├── tty.ts
+│       └── classic.ts
 │
-├── dist/
 ├── package.json
 ├── tsconfig.json
 └── tsup.config.ts
 ```
 
-### 8.2 核心功能
-
-| 模块 | 功能 | 说明 |
-|------|------|------|
-| Core | 非 React 工具 | 颜色、终端检测、流式输出、Diff |
-| Layout | 布局组件 | Panel、Header、Footer、Divider |
-| Display | 展示组件 | Message、ToolCall、Badge、Spinner |
-| Input | 输入组件 | Confirm、Select、TextInput、CommandPalette |
-| Code | 代码组件 | DiffView、TaskBoard、HistoryBrowser |
-| Adapters | 环境适配 | TTY/Classic 自动切换 |
-
-### 8.3 package.json
-
-```json
-{
-  "name": "@ai-stack/tui",
-  "version": "0.0.1",
-  "dependencies": {
-    "ink": "^5.0.1",
-    "@inkjs/ui": "^2.0.0",
-    "chalk": "^5.4.0",
-    "boxen": "^8.0.1",
-    "cli-truncate": "^4.0.0",
-    "terminal-size": "^4.0.0",
-    "strip-ansi": "^7.1.0",
-    "ora": "^8.1.0",
-    "diff": "^7.0.0",
-    "react": "^18.3.1"
-  }
-}
-```
-
-### 8.4 混合架构
-
-```
-┌─────────────────────────────────────────────────────────────┐
-│                      @ai-stack/tui                           │
-├─────────────────────────────────────────────────────────────┤
-│  ┌─────────────────┐    ┌─────────────────────────────────┐ │
-│  │   Ink 组件      │    │   Core 模块 (直接 stdout)       │ │
-│  │  (React TUI)    │    │                                 │ │
-│  │                 │    │  - StreamRenderer (token 流)    │ │
-│  │  - Confirm      │    │  - 颜色/图标                    │ │
-│  │  - Select       │    │  - 终端检测                     │ │
-│  │  - DiffView     │    │  - Spinner                     │ │
-│  │  - TaskBoard    │    │                                 │ │
-│  └─────────────────┘    └─────────────────────────────────┘ │
-│          │                           │                       │
-│          │    ┌──────────────────────┘                       │
-│          │    │                                              │
-│          ▼    ▼                                              │
-│  ┌─────────────────────────────────────────────────────────┐ │
-│  │              Adapters (环境自动检测)                     │ │
-│  │  TTY Mode: Ink 组件  |  Classic Mode: 直接输出          │ │
-│  └─────────────────────────────────────────────────────────┘ │
-└─────────────────────────────────────────────────────────────┘
-```
-
-### 8.5 使用示例
-
-```typescript
-import {
-  // Core (non-React)
-  theme, icons, createStreamRenderer,
-  // Adapters (auto-detect)
-  showConfirm, showSelect, showDiffView,
-  // Components (Ink/React)
-  DiffView, Confirm, TaskBoard,
-} from '@ai-stack/tui';
-
-// 流式输出 (使用 core 模块，不需要 React)
-const renderer = createStreamRenderer();
-renderer.startThinking();
-renderer.addToken('Hello');
-renderer.complete();
-
-// 确认对话框 (自动选择 TTY/Classic 模式)
-const confirmed = await showConfirm('Apply changes?');
-
-// Diff 预览 (自动选择 TTY/Classic 模式)
-const apply = await showDiffView('file.ts', oldContent, newContent);
-```
+**依赖**：
+- `ink`, `@inkjs/ui`
+- `chalk`, `boxen`, `ora`
+- `diff`
+- `react`
 
 ---
 
-## 9. Skills 目录 (@ai-stack-skill/*)
+### 2.9 @ai-stack/agent
 
-自定义 Skills 使用独立的包前缀 `@ai-stack-skill/*`。
-
-### 7.1 @ai-stack-skill/memory (Memory Skill)
+Agent 核心实现。
 
 ```
-packages/skills/memory/
-├── skill.json                 # Skill 定义文件
-├── handlers.cjs               # 编译后的处理函数
+packages/libs/agent/
 ├── src/
-│   ├── handlers.ts            # search/upsert/delete 实现
-│   ├── schema.ts              # JSON Schema 定义
-│   └── store-context.ts       # 数据库连接管理
-├── scripts/
-│   └── copy-handlers.js       # 构建脚本
-├── dist/
-└── package.json
+│   ├── index.ts                # 包入口
+│   ├── types.ts                # 类型定义
+│   ├── agent.ts                # createAgent()
+│   ├── config.ts               # 配置加载
+│   ├── cli.ts                  # CLI 入口
+│   │
+│   ├── tools/                  # 工具系统
+│   │   ├── index.ts
+│   │   ├── description.ts      # 工具文档生成
+│   │   ├── executor.ts         # 工具执行器
+│   │   └── builtin/            # 内置工具
+│   │       └── ask-user.ts
+│   │
+│   ├── permission/             # 权限管控
+│   │   ├── index.ts
+│   │   ├── types.ts
+│   │   └── policy.ts
+│   │
+│   ├── orchestration/          # 编排层
+│   │   ├── index.ts
+│   │   ├── state-machine.ts    # 状态机
+│   │   ├── recovery.ts         # 恢复策略
+│   │   ├── plan-dag.ts         # 计划 DAG
+│   │   └── planner.ts          # 规划器
+│   │
+│   ├── evaluation/             # 评估层
+│   │   ├── index.ts
+│   │   └── evaluator.ts
+│   │
+│   ├── routing/                # 模型路由
+│   │   ├── index.ts
+│   │   └── router.ts
+│   │
+│   ├── observability/          # 可观测性
+│   │   ├── index.ts
+│   │   └── metrics.ts
+│   │
+│   ├── guardrail/              # 安全检查
+│   │   ├── index.ts
+│   │   ├── guardrail.ts
+│   │   └── rules/
+│   │       ├── pii.ts
+│   │       ├── secrets.ts
+│   │       ├── dangerous.ts
+│   │       └── injection.ts
+│   │
+│   ├── sub-agent/              # 子 Agent
+│   │   ├── index.ts
+│   │   └── manager.ts
+│   │
+│   └── ui/                     # UI 辅助
+│       ├── index.ts
+│       ├── colors.ts
+│       ├── spinner.ts
+│       ├── stream.ts
+│       ├── message.ts
+│       ├── layout.ts
+│       └── box.ts
+│
+├── package.json
+├── tsconfig.json
+└── tsup.config.ts
 ```
 
-**skill.json 工具定义**:
-```json
-{
-  "name": "memory",
-  "version": "1.0.0",
-  "tools": [
-    { "name": "search", "description": "Search memory...", "handler": "./handlers.cjs#search" },
-    { "name": "upsert", "description": "Create or update memory...", "handler": "./handlers.cjs#upsert" },
-    { "name": "delete", "description": "Delete memory...", "handler": "./handlers.cjs#delete" }
-  ]
-}
-```
-
-**package.json**:
-```json
-{
-  "name": "@ai-stack-skill/memory",
-  "version": "0.0.1",
-  "dependencies": {
-    "@ai-stack/memory-store-sqlite": "workspace:*",
-    "better-sqlite3": "^11.7.0"
-  }
-}
-```
+**依赖**：
+- `@ai-stack/provider`
+- `@ai-stack/mcp`
+- `@ai-stack/skill`
+- `@ai-stack/memory`
+- `@ai-stack/knowledge`
+- `@ai-stack/tui`
+- `commander`
+- `zod`
 
 ---
 
-### 8.2 @ai-stack-skill/knowledge (Knowledge Skill)
+### 2.10 @ai-stack/assistant
 
-```
-packages/skills/knowledge/
-├── skill.json                 # Skill 定义文件
-├── handlers.cjs               # 编译后的处理函数
-├── src/
-│   ├── handlers.ts            # 工具实现
-│   └── store-context.ts       # 知识库连接管理
-├── scripts/
-│   └── copy-handlers.js       # 构建脚本
-├── dist/
-└── package.json
-```
-
-**skill.json 工具定义**:
-```json
-{
-  "name": "knowledge",
-  "version": "1.0.0",
-  "tools": [
-    { "name": "search_code", "description": "Search code...", "handler": "./handlers.cjs#searchCode" },
-    { "name": "search_docs", "description": "Search docs...", "handler": "./handlers.cjs#searchDocs" },
-    { "name": "index_code", "description": "Index codebase...", "handler": "./handlers.cjs#indexCode" },
-    { "name": "add_doc_source", "description": "Add doc source...", "handler": "./handlers.cjs#addDocSource" },
-    { "name": "crawl_docs", "description": "Crawl docs...", "handler": "./handlers.cjs#crawlDocs" },
-    { "name": "get_knowledge_stats", "description": "Get stats...", "handler": "./handlers.cjs#getStats" }
-  ]
-}
-```
-
-**package.json**:
-```json
-{
-  "name": "@ai-stack-skill/knowledge",
-  "version": "0.0.1",
-  "dependencies": {
-    "@ai-stack/knowledge": "workspace:*",
-    "@ai-stack/memory-store-sqlite": "workspace:*"
-  }
-}
-```
-
----
-
-### 8.3 五层记忆架构
-
-| 层级 | 工厂函数 | 用途 | 优先级 |
-|------|----------|------|--------|
-| Profile | `createProfileStore()` | 用户偏好 (语言/格式/禁忌) | 1 (最高) |
-| TaskState | `createTaskStateStore()` | 当前任务状态 (目标/计划/进度) | 2 |
-| Summary | `createSummaryStore()` | 滚动摘要 (决策/结论/下一步) | 3 |
-| Episodic | `createEventStore()` | 事件日志 (对话/工具/决策) | 4 |
-| Semantic | `createSemanticStore()` | 可检索材料 (全文/向量) | 5 (最低) |
-
-### 7.3 调用流程
-
-**Before (直接调用)**:
-```typescript
-// agent.ts - 旧方式
-await memoryManager.recordEvent(event);
-const bundle = await memoryManager.retrieve({ query });
-```
-
-**After (Policy + Skill)**:
-```typescript
-// agent.ts - 新方式
-const decision = memoryPolicy.shouldRetrieve({ userQuery, sessionId });
-if (decision.shouldRetrieve) {
-  const params = memoryPolicy.buildSearchParams(context);
-  const result = await tools.get('skill__memory__search').execute(params);
-}
-
-const writeDecision = memoryPolicy.shouldWrite({ event });
-if (writeDecision.shouldWrite) {
-  for (const op of writeDecision.operations) {
-    await tools.get('skill__memory__upsert').execute(op.payload);
-  }
-}
-```
-
----
-
-## 10. MCP 服务器 (packages/mcp-servers/)
-
-自定义 MCP 服务器使用独立的包前缀 `@ai-stack-mcp/*`。
-
-### 8.1 @ai-stack-mcp/fetch
-
-Web 内容获取 MCP 服务器，支持 HTML 转 Markdown。
-
-```
-packages/mcp-servers/fetch/
-├── src/
-│   ├── index.ts               # 包入口
-│   ├── types.ts               # 类型定义
-│   ├── fetcher.ts             # Web 获取和 HTML 处理
-│   ├── server.ts              # MCP Server 实现
-│   └── cli.ts                 # CLI 入口
-├── dist/                      # 构建输出
-├── package.json
-├── tsconfig.json
-└── tsup.config.ts
-```
-
-**文件职责**：
-
-| 文件 | 职责 |
-|------|------|
-| `src/types.ts` | FetchInput/FetchResult 类型, Zod schema |
-| `src/fetcher.ts` | `fetchUrl()` HTML 获取和 Markdown 转换 |
-| `src/server.ts` | `createServer()` / `runServer()` MCP 服务器 |
-| `src/cli.ts` | CLI 入口，读取环境变量配置 |
-
-**package.json 关键配置**：
-
-```json
-{
-  "name": "@ai-stack-mcp/fetch",
-  "version": "0.0.1",
-  "bin": {
-    "mcp-fetch": "./dist/cli.js"
-  },
-  "dependencies": {
-    "@modelcontextprotocol/sdk": "^1.0.0",
-    "node-html-markdown": "^1.3.0",
-    "zod": "^3.24.0"
-  }
-}
-```
-
-**MCP 配置示例**：
-
-```json
-{
-  "mcpServers": {
-    "fetch": {
-      "command": "npx",
-      "args": ["-y", "@ai-stack-mcp/fetch"]
-    }
-  }
-}
-```
-
-### 8.2 @ai-stack-mcp/time
-
-时间和时区转换 MCP 服务器，提供当前时间查询和时区转换功能。
-
-```
-packages/mcp-servers/time/
-├── src/
-│   ├── index.ts               # 包入口
-│   ├── types.ts               # 类型定义
-│   ├── timezone.ts            # 时区工具函数
-│   ├── server.ts              # MCP Server 实现
-│   └── cli.ts                 # CLI 入口
-├── dist/                      # 构建输出
-├── package.json
-├── tsconfig.json
-└── tsup.config.ts
-```
-
-**提供的工具**：
-
-| 工具名 | 描述 |
-|--------|------|
-| `get_current_time` | 获取指定时区或系统时区的当前时间 |
-| `convert_time` | 在不同时区之间转换时间 |
-
-**get_current_time 返回格式**：
-```json
-{
-  "timezone": "Asia/Tokyo",
-  "datetime": "2024-01-01T13:00:00+09:00",
-  "is_dst": false
-}
-```
-
-**convert_time 返回格式**：
-```json
-{
-  "source": { "timezone": "America/New_York", "datetime": "...", "is_dst": false },
-  "target": { "timezone": "Asia/Tokyo", "datetime": "...", "is_dst": false },
-  "time_difference": "+14.0h"
-}
-```
-
-**package.json 关键配置**：
-
-```json
-{
-  "name": "@ai-stack-mcp/time",
-  "version": "0.0.1",
-  "bin": {
-    "mcp-time": "./dist/cli.js"
-  },
-  "dependencies": {
-    "@modelcontextprotocol/sdk": "^1.0.0",
-    "zod": "^3.24.0"
-  }
-}
-```
-
-**MCP 配置示例**：
-
-```json
-{
-  "mcpServers": {
-    "time": {
-      "command": "npx",
-      "args": ["-y", "@ai-stack-mcp/time"]
-    }
-  }
-}
-```
-
-**自定义本地时区**：
-
-```json
-{
-  "mcpServers": {
-    "time": {
-      "command": "npx",
-      "args": ["-y", "@ai-stack-mcp/time", "--local-timezone=America/New_York"]
-    }
-  }
-}
-```
-
-### 8.3 @ai-stack-mcp/git
-
-Git 仓库操作 MCP 服务器，提供完整的 Git 操作工具集。
-
-```
-packages/mcp-servers/git/
-├── src/
-│   ├── index.ts               # 包入口
-│   ├── types.ts               # 类型定义
-│   ├── git-operations.ts      # Git 操作实现
-│   ├── server.ts              # MCP Server 实现
-│   └── cli.ts                 # CLI 入口
-├── dist/                      # 构建输出
-├── package.json
-├── tsconfig.json
-└── tsup.config.ts
-```
-
-**提供的工具**：
-
-| 工具名 | 描述 |
-|--------|------|
-| `git_status` | 显示工作区状态 |
-| `git_diff_unstaged` | 显示未暂存的更改 |
-| `git_diff_staged` | 显示已暂存的更改 |
-| `git_diff` | 与目标分支/提交比较差异 |
-| `git_commit` | 提交更改 |
-| `git_add` | 添加文件到暂存区 |
-| `git_reset` | 取消所有暂存 |
-| `git_log` | 显示提交历史 |
-| `git_create_branch` | 创建新分支 |
-| `git_checkout` | 切换分支 |
-| `git_show` | 显示提交内容 |
-| `git_branch` | 列出分支 |
-
-**git_log 返回格式**：
-```json
-[
-  {
-    "hash": "abc123...",
-    "author": "John Doe",
-    "date": "2024-01-01T12:00:00+08:00",
-    "message": "feat: add new feature"
-  }
-]
-```
-
-**package.json 关键配置**：
-
-```json
-{
-  "name": "@ai-stack-mcp/git",
-  "version": "0.0.1",
-  "bin": {
-    "mcp-git": "./dist/cli.js"
-  },
-  "dependencies": {
-    "@modelcontextprotocol/sdk": "^1.0.0",
-    "zod": "^3.24.0"
-  }
-}
-```
-
-**MCP 配置示例**：
-
-```json
-{
-  "mcpServers": {
-    "git": {
-      "command": "npx",
-      "args": ["-y", "@ai-stack-mcp/git"]
-    }
-  }
-}
-```
-
-**指定默认仓库路径**：
-
-```json
-{
-  "mcpServers": {
-    "git": {
-      "command": "npx",
-      "args": ["-y", "@ai-stack-mcp/git", "--repository", "/path/to/repo"]
-    }
-  }
-}
-```
-
-### 9.4 @ai-stack-mcp/bash
-
-Bash/Shell 命令执行 MCP 服务器，提供安全的命令执行和后台进程管理。
-
-```
-packages/mcp-servers/bash/
-├── src/
-│   ├── index.ts               # 包入口
-│   ├── types.ts               # 类型定义
-│   ├── bash-operations.ts     # Bash 操作实现
-│   ├── server.ts              # MCP Server 实现
-│   └── cli.ts                 # CLI 入口
-├── dist/                      # 构建输出
-├── package.json
-├── tsconfig.json
-└── tsup.config.ts
-```
-
-**提供的工具**：
-
-| 工具名 | 描述 |
-|--------|------|
-| `bash_execute` | 执行单条 bash 命令 |
-| `bash_script` | 执行多行 bash 脚本 |
-| `bash_background` | 启动后台进程 |
-| `bash_kill` | 终止后台进程 |
-| `bash_processes` | 列出后台进程 |
-| `bash_read_output` | 读取后台进程输出 |
-| `bash_which` | 查找可执行文件位置 |
-| `bash_env` | 获取环境变量 |
-| `bash_pwd` | 获取当前工作目录 |
-| `bash_cd` | 切换工作目录 |
-
-**bash_execute 返回格式**：
-```
-<stdout 输出>
-
---- STDERR ---
-<stderr 输出>
-
---- EXECUTION INFO ---
-Exit code: 0
-Duration: 123ms
-```
-
-**安全特性**：
-- 内置危险命令拦截 (rm -rf /, fork bomb 等)
-- 支持命令白名单模式
-- 支持自定义黑名单
-- 可配置超时时间
-- 输出缓冲区大小限制
-
-**package.json 关键配置**：
-
-```json
-{
-  "name": "@ai-stack-mcp/bash",
-  "version": "0.0.1",
-  "bin": {
-    "mcp-bash": "./dist/cli.js"
-  },
-  "dependencies": {
-    "@modelcontextprotocol/sdk": "^1.0.0",
-    "zod": "^3.24.0"
-  }
-}
-```
-
-**MCP 配置示例**：
-
-```json
-{
-  "mcpServers": {
-    "bash": {
-      "command": "npx",
-      "args": ["-y", "@ai-stack-mcp/bash"]
-    }
-  }
-}
-```
-
-**自定义配置**：
-
-```json
-{
-  "mcpServers": {
-    "bash": {
-      "command": "npx",
-      "args": ["-y", "@ai-stack-mcp/bash", "--working-dir=/home/user", "--timeout=60000"],
-      "env": {
-        "MCP_BASH_ALLOWED_COMMANDS": "ls,cat,grep,find,echo"
-      }
-    }
-  }
-}
-```
-
-**CLI 参数**：
-
-| 参数 | 描述 |
-|------|------|
-| `-w, --working-dir=PATH` | 默认工作目录 |
-| `-t, --timeout=MS` | 默认超时时间 (毫秒) |
-| `--no-background` | 禁用后台进程工具 |
-| `--max-processes=N` | 最大后台进程数 |
-| `--blocked=CMD1,CMD2` | 额外的黑名单命令 |
-| `--allowed=CMD1,CMD2` | 白名单命令 (启用白名单模式) |
-
-**环境变量**：
-
-| 变量 | 描述 |
-|------|------|
-| `MCP_BASH_WORKING_DIR` | 默认工作目录 |
-| `MCP_BASH_DEFAULT_TIMEOUT` | 默认超时时间 |
-| `MCP_BASH_MAX_BUFFER_SIZE` | 最大输出缓冲区 |
-| `MCP_BASH_ALLOW_BACKGROUND` | 是否允许后台进程 |
-| `MCP_BASH_BLOCKED_COMMANDS` | 黑名单命令 (逗号分隔) |
-| `MCP_BASH_ALLOWED_COMMANDS` | 白名单命令 (逗号分隔) |
-
-### 9.5 @ai-stack-mcp/lsp
-
-语言服务器协议 (LSP) MCP 服务器，提供代码智能功能。
-
-```
-packages/mcp-servers/lsp/
-├── src/
-│   ├── index.ts               # 包入口
-│   ├── types.ts               # 类型定义
-│   ├── language-client.ts     # 语言服务器客户端管理
-│   ├── server.ts              # MCP Server 实现
-│   └── cli.ts                 # CLI 入口
-├── dist/                      # 构建输出
-├── package.json
-├── tsconfig.json
-└── tsup.config.ts
-```
-
-**提供的工具**：
-
-| 工具名 | 描述 |
-|--------|------|
-| `lsp_get_diagnostics` | 获取文件诊断信息 (错误/警告) |
-| `lsp_go_to_definition` | 跳转到符号定义 |
-| `lsp_find_references` | 查找所有引用 |
-| `lsp_get_completions` | 获取代码补全建议 |
-| `lsp_get_hover` | 获取悬停信息 (类型/文档) |
-| `lsp_get_document_symbols` | 获取文档符号列表 |
-| `lsp_get_workspace_symbols` | 搜索工作区符号 |
-| `lsp_format_document` | 格式化文档 |
-| `lsp_rename_symbol` | 重命名符号 |
-| `lsp_get_code_actions` | 获取代码操作 (快速修复) |
-| `lsp_start_server` | 启动语言服务器 |
-| `lsp_stop_server` | 停止语言服务器 |
-| `lsp_list_servers` | 列出运行中的语言服务器 |
-
-**package.json 关键配置**：
-
-```json
-{
-  "name": "@ai-stack-mcp/lsp",
-  "version": "0.0.1",
-  "bin": {
-    "mcp-lsp": "./dist/cli.js"
-  },
-  "dependencies": {
-    "@modelcontextprotocol/sdk": "^1.0.0",
-    "vscode-jsonrpc": "^8.2.0",
-    "vscode-languageserver-protocol": "^3.17.5",
-    "zod": "^3.24.0"
-  }
-}
-```
-
-**MCP 配置示例**：
-
-```json
-{
-  "mcpServers": {
-    "lsp": {
-      "command": "npx",
-      "args": ["-y", "@ai-stack-mcp/lsp", "--working-dir=/path/to/project"]
-    }
-  }
-}
-```
-
-**CLI 参数**：
-
-| 参数 | 描述 |
-|------|------|
-| `-w, --working-dir=PATH` | 工作目录 |
-| `--tsserver-path=PATH` | TypeScript 服务器路径 |
-| `--no-typescript` | 不自动启动 TypeScript 服务器 |
-| `--server=ID:CMD:ARGS` | 添加语言服务器 |
-
-**使用示例**：
-
-```bash
-# 基本使用 (自动启动 TypeScript 服务器)
-mcp-lsp
-
-# 添加 Python 语言服务器
-mcp-lsp --server=python:pyright-langserver:--stdio
-
-# 添加多个语言服务器
-mcp-lsp --server=rust:rust-analyzer --server=go:gopls
-```
-
----
-
-## 11. @ai-stack/assistant 包 (个人 AI 助手)
-
-### 10.1 目录结构
+个人 AI 助手。
 
 ```
 packages/libs/assistant/
 ├── src/
-│   ├── index.ts                    # 包入口
-│   ├── cli.ts                      # CLI 入口 (assistant 命令)
-│   ├── types.ts                    # 核心类型定义
-│   ├── config.ts                   # 配置加载
+│   ├── index.ts                # 包入口
+│   ├── cli.ts                  # CLI 入口
+│   ├── types.ts                # 类型定义
+│   ├── config.ts               # 配置加载
 │   │
-│   ├── assistant/                  # 核心 Assistant
+│   ├── assistant/              # 核心助手
 │   │   ├── index.ts
-│   │   └── assistant.ts            # createAssistant() 工厂函数
+│   │   └── assistant.ts
 │   │
-│   ├── memory/                     # Markdown Memory 系统
-│   │   ├── index.ts
-│   │   ├── types.ts
-│   │   ├── markdown-memory.ts      # createMarkdownMemory()
-│   │   ├── markdown-parser.ts      # 解析 MEMORY.md 和日志
-│   │   ├── markdown-writer.ts      # 写入 Markdown
-│   │   ├── sqlite-index.ts         # SQLite 派生索引 (FTS5)
-│   │   └── sync-engine.ts          # Markdown <-> SQLite 同步
-│   │
-│   ├── gateway/                    # 多通道网关
+│   ├── memory/                 # Markdown Memory
 │   │   ├── index.ts
 │   │   ├── types.ts
-│   │   ├── gateway.ts              # createGateway()
-│   │   ├── router.ts               # 消息路由
-│   │   ├── session.ts              # Session 管理
+│   │   ├── markdown-memory.ts
+│   │   ├── markdown-parser.ts
+│   │   ├── markdown-writer.ts
+│   │   ├── sqlite-index.ts     # 派生索引
+│   │   └── sync-engine.ts
+│   │
+│   ├── gateway/                # 多通道网关
+│   │   ├── index.ts
+│   │   ├── types.ts
+│   │   ├── gateway.ts
+│   │   ├── router.ts
+│   │   ├── session.ts
 │   │   └── adapters/
 │   │       ├── index.ts
-│   │       ├── base.ts             # BaseAdapter 抽象类
-│   │       ├── cli.ts              # CLIAdapter
-│   │       ├── telegram.ts         # TelegramAdapter
-│   │       └── discord.ts          # DiscordAdapter
+│   │       ├── base.ts
+│   │       ├── cli.ts
+│   │       ├── telegram.ts
+│   │       └── discord.ts
 │   │
-│   ├── scheduler/                  # 调度器
+│   ├── scheduler/              # 调度器
 │   │   ├── index.ts
 │   │   ├── types.ts
-│   │   ├── scheduler.ts            # createScheduler()
-│   │   ├── cron-job.ts             # Cron 表达式处理
-│   │   ├── reminder.ts             # 一次性提醒
-│   │   ├── watcher.ts              # 文件监听触发
-│   │   └── task-queue.ts           # 持久化任务队列
+│   │   ├── scheduler.ts
+│   │   ├── cron-job.ts
+│   │   ├── reminder.ts
+│   │   ├── watcher.ts
+│   │   └── task-queue.ts
 │   │
-│   └── daemon/                     # 守护进程
+│   └── daemon/                 # 守护进程
 │       ├── index.ts
 │       ├── types.ts
-│       └── daemon.ts               # createDaemon()
+│       └── daemon.ts
 │
-├── dist/                           # 构建输出
 ├── package.json
 ├── tsconfig.json
 └── tsup.config.ts
 ```
 
-### 10.2 核心功能
-
-| 模块 | 功能 | 说明 |
-|------|------|------|
-| **Markdown Memory** | 人类可编辑的记忆 | MEMORY.md 为 Source of Truth，SQLite 为派生索引 |
-| **Gateway** | 多通道消息网关 | CLI、Telegram、Discord、WhatsApp 适配器 |
-| **Scheduler** | 任务调度 | Cron 定时、提醒、间隔、文件监听触发 |
-| **Daemon** | 后台进程 | PID 管理、健康检查、日志 |
-
-### 10.3 Markdown Memory 架构
-
-```
-┌─────────────────────────────────────────────────────────────┐
-│                 Source of Truth (Markdown)                   │
-│  ┌─────────────────┐    ┌─────────────────────────────────┐ │
-│  │   MEMORY.md     │    │   memory/YYYY-MM-DD.md          │ │
-│  │   (长期记忆)     │    │   (每日日志)                     │ │
-│  └────────┬────────┘    └───────────────┬─────────────────┘ │
-└───────────┼─────────────────────────────┼───────────────────┘
-            │                             │
-            └──────────────┬──────────────┘
-                           │ Sync Engine
-                           ▼
-┌─────────────────────────────────────────────────────────────┐
-│                 Derived Index (SQLite)                       │
-│  ┌─────────────────┐    ┌─────────────────────────────────┐ │
-│  │   FTS5 索引     │    │   sqlite-vec 向量索引 (可选)     │ │
-│  └─────────────────┘    └─────────────────────────────────┘ │
-│                     可从 Markdown 重建                        │
-└─────────────────────────────────────────────────────────────┘
-```
-
-**MEMORY.md 格式**:
-```markdown
-# Assistant Memory
-
-## Profile
-- **Name**: Alice
-- **Timezone**: Asia/Shanghai
-- **Language**: Chinese
-
-## Facts
-- User prefers concise responses
-- Works on AI projects
-
-## Todos
-- [ ] Review PR #123
-
-## Notes
-User mentioned interest in Rust programming.
-```
-
-### 10.4 package.json
-
-```json
-{
-  "name": "@ai-stack/assistant",
-  "version": "0.0.1",
-  "bin": {
-    "assistant": "./dist/cli.js"
-  },
-  "dependencies": {
-    "@ai-stack/agent": "workspace:*",
-    "@ai-stack/memory": "workspace:*",
-    "@ai-stack/memory-store-sqlite": "workspace:*",
-    "chokidar": "^4.0.0",
-    "commander": "^12.1.0",
-    "cron-parser": "^4.9.0",
-    "gray-matter": "^4.0.3"
-  },
-  "optionalDependencies": {
-    "telegraf": "^4.16.0",
-    "discord.js": "^14.14.0"
-  }
-}
-```
-
-### 10.5 CLI 命令
-
-```bash
-# 交互对话
-assistant chat
-
-# 守护进程
-assistant daemon start|stop|status|logs
-
-# 内存管理
-assistant memory sync|search|show
-
-# 调度管理
-assistant scheduler list|cancel
-
-# 配置
-assistant config init|show
-```
-
-### 10.6 配置文件示例
-
-**~/.ai-assistant/assistant.json**:
-```json
-{
-  "name": "My Assistant",
-  "agent": {
-    "model": "gpt-4o",
-    "temperature": 0.7
-  },
-  "memory": {
-    "enabled": true,
-    "syncOnStartup": true,
-    "watchFiles": true
-  },
-  "gateway": {
-    "sessionStrategy": "per-peer",
-    "channels": {
-      "telegram": {
-        "enabled": true,
-        "token": "${TELEGRAM_BOT_TOKEN}"
-      },
-      "cli": { "enabled": true }
-    }
-  },
-  "scheduler": {
-    "enabled": true,
-    "allowAgentControl": true
-  }
-}
-```
+**依赖**：
+- `@ai-stack/agent`
+- `@ai-stack/memory`
+- `@ai-stack/memory-store-sqlite`
+- `@ai-stack/tui`
+- `chokidar`
+- `cron-parser`
+- `gray-matter`
+- `telegraf` (可选)
+- `discord.js` (可选)
 
 ---
 
-## 12. @ai-stack/code 包 (代码编辑 Agent)
+### 2.11 @ai-stack/code
 
-### 11.1 目录结构
+代码编辑 Agent。
 
 ```
 packages/libs/code/
 ├── src/
-│   ├── index.ts                    # 包入口
-│   ├── cli.ts                      # CLI 入口 (ai-code 命令)
-│   ├── types.ts                    # 核心类型定义
-│   ├── errors.ts                   # 错误类
-│   ├── config.ts                   # 配置加载
-│   ├── config-schema.ts            # Zod 配置校验
+│   ├── index.ts                # 包入口
+│   ├── cli.ts                  # CLI 入口
+│   ├── types.ts                # 类型定义
+│   ├── errors.ts               # 错误类
+│   ├── config.ts               # 配置加载
+│   ├── config-schema.ts        # Zod Schema
 │   │
-│   ├── code-agent/                 # 核心 Code Agent
+│   ├── code-agent/             # 核心 Agent
 │   │   ├── index.ts
-│   │   └── code-agent.ts           # createCodeAgent() 工厂函数
+│   │   └── code-agent.ts
 │   │
-│   ├── tools/                      # 内置工具
+│   ├── tools/                  # 内置工具
 │   │   ├── index.ts
-│   │   ├── read.ts                 # Read 工具 (带行号读取)
-│   │   ├── write.ts                # Write 工具 (创建/覆盖文件)
-│   │   ├── edit.ts                 # Edit 工具 (搜索替换)
-│   │   ├── glob.ts                 # Glob 工具 (文件模式匹配)
-│   │   ├── grep.ts                 # Grep 工具 (内容搜索)
-│   │   ├── undo.ts                 # Undo 工具 (撤销)
-│   │   ├── redo.ts                 # Redo 工具 (重做)
-│   │   └── task.ts                 # Task 工具 (任务管理)
+│   │   ├── read.ts             # Read 工具
+│   │   ├── write.ts            # Write 工具
+│   │   ├── edit.ts             # Edit 工具
+│   │   ├── glob.ts             # Glob 工具
+│   │   ├── grep.ts             # Grep 工具
+│   │   ├── undo.ts             # Undo 工具
+│   │   ├── redo.ts             # Redo 工具
+│   │   └── task.ts             # Task 工具
 │   │
-│   ├── file-history/               # Undo/Redo 系统
+│   ├── file-history/           # Undo/Redo 系统
 │   │   ├── index.ts
 │   │   ├── types.ts
-│   │   ├── store.ts                # SQLite 历史存储
-│   │   └── diff-engine.ts          # Diff 计算与应用
+│   │   ├── store.ts            # SQLite 存储
+│   │   └── diff-engine.ts
 │   │
-│   ├── task/                       # 任务管理
+│   ├── task/                   # 任务管理
 │   │   ├── index.ts
-│   │   └── store.ts                # SQLite 任务存储
+│   │   └── store.ts
 │   │
-│   ├── safety/                     # 安全控制
+│   ├── safety/                 # 安全控制
 │   │   ├── index.ts
-│   │   ├── path-validator.ts       # 路径验证 (沙箱)
-│   │   └── content-validator.ts    # 内容验证 (密钥检测)
+│   │   ├── path-validator.ts   # 路径验证
+│   │   └── content-validator.ts # 内容验证
 │   │
 │   └── prompts/
-│       └── code-prompt.ts          # System Prompt
+│       └── code-prompt.ts
 │
-├── dist/                           # 构建输出
 ├── package.json
 ├── tsconfig.json
 └── tsup.config.ts
 ```
 
-### 11.2 核心功能
+**依赖**：
+- `@ai-stack/agent`
+- `@ai-stack/mcp`
+- `@ai-stack/provider`
+- `@ai-stack/tui`
+- `better-sqlite3`
+- `diff`
+- `glob`
+- `picomatch`
+- `zod`
 
-| 模块 | 功能 | 说明 |
-|------|------|------|
-| **Read** | 文件读取 | 带行号输出，支持分页 |
-| **Write** | 文件写入 | 自动创建目录，记录历史 |
-| **Edit** | 搜索替换 | 精确匹配，支持全局替换 |
-| **Glob** | 文件搜索 | 按模式匹配，按修改时间排序 |
-| **Grep** | 内容搜索 | 正则搜索，多种输出模式 |
-| **Undo/Redo** | 撤销重做 | SQLite 持久化历史，检查点支持 |
-| **Task** | 任务管理 | 创建/更新/列表/依赖关系 |
-| **Safety** | 安全控制 | 路径沙箱、密钥检测 |
+---
 
-### 11.3 package.json
+## 3. 技能包 (packages/skills/)
 
-```json
-{
-  "name": "@ai-stack/code",
-  "version": "0.0.1",
-  "bin": {
-    "ai-code": "./dist/cli.js"
-  },
-  "dependencies": {
-    "@ai-stack/agent": "workspace:*",
-    "@ai-stack/mcp": "workspace:*",
-    "@ai-stack/provider": "workspace:*",
-    "better-sqlite3": "^11.7.0",
-    "commander": "^12.1.0",
-    "diff": "^7.0.0",
-    "glob": "^11.0.0",
-    "picomatch": "^4.0.0",
-    "zod": "^3.23.0"
-  }
-}
+### 3.1 @ai-stack-skill/memory
+
+```
+packages/skills/memory/
+├── skill.json                  # Skill 定义
+├── handlers.cjs                # 编译后处理函数
+├── src/
+│   ├── handlers.ts             # search/upsert/delete
+│   ├── schema.ts               # JSON Schema
+│   └── store-context.ts        # 数据库连接
+├── tests/
+│   └── schema.test.ts
+├── scripts/
+│   └── copy-handlers.js
+├── package.json
+├── tsconfig.json
+└── tsup.config.ts
 ```
 
-### 11.4 CLI 命令
+**工具**：
+- `search` - 搜索记忆
+- `upsert` - 创建/更新
+- `delete` - 删除
 
-```bash
-# 交互模式
-ai-code
+---
 
-# 单次执行
-ai-code "读取 package.json 文件"
+### 3.2 @ai-stack-skill/knowledge
 
-# 指定配置和工作目录
-ai-code --config ./code.json --working-dir ./my-project
-
-# Undo/Redo
-ai-code undo
-ai-code redo
-
-# 历史记录
-ai-code history
-
-# 检查点
-ai-code checkpoint create my-checkpoint
-ai-code checkpoint restore my-checkpoint
-
-# 配置
-ai-code config init
-ai-code config show
+```
+packages/skills/knowledge/
+├── skill.json
+├── handlers.cjs
+├── src/
+│   ├── handlers.ts
+│   └── store-context.ts
+├── scripts/
+│   └── copy-handlers.js
+├── package.json
+├── tsconfig.json
+└── tsup.config.ts
 ```
 
-### 11.5 配置文件示例
+**工具**：
+- `search_code` - 搜索代码
+- `search_docs` - 搜索文档
+- `index_code` - 索引代码库
+- `add_doc_source` - 添加文档源
+- `crawl_docs` - 爬取文档
+- `get_knowledge_stats` - 获取统计
 
-**code.json**:
-```json
-{
-  "model": "gpt-4o",
-  "temperature": 0.7,
-  "maxTokens": 8192,
-  "maxIterations": 50,
+---
 
-  "safety": {
-    "workingDir": ".",
-    "allowedPaths": ["**/*"],
-    "blockedPaths": ["**/node_modules/**", "**/.git/**"],
-    "maxFileSize": 1048576,
-    "blockSecrets": true,
-    "confirmDestructive": true
-  },
+## 4. MCP 服务器 (packages/mcp-servers/)
 
-  "history": {
-    "enabled": true,
-    "dbPath": ".ai-code/history.db",
-    "maxChanges": 1000
-  },
+### 4.1 @ai-stack-mcp/time
 
-  "tasks": {
-    "enabled": true,
-    "dbPath": ".ai-code/tasks.db"
-  },
+时间和时区转换。
 
-  "mcp": {
-    "configPath": "mcp.json",
-    "autoConnect": true
-  }
-}
+```
+packages/mcp-servers/time/
+├── src/
+│   ├── index.ts
+│   ├── types.ts
+│   ├── timezone.ts
+│   ├── server.ts
+│   └── cli.ts
+├── package.json
+├── tsconfig.json
+└── tsup.config.ts
+```
+
+**工具**：
+- `get_current_time` - 获取当前时间
+- `convert_time` - 时区转换
+
+---
+
+### 4.2 @ai-stack-mcp/fetch
+
+Web 内容获取。
+
+```
+packages/mcp-servers/fetch/
+├── src/
+│   ├── index.ts
+│   ├── types.ts
+│   ├── fetcher.ts
+│   ├── server.ts
+│   └── cli.ts
+├── package.json
+├── tsconfig.json
+└── tsup.config.ts
+```
+
+**工具**：
+- `fetch_url` - 获取 URL 内容 (转 Markdown)
+
+---
+
+### 4.3 @ai-stack-mcp/git
+
+Git 仓库操作。
+
+```
+packages/mcp-servers/git/
+├── src/
+│   ├── index.ts
+│   ├── types.ts
+│   ├── git-operations.ts
+│   ├── server.ts
+│   └── cli.ts
+├── package.json
+├── tsconfig.json
+└── tsup.config.ts
+```
+
+**工具**：
+- `git_status` - 工作区状态
+- `git_diff_unstaged` - 未暂存差异
+- `git_diff_staged` - 已暂存差异
+- `git_diff` - 分支比较
+- `git_commit` - 提交
+- `git_add` - 暂存
+- `git_reset` - 取消暂存
+- `git_log` - 提交历史
+- `git_create_branch` - 创建分支
+- `git_checkout` - 切换分支
+- `git_show` - 显示提交
+- `git_branch` - 列出分支
+
+---
+
+### 4.4 @ai-stack-mcp/bash
+
+Shell 命令执行。
+
+```
+packages/mcp-servers/bash/
+├── src/
+│   ├── index.ts
+│   ├── types.ts
+│   ├── bash-operations.ts
+│   ├── server.ts
+│   └── cli.ts
+├── package.json
+├── tsconfig.json
+└── tsup.config.ts
+```
+
+**工具**：
+- `bash_execute` - 执行命令
+- `bash_script` - 执行脚本
+- `bash_background` - 后台进程
+- `bash_kill` - 终止进程
+- `bash_processes` - 列出进程
+- `bash_read_output` - 读取输出
+- `bash_which` - 查找命令
+- `bash_env` - 环境变量
+- `bash_pwd` - 当前目录
+- `bash_cd` - 切换目录
+
+---
+
+### 4.5 @ai-stack-mcp/lsp
+
+语言服务器协议。
+
+```
+packages/mcp-servers/lsp/
+├── src/
+│   ├── index.ts
+│   ├── types.ts
+│   ├── language-client.ts
+│   ├── server.ts
+│   └── cli.ts
+├── package.json
+├── tsconfig.json
+└── tsup.config.ts
+```
+
+**工具**：
+- `lsp_get_diagnostics` - 诊断信息
+- `lsp_go_to_definition` - 定义跳转
+- `lsp_find_references` - 引用查找
+- `lsp_get_completions` - 代码补全
+- `lsp_get_hover` - 悬停信息
+- `lsp_get_document_symbols` - 文档符号
+- `lsp_get_workspace_symbols` - 工作区符号
+- `lsp_format_document` - 格式化
+- `lsp_rename_symbol` - 重命名
+- `lsp_get_code_actions` - 代码操作
+- `lsp_start_server` - 启动服务器
+- `lsp_stop_server` - 停止服务器
+- `lsp_list_servers` - 列出服务器
+
+---
+
+### 4.6 @ai-stack-mcp/electron-cdp
+
+Chrome DevTools 集成。
+
+```
+packages/mcp-servers/electron-cdp/
+├── src/
+│   ├── index.ts
+│   ├── types.ts
+│   ├── cdp-client.ts
+│   ├── server.ts
+│   └── cli.ts
+├── package.json
+├── tsconfig.json
+└── tsup.config.ts
 ```
 
 ---
 
-## 13. Rush 配置目录
+## 5. 示例项目 (packages/examples/)
 
-### 11.1 common/config/rush/
-
-```
-common/config/rush/
-├── .npmrc                     # npm 配置
-├── command-line.json          # 自定义命令
-├── common-versions.json       # 共享版本
-├── pnpm-config.json          # pnpm 配置
-├── pnpm-lock.yaml            # 依赖锁文件
-└── ... (其他 Rush 配置)
-```
-
-### 11.2 common/scripts/
-
-```
-common/scripts/
-├── install-run.js            # 通用安装运行脚本
-├── install-run-rush.js       # Rush 安装运行脚本
-├── install-run-rushx.js      # Rushx 安装运行脚本
-└── install-run-rush-pnpm.js  # pnpm 安装运行脚本
-```
-
----
-
-## 14. 开发工具配置
-
-### 12.1 .claude/ 目录
-
-```
-.claude/
-├── settings.json             # Claude Code 设置
-├── commands/                 # 自定义命令
-│   ├── adk/                 # ADK 相关命令
-│   │   ├── plan.md
-│   │   ├── specify.md
-│   │   ├── tasks.md
-│   │   └── ...
-│   └── adkl/                # ADK Lite 命令
-└── skills/                  # 技能定义
-    └── common-knowledge/    # 通用知识库
-```
-
-### 12.2 .ttadk/ 目录
-
-```
-.ttadk/
-├── config.json              # TTADK 配置
-├── config-sum/             # 配置摘要
-└── plugins/                # 插件
-    └── ttadk/
-        ├── core/           # 核心插件
-        │   ├── mcps/       # MCP 服务配置
-        │   └── resources/  # 模板和脚本
-        └── common-kit/     # 通用工具包
-```
-
----
-
-## 15. 构建输出
-
-### 13.1 dist/ 目录结构
-
-每个包的 `dist/` 目录输出：
-
-```
-dist/
-├── index.js           # CommonJS 入口
-├── index.mjs          # ESM 入口
-├── index.d.ts         # TypeScript 类型声明
-├── index.d.mts        # ESM 类型声明
-└── index.js.map       # Source Map
-```
-
-### 13.2 构建命令
-
-```bash
-# 单包构建
-rushx build
-
-# 全量构建
-rush build
-
-# 重新构建
-rush rebuild
-```
-
----
-
-## 16. 示例项目 (packages/examples/)
-
-示例项目使用 `@ai-stack-example/*` 前缀，提供各个包的实际使用示例。
-
-### 14.1 @ai-stack-example/agent
-
-Agent 功能的完整示例，包含 MCP、Skill、Memory、Knowledge 集成。
+### 5.1 @ai-stack-example/agent
 
 ```
 packages/examples/agent/
-├── package.json            # 包依赖配置
-├── agent.json              # Agent 配置
-├── mcp.json                # MCP 服务器配置
-├── skills/                 # 自定义 Skill 示例
+├── package.json
+├── agent.json                  # Agent 配置
+├── mcp.json                    # MCP 配置
+├── skills/                     # 自定义 Skill
 │   └── search-skill/
-│       ├── skill.json
-│       └── handlers.cjs
-├── memory/                 # Memory 数据目录
-│   └── sqlite.db
-├── knowledge/              # Knowledge 数据目录
-│   └── sqlite.db
-├── README.md
-└── .gitignore
+├── memory/                     # Memory 数据
+├── knowledge/                  # Knowledge 数据
+└── README.md
 ```
 
-**启动命令**:
+**命令**：
 ```bash
-pnpm start        # 启动交互对话
-pnpm run tools    # 列出可用工具
+pnpm start        # 交互对话
+pnpm run tools    # 列出工具
 ```
 
-### 14.2 @ai-stack-example/assistant
+---
 
-个人 AI 助手示例，包含 Markdown Memory、多通道网关、调度器。
+### 5.2 @ai-stack-example/assistant
 
 ```
 packages/examples/assistant/
-├── package.json            # 包依赖配置
-├── assistant.json          # Assistant 配置
-├── mcp.json                # MCP 服务器配置
-├── MEMORY.md               # Markdown 记忆文件 (Source of Truth)
-├── README.md
-└── .gitignore
+├── package.json
+├── assistant.json              # Assistant 配置
+├── mcp.json                    # MCP 配置
+├── MEMORY.md                   # Markdown 记忆
+└── README.md
 ```
 
-**启动命令**:
+**命令**：
 ```bash
-pnpm start              # 启动交互对话
-pnpm run daemon         # 启动守护进程
+pnpm start              # 交互对话
+pnpm run daemon         # 守护进程
 pnpm run memory:sync    # 同步记忆
-pnpm run scheduler:list # 查看调度任务
+pnpm run scheduler:list # 调度任务
 ```
 
-### 14.3 @ai-stack-example/code
+---
 
-代码编辑 Agent 示例，包含文件操作、搜索、Undo/Redo、任务管理。
+### 5.3 @ai-stack-example/code
 
 ```
 packages/examples/code/
-├── package.json            # 包依赖配置
-├── code.json               # Code Agent 配置
-├── mcp.json                # MCP 服务器配置 (bash, git, lsp)
-├── .ai-code/               # 数据目录 (自动创建)
-│   ├── history.db          # 文件历史
-│   └── tasks.db            # 任务数据
-├── README.md
-└── .gitignore
+├── package.json
+├── code.json                   # Code Agent 配置
+├── mcp.json                    # MCP 配置
+├── .ai-code/                   # 数据目录
+│   ├── history.db
+│   └── tasks.db
+└── README.md
 ```
 
-**启动命令**:
+**命令**：
 ```bash
-pnpm start          # 启动交互对话
-pnpm run undo       # 撤销最近更改
-pnpm run redo       # 重做撤销
-pnpm run history    # 查看更改历史
-pnpm run tasks      # 查看任务列表
+pnpm start          # 交互对话
+pnpm run undo       # 撤销
+pnpm run redo       # 重做
+pnpm run history    # 历史
+pnpm run tasks      # 任务
 ```
 
-**配置说明**:
+---
 
-| 配置文件 | 用途 |
-|----------|------|
-| `code.json` | Agent 模型、安全策略、历史/任务数据库路径 |
-| `mcp.json` | MCP 服务器配置 (fetch, bash, git, lsp) |
+## 6. Rush 配置 (common/)
 
-**MCP 工具集成**:
-- `fetch` - Web 内容获取
-- `bash` - Shell 命令执行
-- `git` - Git 仓库操作
-- `lsp` - 代码智能 (定义跳转、引用查找等)
+```
+common/
+├── config/rush/
+│   ├── .npmrc
+│   ├── command-line.json       # 自定义命令
+│   ├── common-versions.json    # 共享版本
+│   ├── pnpm-config.json
+│   └── pnpm-lock.yaml          # 依赖锁
+│
+└── scripts/
+    ├── install-run.js
+    ├── install-run-rush.js
+    ├── install-run-rushx.js
+    └── install-run-rush-pnpm.js
+```
+
+---
+
+## 7. 包命名约定
+
+| 前缀 | 位置 | 用途 |
+|------|------|------|
+| `@ai-stack/*` | packages/libs/ | 核心库 |
+| `@ai-stack-skill/*` | packages/skills/ | 技能包 |
+| `@ai-stack-mcp/*` | packages/mcp-servers/ | MCP 服务器 |
+| `@ai-stack-example/*` | packages/examples/ | 示例项目 |
+
+---
+
+## 8. 文件组织约定
+
+每个包遵循统一的文件组织：
+
+```
+package-name/
+├── src/
+│   ├── index.ts        # 公共导出
+│   ├── types.ts        # 类型定义
+│   ├── errors.ts       # 错误类 (可选)
+│   └── *.ts            # 实现文件
+├── tests/              # 测试文件 (可选)
+├── dist/               # 构建输出
+├── package.json
+├── tsconfig.json
+└── tsup.config.ts
+```
+
+**导入约定**：
+```typescript
+// 本地导入使用 .js 扩展名 (ESM)
+import { foo } from './foo.js';
+
+// Workspace 依赖
+import { createAgent } from '@ai-stack/agent';
+```

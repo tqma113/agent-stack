@@ -63,6 +63,13 @@ import type {
   AgentMemoryConfig,
   AgentKnowledgeConfig,
   AgentPermissionConfig,
+  AgentStateMachineConfig,
+  AgentRecoveryConfig,
+  AgentPlannerConfig,
+  AgentEvaluatorConfig,
+  AgentRouterConfig,
+  AgentMetricsConfig,
+  AgentGuardrailConfig,
   Tool,
   AgentResponse,
   ToolCallResult,
@@ -85,6 +92,49 @@ import {
 } from './permission/index.js';
 import { createAskUserTool } from './tools/ask-user.js';
 import type { AgentEventListener as AgentEventListenerType } from './types.js';
+
+// Import architecture modules
+import {
+  createStateMachine,
+  type StateMachineInstance,
+  type AgentState,
+  type PlanDAGRef,
+} from './state-machine/index.js';
+import {
+  createRecoveryPolicy,
+  createApiRecoveryPolicy,
+  createToolRecoveryPolicy,
+  type RecoveryPolicyInstance,
+} from './recovery/index.js';
+import {
+  createPlanDAG,
+  createPlanner,
+  type PlanDAGInstance,
+  type PlannerInstance,
+  type PlanNode,
+} from './planner/index.js';
+import {
+  createEvaluator,
+  type EvaluatorInstance,
+  type EvalContext,
+} from './evaluator/index.js';
+import {
+  createModelRouter,
+  type ModelRouterInstance,
+  type TaskType,
+  type CostStats,
+} from './router/index.js';
+import {
+  createMetricsAggregator,
+  type MetricsAggregatorInstance,
+  type AggregatedMetrics,
+} from './metrics/index.js';
+import {
+  createGuardrail,
+  type GuardrailInstance,
+  type GuardrailRule,
+  type GuardrailResult,
+} from './guardrail/index.js';
 
 const DEFAULT_SYSTEM_PROMPT = `You are a helpful AI assistant. Be concise and helpful in your responses.`;
 
@@ -156,6 +206,39 @@ export interface AgentInstance {
   setPermissionCallback(callback: ((request: ConfirmationRequest) => Promise<ConfirmationResponse>) | null): void;
   clearSessionApprovals(): void;
   getPermissionAuditLog(): PermissionAuditEntry[];
+
+  // State Machine (Orchestrator layer)
+  getStateMachine(): StateMachineInstance | null;
+  getAgentState(): AgentState | null;
+  pauseExecution(): void;
+  resumeExecution(): void;
+  createCheckpoint(name?: string): Promise<string | null>;
+  restoreCheckpoint(checkpointId: string): Promise<boolean>;
+
+  // Recovery Policy
+  getRecoveryPolicy(): RecoveryPolicyInstance | null;
+
+  // Metrics (Observability layer)
+  getMetricsAggregator(): MetricsAggregatorInstance | null;
+  getMetrics(): AggregatedMetrics | null;
+  resetMetrics(): void;
+
+  // Guardrail (Safety layer)
+  getGuardrail(): GuardrailInstance | null;
+  addGuardrailRule(rule: GuardrailRule): void;
+  removeGuardrailRule(ruleId: string): void;
+
+  // Model Router
+  getModelRouter(): ModelRouterInstance | null;
+  getCostStats(): CostStats | null;
+  resetCostStats(): void;
+
+  // Evaluator
+  getEvaluator(): EvaluatorInstance | null;
+
+  // Planner
+  getPlanner(): PlannerInstance | null;
+  getCurrentPlan(): PlanDAGInstance | null;
 
   // Resource Management
   close(): Promise<void>;
@@ -262,6 +345,134 @@ export function createAgent(config: AgentConfig = {}): AgentInstance {
   // Telemetry configuration
   const telemetryConfig: TelemetryConfig = config.telemetry ?? {};
   let eventListener: AgentEventListener | undefined = telemetryConfig.onEvent;
+
+  // ==========================================================================
+  // Architecture Modules Integration
+  // ==========================================================================
+
+  // State Machine (Orchestrator layer)
+  let stateMachine: StateMachineInstance | null = null;
+  const stateMachineConfig = config.stateMachine;
+  if (stateMachineConfig?.enabled) {
+    stateMachine = createStateMachine({
+      checkpointPath: stateMachineConfig.checkpointPath,
+      autoCheckpoint: stateMachineConfig.autoCheckpoint,
+      checkpointInterval: stateMachineConfig.checkpointInterval,
+      maxWorkingMemorySize: stateMachineConfig.maxWorkingMemorySize,
+      includeConversationHistory: stateMachineConfig.includeConversationHistory,
+      debug: stateMachineConfig.debug,
+      onStateChange: stateMachineConfig.onStateChange as ((state: AgentState, transition: unknown) => void) | undefined,
+    });
+  }
+
+  // Recovery Policy
+  let llmRecovery: RecoveryPolicyInstance | null = null;
+  let toolRecovery: RecoveryPolicyInstance | null = null;
+  const recoveryConfig = config.recovery;
+  if (recoveryConfig?.enabled) {
+    llmRecovery = createApiRecoveryPolicy({
+      maxRetries: recoveryConfig.maxRetries ?? 3,
+      backoffStrategy: recoveryConfig.backoffStrategy ?? 'exponential',
+      initialDelayMs: recoveryConfig.initialDelayMs ?? 1000,
+      maxDelayMs: recoveryConfig.maxDelayMs ?? 30000,
+      circuitBreaker: recoveryConfig.circuitBreaker,
+      beforeRetry: recoveryConfig.onError
+        ? async (ctx) => recoveryConfig.onError!(ctx.error, ctx.operation, ctx.attempt)
+        : undefined,
+      onRecovered: recoveryConfig.onRecovered
+        ? (ctx) => recoveryConfig.onRecovered!(ctx.error, ctx.operation, ctx.attempt)
+        : undefined,
+    });
+    toolRecovery = createToolRecoveryPolicy({
+      maxRetries: Math.min(recoveryConfig.maxRetries ?? 2, 2),
+      backoffStrategy: 'linear',
+      initialDelayMs: 500,
+    });
+  }
+
+  // Metrics Aggregator (Observability layer)
+  let metricsAggregator: MetricsAggregatorInstance | null = null;
+  const metricsConfig = config.metrics;
+  if (metricsConfig?.enabled) {
+    metricsAggregator = createMetricsAggregator({
+      enabled: true,
+      retentionPeriodMs: metricsConfig.retentionPeriodMs,
+      onExport: metricsConfig.onExport as ((metrics: AggregatedMetrics) => void) | undefined,
+      autoExportIntervalMs: metricsConfig.autoExportIntervalMs,
+      alerts: metricsConfig.alerts as any,
+      onAlert: metricsConfig.onAlert as any,
+    });
+    if (metricsConfig.autoExportIntervalMs) {
+      metricsAggregator.startAutoExport();
+    }
+  }
+
+  // Guardrail (Safety layer)
+  let guardrail: GuardrailInstance | null = null;
+  const guardrailConfig = config.guardrail;
+  if (guardrailConfig?.enabled) {
+    guardrail = createGuardrail({
+      enableBuiltInRules: guardrailConfig.enableBuiltInRules ?? true,
+      blockOnViolation: guardrailConfig.blockOnViolation ?? true,
+      onViolation: guardrailConfig.onViolation
+        ? (result, content) => guardrailConfig.onViolation!(result.ruleId, result.message ?? '', content)
+        : undefined,
+    });
+  }
+
+  // Model Router
+  let modelRouter: ModelRouterInstance | null = null;
+  const routerConfig = config.router;
+  if (routerConfig?.enabled) {
+    modelRouter = createModelRouter({
+      fast: routerConfig.fast ? {
+        model: routerConfig.fast.model,
+        inputCostPer1K: routerConfig.fast.inputCostPer1K,
+        outputCostPer1K: routerConfig.fast.outputCostPer1K,
+        maxContext: routerConfig.fast.maxContext,
+        supportedTasks: ['tool_selection', 'classification', 'extraction', 'formatting'],
+        latencyTier: 2,
+        qualityTier: 6,
+      } : undefined,
+      standard: routerConfig.standard ? {
+        model: routerConfig.standard.model,
+        inputCostPer1K: routerConfig.standard.inputCostPer1K,
+        outputCostPer1K: routerConfig.standard.outputCostPer1K,
+        maxContext: routerConfig.standard.maxContext,
+        supportedTasks: ['tool_selection', 'classification', 'extraction', 'formatting', 'summarization', 'conversation'],
+        latencyTier: 4,
+        qualityTier: 8,
+      } : undefined,
+      strong: routerConfig.strong ? {
+        model: routerConfig.strong.model,
+        inputCostPer1K: routerConfig.strong.inputCostPer1K,
+        outputCostPer1K: routerConfig.strong.outputCostPer1K,
+        maxContext: routerConfig.strong.maxContext,
+        supportedTasks: ['tool_selection', 'classification', 'extraction', 'formatting', 'summarization', 'conversation', 'code_generation', 'reasoning', 'planning'],
+        latencyTier: 5,
+        qualityTier: 9,
+      } : undefined,
+      costOptimization: routerConfig.costOptimization,
+      dailyCostLimit: routerConfig.dailyCostLimit,
+      onCostWarning: routerConfig.onCostWarning
+        ? (stats) => routerConfig.onCostWarning!(stats.totalCost, routerConfig.dailyCostLimit ?? 0)
+        : undefined,
+      onCostLimitReached: routerConfig.onCostLimitReached
+        ? (stats) => routerConfig.onCostLimitReached!(stats.totalCost)
+        : undefined,
+    });
+  }
+
+  // Evaluator
+  let evaluator: EvaluatorInstance | null = null;
+  const evaluatorConfig = config.evaluator;
+  // Evaluator will be initialized later when we have the chat function
+
+  // Planner
+  let planner: PlannerInstance | null = null;
+  let currentPlan: PlanDAGInstance | null = null;
+  const plannerConfig = config.planner;
+  // Planner will be initialized later when we have the chat function
 
   /**
    * Emit an agent event
@@ -1169,10 +1380,124 @@ export function createAgent(config: AgentConfig = {}): AgentInstance {
     },
 
     // ============================================
+    // State Machine (Orchestrator Layer)
+    // ============================================
+
+    getStateMachine(): StateMachineInstance | null {
+      return stateMachine;
+    },
+
+    getAgentState(): AgentState | null {
+      return stateMachine?.getState() ?? null;
+    },
+
+    pauseExecution(): void {
+      stateMachine?.pause();
+    },
+
+    resumeExecution(): void {
+      stateMachine?.resume();
+    },
+
+    async createCheckpoint(name?: string): Promise<string | null> {
+      if (!stateMachine) return null;
+      return stateMachine.checkpoint(name);
+    },
+
+    async restoreCheckpoint(checkpointId: string): Promise<boolean> {
+      if (!stateMachine) return false;
+      try {
+        await stateMachine.restore(checkpointId);
+        return true;
+      } catch {
+        return false;
+      }
+    },
+
+    // ============================================
+    // Recovery Policy
+    // ============================================
+
+    getRecoveryPolicy(): RecoveryPolicyInstance | null {
+      return llmRecovery;
+    },
+
+    // ============================================
+    // Metrics (Observability Layer)
+    // ============================================
+
+    getMetricsAggregator(): MetricsAggregatorInstance | null {
+      return metricsAggregator;
+    },
+
+    getMetrics(): AggregatedMetrics | null {
+      return metricsAggregator?.getMetrics() ?? null;
+    },
+
+    resetMetrics(): void {
+      metricsAggregator?.reset();
+    },
+
+    // ============================================
+    // Guardrail (Safety Layer)
+    // ============================================
+
+    getGuardrail(): GuardrailInstance | null {
+      return guardrail;
+    },
+
+    addGuardrailRule(rule: GuardrailRule): void {
+      guardrail?.addRule(rule);
+    },
+
+    removeGuardrailRule(ruleId: string): void {
+      guardrail?.removeRule(ruleId);
+    },
+
+    // ============================================
+    // Model Router
+    // ============================================
+
+    getModelRouter(): ModelRouterInstance | null {
+      return modelRouter;
+    },
+
+    getCostStats(): CostStats | null {
+      return modelRouter?.getCostStats() ?? null;
+    },
+
+    resetCostStats(): void {
+      modelRouter?.resetCostStats();
+    },
+
+    // ============================================
+    // Evaluator
+    // ============================================
+
+    getEvaluator(): EvaluatorInstance | null {
+      return evaluator;
+    },
+
+    // ============================================
+    // Planner
+    // ============================================
+
+    getPlanner(): PlannerInstance | null {
+      return planner;
+    },
+
+    getCurrentPlan(): PlanDAGInstance | null {
+      return currentPlan;
+    },
+
+    // ============================================
     // Resource Management
     // ============================================
 
     async close(): Promise<void> {
+      // Stop metrics auto-export
+      metricsAggregator?.stopAutoExport();
+
       await Promise.all([
         instance.closeMCP(),
         instance.closeSkills(),
@@ -1243,6 +1568,33 @@ export function createAgent(config: AgentConfig = {}): AgentInstance {
       input: string,
       options: ConversationOptions = {}
     ): Promise<AgentResponse> {
+      const chatStartTime = Date.now();
+
+      // ==========================================================
+      // Phase 1: Guardrail Input Check
+      // ==========================================================
+      if (guardrail) {
+        const inputResults = await guardrail.checkInput(input);
+        if (guardrail.shouldBlock(inputResults)) {
+          const violation = inputResults.find(r => !r.passed);
+          const errorMsg = `Input blocked by guardrail: ${violation?.message ?? 'Policy violation'}`;
+
+          // Record metrics
+          metricsAggregator?.recordLatency('chat', Date.now() - chatStartTime);
+          metricsAggregator?.recordError('chat', 'guardrail_blocked', errorMsg);
+
+          throw new Error(errorMsg);
+        }
+      }
+
+      // ==========================================================
+      // Phase 2: State Machine Transition - START
+      // ==========================================================
+      stateMachine?.transition({
+        type: 'START',
+        input,
+      });
+
       // Auto-initialize MCP if configured with autoConnect
       if (mcpConfig?.autoConnect && !mcpManager) {
         await instance.initializeMCP();
@@ -1353,36 +1705,107 @@ export function createAgent(config: AgentConfig = {}): AgentInstance {
           maxIterations,
         });
 
+        // ==========================================================
+        // Phase 4: Model Router - Select Model
+        // ==========================================================
+        const routingDecision = modelRouter
+          ? modelRouter.route(toolsArray ? 'tool_selection' : 'conversation')
+          : null;
+        const effectiveModel = routingDecision?.model ?? agentConfig.model;
+
         // Emit LLM request event
         emitEvent({
           type: 'llm:request',
-          model: agentConfig.model,
+          model: effectiveModel,
           messageCount: messages.length,
           toolCount: toolsArray?.length ?? 0,
         });
 
         const llmStartTime = Date.now();
-        const response = await doChat(messages, {
-          model: agentConfig.model,
-          temperature: agentConfig.temperature,
-          maxTokens: agentConfig.maxTokens,
-          tools: toolsArray,
-        });
+
+        // ==========================================================
+        // Phase 3: Recovery Policy - Wrap LLM Call
+        // ==========================================================
+        let response;
+        try {
+          const llmCall = () => doChat(messages, {
+            model: effectiveModel,
+            temperature: agentConfig.temperature,
+            maxTokens: agentConfig.maxTokens,
+            tools: toolsArray,
+          });
+
+          response = llmRecovery
+            ? await llmRecovery.execute('llm_chat', llmCall)
+            : await llmCall();
+        } catch (error) {
+          const errorMessage = error instanceof Error ? error.message : String(error);
+
+          // Record error metrics
+          metricsAggregator?.recordLatency('llm_chat', Date.now() - llmStartTime);
+          metricsAggregator?.recordError('llm_chat', 'llm_error', errorMessage);
+
+          // State machine error transition
+          stateMachine?.transition({
+            type: 'ERROR',
+            error: error instanceof Error ? error : new Error(errorMessage),
+          });
+
+          throw error;
+        }
+
+        const llmDurationMs = Date.now() - llmStartTime;
+
+        // ==========================================================
+        // Record LLM Metrics
+        // ==========================================================
+        metricsAggregator?.recordLatency('llm_chat', llmDurationMs);
+        if (response.usage) {
+          metricsAggregator?.recordTokens(
+            effectiveModel,
+            response.usage.promptTokens ?? 0,
+            response.usage.completionTokens ?? 0
+          );
+          // Record cost if model router is available
+          if (modelRouter && routingDecision) {
+            modelRouter.recordUsage(
+              routingDecision.tier,
+              {
+                input: response.usage.promptTokens ?? 0,
+                output: response.usage.completionTokens ?? 0,
+              }
+            );
+          }
+        }
 
         // Emit LLM response event
         emitEvent({
           type: 'llm:response',
-          model: agentConfig.model,
+          model: effectiveModel,
           hasToolCalls: !!(response.toolCalls && response.toolCalls.length > 0),
           toolCallCount: response.toolCalls?.length ?? 0,
           contentLength: response.content?.length ?? 0,
           usage: response.usage,
-          durationMs: Date.now() - llmStartTime,
+          durationMs: llmDurationMs,
         });
 
         // If no tool calls, we're done
         if (!response.toolCalls || response.toolCalls.length === 0) {
-          const content = response.content ?? '';
+          let content = response.content ?? '';
+
+          // ==========================================================
+          // Phase 2: Guardrail Output Check
+          // ==========================================================
+          if (guardrail) {
+            const outputResults = await guardrail.checkOutput(content);
+            if (guardrail.shouldBlock(outputResults)) {
+              const violation = outputResults.find(r => !r.passed);
+              // Filter/modify output instead of blocking entirely
+              content = `[Content filtered: ${violation?.message ?? 'Policy violation'}]`;
+              metricsAggregator?.recordError('chat', 'guardrail_output_filtered', violation?.message);
+            }
+          }
+
           conversationHistory.push(assistantMessage(content));
 
           // Record assistant message to memory
@@ -1394,6 +1817,19 @@ export function createAgent(config: AgentConfig = {}): AgentInstance {
               })
             );
           }
+
+          // ==========================================================
+          // State Machine - COMPLETE
+          // ==========================================================
+          stateMachine?.transition({
+            type: 'COMPLETE',
+            result: content,
+          });
+
+          // ==========================================================
+          // Record Final Metrics
+          // ==========================================================
+          metricsAggregator?.recordLatency('chat', Date.now() - chatStartTime);
 
           return {
             content,
@@ -1429,6 +1865,19 @@ export function createAgent(config: AgentConfig = {}): AgentInstance {
           try {
             const args = JSON.parse(toolCall.function.arguments);
 
+            // ==========================================================
+            // Guardrail Tool Call Check
+            // ==========================================================
+            if (guardrail) {
+              const toolCheckResults = await guardrail.checkToolCall(toolCall.function.name, args);
+              if (guardrail.shouldBlock(toolCheckResults)) {
+                const violation = toolCheckResults.find(r => !r.passed);
+                const blockResult = `Tool call blocked by guardrail: ${violation?.message ?? 'Policy violation'}`;
+                metricsAggregator?.recordToolCall(toolCall.function.name, Date.now() - toolStartTime, false, blockResult);
+                return { toolCall, result: blockResult, args, error: true };
+              }
+            }
+
             // Emit tool start event
             emitEvent({
               type: 'tool:start',
@@ -1447,20 +1896,30 @@ export function createAgent(config: AgentConfig = {}): AgentInstance {
               toolCallEventId = event.id;
             }
 
-            // Execute with permission check and timeout
-            const executePromise = executeToolWithPermission(
-              tool,
-              args,
-              toolCall.function.name
-            );
+            // ==========================================================
+            // Execute with Recovery Policy, Permission Check, and Timeout
+            // ==========================================================
+            const toolExecutor = async () => {
+              const executePromise = executeToolWithPermission(
+                tool,
+                args,
+                toolCall.function.name
+              );
 
-            const { result } = toolExecConfig.toolTimeout > 0
-              ? await withTimeout(
-                  executePromise,
-                  toolExecConfig.toolTimeout,
-                  `Tool "${toolCall.function.name}" timed out after ${toolExecConfig.toolTimeout}ms`
-                )
-              : await executePromise;
+              return toolExecConfig.toolTimeout > 0
+                ? await withTimeout(
+                    executePromise,
+                    toolExecConfig.toolTimeout,
+                    `Tool "${toolCall.function.name}" timed out after ${toolExecConfig.toolTimeout}ms`
+                  )
+                : await executePromise;
+            };
+
+            const { result } = toolRecovery
+              ? await toolRecovery.execute(`tool_${toolCall.function.name}`, toolExecutor)
+              : await toolExecutor();
+
+            const toolDurationMs = Date.now() - toolStartTime;
 
             // Record tool result to memory
             if (memoryManager) {
@@ -1470,19 +1929,28 @@ export function createAgent(config: AgentConfig = {}): AgentInstance {
               );
             }
 
+            // ==========================================================
+            // Record Tool Metrics
+            // ==========================================================
+            metricsAggregator?.recordToolCall(toolCall.function.name, toolDurationMs, true);
+
             // Emit tool end event
             emitEvent({
               type: 'tool:end',
               toolName: toolCall.function.name,
               result,
               toolCallId: toolCall.id,
-              durationMs: Date.now() - toolStartTime,
+              durationMs: toolDurationMs,
             });
 
             return { toolCall, result, args, error: false };
           } catch (error) {
             const errorMessage = error instanceof Error ? error.message : String(error);
             const errorResult = `Error executing tool: ${errorMessage}`;
+            const toolDurationMs = Date.now() - toolStartTime;
+
+            // Record tool error metrics
+            metricsAggregator?.recordToolCall(toolCall.function.name, toolDurationMs, false, errorMessage);
 
             // Emit tool error event
             emitEvent({
@@ -1536,6 +2004,30 @@ export function createAgent(config: AgentConfig = {}): AgentInstance {
       callbacks: StreamCallbacks = {},
       options: ConversationOptions = {}
     ): Promise<AgentResponse> {
+      const streamStartTime = Date.now();
+
+      // ==========================================================
+      // Guardrail Input Check (same as chat)
+      // ==========================================================
+      if (guardrail) {
+        const inputResults = await guardrail.checkInput(input);
+        if (guardrail.shouldBlock(inputResults)) {
+          const violation = inputResults.find(r => !r.passed);
+          const errorMsg = `Input blocked by guardrail: ${violation?.message ?? 'Policy violation'}`;
+          metricsAggregator?.recordLatency('stream', Date.now() - streamStartTime);
+          metricsAggregator?.recordError('stream', 'guardrail_blocked', errorMsg);
+          throw new Error(errorMsg);
+        }
+      }
+
+      // ==========================================================
+      // State Machine Transition - START
+      // ==========================================================
+      stateMachine?.transition({
+        type: 'START',
+        input,
+      });
+
       // Auto-initialize MCP if configured with autoConnect
       if (mcpConfig?.autoConnect && !mcpManager) {
         await instance.initializeMCP();
@@ -1670,20 +2162,47 @@ export function createAgent(config: AgentConfig = {}): AgentInstance {
 
           // If no tool calls, we're done
           if (!finalResult.toolCalls || finalResult.toolCalls.length === 0) {
-            conversationHistory.push(assistantMessage(fullContent));
+            let outputContent = fullContent;
+
+            // ==========================================================
+            // Guardrail Output Check (same as chat)
+            // ==========================================================
+            if (guardrail) {
+              const outputResults = await guardrail.checkOutput(outputContent);
+              if (guardrail.shouldBlock(outputResults)) {
+                const violation = outputResults.find(r => !r.passed);
+                outputContent = `[Content filtered: ${violation?.message ?? 'Policy violation'}]`;
+                metricsAggregator?.recordError('stream', 'guardrail_output_filtered', violation?.message);
+              }
+            }
+
+            conversationHistory.push(assistantMessage(outputContent));
 
             // Record assistant message to memory
             if (memoryManager) {
               const observer = memoryManager.getObserver();
               await memoryManager.recordEvent(
-                observer.createAssistantMessageEvent(fullContent, {
+                observer.createAssistantMessageEvent(outputContent, {
                   hasToolCalls: toolCallResults.length > 0,
                 })
               );
             }
 
+            // ==========================================================
+            // State Machine - COMPLETE
+            // ==========================================================
+            stateMachine?.transition({
+              type: 'COMPLETE',
+              result: outputContent,
+            });
+
+            // ==========================================================
+            // Record Final Metrics
+            // ==========================================================
+            metricsAggregator?.recordLatency('stream', Date.now() - streamStartTime);
+
             const response: AgentResponse = {
-              content: fullContent,
+              content: outputContent,
               toolCalls: toolCallResults.length > 0 ? toolCallResults : undefined,
             };
 
@@ -1721,27 +2240,52 @@ export function createAgent(config: AgentConfig = {}): AgentInstance {
               toolCallEventId = event.id;
             }
 
+            const toolStartTime = Date.now();
+
             if (!tool) {
               const errorResult = `Error: Unknown tool "${toolCall.function.name}"`;
               onToolResult?.(toolCall.function.name, errorResult);
+              metricsAggregator?.recordToolCall(toolCall.function.name, Date.now() - toolStartTime, false, errorResult);
               return { toolCall, result: errorResult, args, error: true };
             }
 
-            try {
-              // Execute with permission check and timeout
-              const executePromise = executeToolWithPermission(
-                tool,
-                args,
-                toolCall.function.name
-              );
+            // ==========================================================
+            // Guardrail Tool Call Check
+            // ==========================================================
+            if (guardrail) {
+              const toolCheckResults = await guardrail.checkToolCall(toolCall.function.name, args);
+              if (guardrail.shouldBlock(toolCheckResults)) {
+                const violation = toolCheckResults.find(r => !r.passed);
+                const blockResult = `Tool call blocked by guardrail: ${violation?.message ?? 'Policy violation'}`;
+                onToolResult?.(toolCall.function.name, blockResult);
+                metricsAggregator?.recordToolCall(toolCall.function.name, Date.now() - toolStartTime, false, blockResult);
+                return { toolCall, result: blockResult, args, error: true };
+              }
+            }
 
-              const { result } = toolExecConfig.toolTimeout > 0
-                ? await withTimeout(
-                    executePromise,
-                    toolExecConfig.toolTimeout,
-                    `Tool "${toolCall.function.name}" timed out after ${toolExecConfig.toolTimeout}ms`
-                  )
-                : await executePromise;
+            try {
+              // Execute with recovery policy, permission check and timeout
+              const toolExecutor = async () => {
+                const executePromise = executeToolWithPermission(
+                  tool,
+                  args,
+                  toolCall.function.name
+                );
+
+                return toolExecConfig.toolTimeout > 0
+                  ? await withTimeout(
+                      executePromise,
+                      toolExecConfig.toolTimeout,
+                      `Tool "${toolCall.function.name}" timed out after ${toolExecConfig.toolTimeout}ms`
+                    )
+                  : await executePromise;
+              };
+
+              const { result } = toolRecovery
+                ? await toolRecovery.execute(`tool_${toolCall.function.name}`, toolExecutor)
+                : await toolExecutor();
+
+              const toolDurationMs = Date.now() - toolStartTime;
 
               // Record tool result to memory
               if (memoryManager) {
@@ -1751,11 +2295,19 @@ export function createAgent(config: AgentConfig = {}): AgentInstance {
                 );
               }
 
+              // Record tool metrics
+              metricsAggregator?.recordToolCall(toolCall.function.name, toolDurationMs, true);
+
               onToolResult?.(toolCall.function.name, result);
               return { toolCall, result, args, error: false };
             } catch (error) {
               const errorMessage = error instanceof Error ? error.message : String(error);
               const errorResult = `Error executing tool: ${errorMessage}`;
+              const toolDurationMs = Date.now() - toolStartTime;
+
+              // Record tool error metrics
+              metricsAggregator?.recordToolCall(toolCall.function.name, toolDurationMs, false, errorMessage);
+
               onToolResult?.(toolCall.function.name, errorResult);
               return { toolCall, result: errorResult, args, error: true };
             }
@@ -1787,6 +2339,19 @@ export function createAgent(config: AgentConfig = {}): AgentInstance {
         // Note: Loop exits via return statements or throw inside
       } catch (error) {
         const err = error instanceof Error ? error : new Error(String(error));
+
+        // ==========================================================
+        // State Machine - ERROR
+        // ==========================================================
+        stateMachine?.transition({
+          type: 'ERROR',
+          error: err,
+        });
+
+        // Record error metrics
+        metricsAggregator?.recordLatency('stream', Date.now() - streamStartTime);
+        metricsAggregator?.recordError('stream', 'stream_error', err.message);
+
         onError?.(err);
         throw err;
       }
@@ -1823,6 +2388,38 @@ export function createAgent(config: AgentConfig = {}): AgentInstance {
   // Register AskUser tool if callback is provided
   if (config.onAskUser) {
     instance.registerTool(createAskUserTool(config.onAskUser));
+  }
+
+  // ==========================================================================
+  // Deferred Initialization: Evaluator and Planner (need chat function)
+  // ==========================================================================
+
+  // Initialize Evaluator (uses instance.complete for LLM evaluation)
+  if (evaluatorConfig?.enabled) {
+    evaluator = createEvaluator(
+      {
+        passThreshold: evaluatorConfig.passThreshold ?? 0.7,
+        useLLMEval: evaluatorConfig.useLLMEval ?? false,
+        evalModel: evaluatorConfig.evalModel,
+        maxRetries: evaluatorConfig.maxRetries ?? 1,
+        enableSelfCheck: evaluatorConfig.enableSelfCheck ?? false,
+      },
+      // LLM function for evaluation
+      async (prompt: string) => instance.complete(prompt)
+    );
+  }
+
+  // Initialize Planner (uses instance.complete for plan generation)
+  if (plannerConfig?.enabled) {
+    planner = createPlanner(
+      {
+        mode: plannerConfig.mode ?? 'react',
+        maxSteps: plannerConfig.maxSteps ?? 10,
+        allowDynamicReplanning: plannerConfig.allowDynamicReplanning ?? true,
+      },
+      // LLM function for planning
+      async (prompt: string) => instance.complete(prompt)
+    );
   }
 
   return instance;

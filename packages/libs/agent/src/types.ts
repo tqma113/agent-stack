@@ -159,6 +159,16 @@ export interface AgentConfig {
   stateMachine?: AgentStateMachineConfig;
   /** Recovery policy configuration for error handling */
   recovery?: AgentRecoveryConfig;
+  /** Planner configuration for task decomposition */
+  planner?: AgentPlannerConfig;
+  /** Evaluator configuration for output quality assessment */
+  evaluator?: AgentEvaluatorConfig;
+  /** Model router configuration for intelligent model selection */
+  router?: AgentRouterConfig;
+  /** Metrics configuration for observability */
+  metrics?: AgentMetricsConfig;
+  /** Guardrail configuration for safety checks */
+  guardrail?: AgentGuardrailConfig;
 
   /**
    * Callback for user interaction (enables AskUser tool)
@@ -948,4 +958,183 @@ export interface AgentRecoveryConfig {
 
   /** Recovery callback */
   onRecovered?: (error: Error, operation: string, attempts: number) => void;
+}
+
+// =============================================================================
+// Planner Configuration
+// =============================================================================
+
+/**
+ * Planner configuration for task decomposition
+ */
+export interface AgentPlannerConfig {
+  /** Enable planner (default: false) */
+  enabled?: boolean;
+
+  /** Planning mode */
+  mode?: 'react' | 'plan-execute' | 'hybrid';
+
+  /** Maximum steps in a plan */
+  maxSteps?: number;
+
+  /** Allow dynamic replanning on failures */
+  allowDynamicReplanning?: boolean;
+
+  /** Model to use for planning (defaults to agent's model) */
+  model?: string;
+
+  /** Show plan before execution */
+  showPlanBeforeExecution?: boolean;
+
+  /** Require user approval before executing plan */
+  requireApproval?: boolean;
+}
+
+// =============================================================================
+// Evaluator Configuration
+// =============================================================================
+
+/**
+ * Evaluator configuration for output quality assessment
+ */
+export interface AgentEvaluatorConfig {
+  /** Enable evaluator (default: false) */
+  enabled?: boolean;
+
+  /** Pass threshold (0-1, default: 0.7) */
+  passThreshold?: number;
+
+  /** Maximum retries on failed evaluation */
+  maxRetries?: number;
+
+  /** Use LLM for evaluation (default: true) */
+  useLLMEval?: boolean;
+
+  /** Model to use for evaluation (can be cheaper model) */
+  evalModel?: string;
+
+  /** Enable self-check for consistency */
+  enableSelfCheck?: boolean;
+}
+
+// =============================================================================
+// Model Router Configuration
+// =============================================================================
+
+/**
+ * Model tier configuration for routing
+ */
+export interface AgentModelTier {
+  /** Model identifier */
+  model: string;
+  /** Cost per 1K input tokens (USD) */
+  inputCostPer1K: number;
+  /** Cost per 1K output tokens (USD) */
+  outputCostPer1K: number;
+  /** Maximum context length */
+  maxContext: number;
+}
+
+/**
+ * Model router configuration for intelligent model selection
+ */
+export interface AgentRouterConfig {
+  /** Enable model router (default: false) */
+  enabled?: boolean;
+
+  /** Fast tier model */
+  fast?: AgentModelTier;
+
+  /** Standard tier model */
+  standard?: AgentModelTier;
+
+  /** Strong tier model */
+  strong?: AgentModelTier;
+
+  /** Enable cost optimization */
+  costOptimization?: boolean;
+
+  /** Daily cost limit (USD) */
+  dailyCostLimit?: number;
+
+  /** Callback when cost limit is approached */
+  onCostWarning?: (totalCost: number, limit: number) => void;
+
+  /** Callback when cost limit is reached */
+  onCostLimitReached?: (totalCost: number) => void;
+}
+
+// =============================================================================
+// Metrics Configuration
+// =============================================================================
+
+/**
+ * Metrics configuration for observability
+ */
+export interface AgentMetricsConfig {
+  /** Enable metrics collection (default: false) */
+  enabled?: boolean;
+
+  /** Retention period for metrics (ms) */
+  retentionPeriodMs?: number;
+
+  /** Export callback */
+  onExport?: (metrics: unknown) => void;
+
+  /** Auto-export interval (ms) */
+  autoExportIntervalMs?: number;
+
+  /** Alert conditions */
+  alerts?: Array<{
+    name: string;
+    metric: 'error_rate' | 'latency_p95' | 'cost_total';
+    operator: 'gt' | 'lt' | 'gte' | 'lte';
+    threshold: number;
+    severity: 'info' | 'warning' | 'critical';
+  }>;
+
+  /** Alert callback */
+  onAlert?: (alert: unknown) => void;
+}
+
+// =============================================================================
+// Guardrail Configuration
+// =============================================================================
+
+/**
+ * Guardrail configuration for safety checks
+ */
+export interface AgentGuardrailConfig {
+  /** Enable guardrail (default: false) */
+  enabled?: boolean;
+
+  /** Enable built-in rules (PII, secrets, etc.) */
+  enableBuiltInRules?: boolean;
+
+  /** Block on violation (default: true for 'block' severity) */
+  blockOnViolation?: boolean;
+
+  /** Callback on violation */
+  onViolation?: (ruleId: string, message: string, content: string) => void;
+
+  /** Custom PII detection options */
+  piiOptions?: {
+    detectEmail?: boolean;
+    detectPhone?: boolean;
+    detectSSN?: boolean;
+    detectCreditCard?: boolean;
+  };
+
+  /** Custom secrets detection options */
+  secretsOptions?: {
+    detectApiKeys?: boolean;
+    detectPasswords?: boolean;
+    detectTokens?: boolean;
+  };
+
+  /** Length limits */
+  lengthLimits?: {
+    maxInputLength?: number;
+    maxOutputLength?: number;
+  };
 }

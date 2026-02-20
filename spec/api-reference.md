@@ -1,5 +1,26 @@
 # API 参考
 
+本文档提供 AI Stack 所有公共 API 的详细参考。
+
+---
+
+## 目录
+
+| 包 | 描述 |
+|---|------|
+| [1. @ai-stack/provider](#1-ai-stackprovider) | 多模型 LLM 抽象层 |
+| [2. @ai-stack/mcp](#2-ai-stackmcp) | MCP 协议支持 |
+| [3. @ai-stack/skill](#3-ai-stackskill) | 技能系统 |
+| [4. @ai-stack/memory-store-sqlite](#4-ai-stackmemory-store-sqlite) | SQLite 存储层 |
+| [5. @ai-stack/memory](#5-ai-stackmemory) | 记忆策略层 |
+| [6. @ai-stack/knowledge](#6-ai-stackknowledge) | 知识索引 |
+| [7. @ai-stack/tui](#7-ai-stacktui) | 终端 UI 组件 |
+| [8. @ai-stack/agent](#8-ai-stackagent) | Agent 核心 |
+| [9. @ai-stack/assistant](#9-ai-stackassistant) | 个人助手 |
+| [10. @ai-stack/code](#10-ai-stackcode) | 代码 Agent |
+
+---
+
 ## 1. @ai-stack/provider
 
 ### 1.1 createProvider() 统一工厂函数 (推荐)
@@ -543,6 +564,122 @@ const agent = createAgent(config?: AgentConfig): AgentInstance
 | `skills` | `Record<string, SkillEntry>` | 内联 Skill 配置 |
 | `toolOptions` | `SkillToolBridgeOptions` | 工具桥接选项 |
 | `autoLoad` | `boolean` | 是否自动加载 |
+
+**AgentStateMachineConfig** (架构模块):
+
+| 参数 | 类型 | 默认值 | 描述 |
+|------|------|--------|------|
+| `enabled` | `boolean` | `false` | 是否启用状态机 |
+| `checkpointPath` | `string` | - | 检查点存储路径 |
+| `autoCheckpoint` | `boolean` | `false` | 是否自动检查点 |
+| `checkpointInterval` | `number` | `5` | 检查点间隔 (步数) |
+| `onStateChange` | `(state, transition) => void` | - | 状态变化回调 |
+
+**AgentRecoveryConfig** (架构模块):
+
+| 参数 | 类型 | 默认值 | 描述 |
+|------|------|--------|------|
+| `enabled` | `boolean` | `false` | 是否启用恢复策略 |
+| `maxRetries` | `number` | `3` | 最大重试次数 |
+| `backoffStrategy` | `'none' \| 'fixed' \| 'linear' \| 'exponential' \| 'fibonacci'` | `'exponential'` | 退避策略 |
+| `initialDelayMs` | `number` | `1000` | 初始延迟 |
+| `maxDelayMs` | `number` | `30000` | 最大延迟 |
+| `circuitBreaker` | `{ failureThreshold, resetTimeoutMs }` | - | 熔断器配置 |
+| `onError` | `(error, operation, attempt) => void` | - | 错误回调 |
+| `onRecovered` | `(error, operation, attempt) => void` | - | 恢复回调 |
+
+**AgentGuardrailConfig** (架构模块):
+
+| 参数 | 类型 | 默认值 | 描述 |
+|------|------|--------|------|
+| `enabled` | `boolean` | `false` | 是否启用 Guardrail |
+| `enableBuiltInRules` | `boolean` | `true` | 启用内置规则 |
+| `blockOnViolation` | `boolean` | `true` | 违规时阻止 |
+| `onViolation` | `(ruleId, message, content) => void` | - | 违规回调 |
+
+**AgentRouterConfig** (架构模块):
+
+| 参数 | 类型 | 默认值 | 描述 |
+|------|------|--------|------|
+| `enabled` | `boolean` | `false` | 是否启用模型路由 |
+| `fast` | `AgentModelTier` | - | 快速模型配置 |
+| `standard` | `AgentModelTier` | - | 标准模型配置 |
+| `strong` | `AgentModelTier` | - | 强力模型配置 |
+| `costOptimization` | `boolean` | `false` | 成本优化 |
+| `dailyCostLimit` | `number` | - | 每日成本限制 |
+| `onCostWarning` | `(totalCost, limit) => void` | - | 成本警告回调 |
+| `onCostLimitReached` | `(totalCost) => void` | - | 成本限制达到回调 |
+
+**AgentMetricsConfig** (架构模块):
+
+| 参数 | 类型 | 默认值 | 描述 |
+|------|------|--------|------|
+| `enabled` | `boolean` | `false` | 是否启用指标收集 |
+| `retentionPeriodMs` | `number` | `3600000` | 保留时间 |
+| `onExport` | `(metrics) => void` | - | 导出回调 |
+| `autoExportIntervalMs` | `number` | - | 自动导出间隔 |
+| `alerts` | `AlertCondition[]` | - | 告警条件 |
+| `onAlert` | `(alert) => void` | - | 告警回调 |
+
+**AgentEvaluatorConfig** (架构模块):
+
+| 参数 | 类型 | 默认值 | 描述 |
+|------|------|--------|------|
+| `enabled` | `boolean` | `false` | 是否启用评估器 |
+| `passThreshold` | `number` | `0.7` | 通过阈值 |
+| `maxRetries` | `number` | `1` | 最大重试 |
+| `useLLMEval` | `boolean` | `false` | 使用 LLM 评估 |
+| `evalModel` | `string` | - | 评估模型 |
+| `enableSelfCheck` | `boolean` | `false` | 启用自检 |
+
+**AgentPlannerConfig** (架构模块):
+
+| 参数 | 类型 | 默认值 | 描述 |
+|------|------|--------|------|
+| `enabled` | `boolean` | `false` | 是否启用规划器 |
+| `mode` | `'react' \| 'plan-execute' \| 'hybrid'` | `'react'` | 规划模式 |
+| `maxSteps` | `number` | `10` | 最大步骤数 |
+| `allowDynamicReplanning` | `boolean` | `true` | 允许动态重规划 |
+| `model` | `string` | - | 规划模型 |
+
+---
+
+#### 架构模块方法 (AgentInstance)
+
+```typescript
+// State Machine (Orchestrator layer)
+getStateMachine(): StateMachineInstance | null
+getAgentState(): AgentState | null
+pauseExecution(): void
+resumeExecution(): void
+createCheckpoint(name?: string): Promise<string | null>
+restoreCheckpoint(checkpointId: string): Promise<boolean>
+
+// Recovery Policy
+getRecoveryPolicy(): RecoveryPolicyInstance | null
+
+// Metrics (Observability layer)
+getMetricsAggregator(): MetricsAggregatorInstance | null
+getMetrics(): AggregatedMetrics | null
+resetMetrics(): void
+
+// Guardrail (Safety layer)
+getGuardrail(): GuardrailInstance | null
+addGuardrailRule(rule: GuardrailRule): void
+removeGuardrailRule(ruleId: string): void
+
+// Model Router
+getModelRouter(): ModelRouterInstance | null
+getCostStats(): CostStats | null
+resetCostStats(): void
+
+// Evaluator
+getEvaluator(): EvaluatorInstance | null
+
+// Planner
+getPlanner(): PlannerInstance | null
+getCurrentPlan(): PlanDAGInstance | null
+```
 
 ---
 

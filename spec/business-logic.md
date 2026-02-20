@@ -1,393 +1,183 @@
 # 业务逻辑详解
 
-## 1. 核心业务模型
-
-AI Stack 的核心业务是提供一个可扩展的 AI Agent 开发框架，主要包含四层：
-
-```
-┌─────────────────────────────────────────────────────────┐
-│                   @ai-stack/agent                     │
-│  ┌───────────────────────────────────────────────────┐  │
-│  │                    Agent 类                        │  │
-│  │  - 对话管理                                        │  │
-│  │  - 工具注册与执行                                  │  │
-│  │  - 流式响应                                        │  │
-│  └───────────────────────────────────────────────────┘  │
-└─────────────────────────────────────────────────────────┘
-          │                     │                     │
-          ▼                     ▼                     ▼
-┌──────────────────┐   ┌──────────────────┐   ┌──────────────────┐
-│ @ai-stack/    │   │ @ai-stack/mcp │   │ @ai-stack/    │
-│    provider      │   │                  │   │    skill         │
-│  ┌────────────┐  │   │  ┌────────────┐  │   │  ┌────────────┐  │
-│  │ Multi-LLM │  │   │  │ MCPClient  │  │   │  │ Skill      │  │
-│  │ Provider  │  │   │  │ Manager    │  │   │  │ Manager    │  │
-│  └────────────┘  │   │  └────────────┘  │   │  └────────────┘  │
-└──────────────────┘   └──────────────────┘   └──────────────────┘
-          │                     │                     │
-          ▼                     ▼                     ▼
-   ┌────────────┐       ┌────────────┐       ┌────────────┐
-   │ LLM APIs   │       │ MCP Servers│       │ Local Skills│
-   │ (OpenAI,   │       └────────────┘       └────────────┘
-   │ Anthropic, │
-   │ Google...) │
-   └────────────┘
-```
+本文档描述 AI Stack 的核心业务流程、数据流和集成模式。
 
 ---
 
-## 2. @ai-stack/provider 业务逻辑
-
-### 2.1 createProvider() 统一工厂函数 (推荐)
-
-**职责**：提供多模型抽象层，统一 OpenAI、Anthropic、Google Gemini 和 OpenAI 兼容 API
+## 1. 核心业务模型
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│                    createProvider()                              │
-│  ┌─────────────────────────────────────────────────────────┐    │
-│  │                  ProviderInstance                        │    │
-│  │  - chat()       统一聊天接口                             │    │
-│  │  - chatStream() 统一流式接口                             │    │
-│  │  - embed()      统一嵌入接口                             │    │
-│  └─────────────────────────────────────────────────────────┘    │
+│                        @ai-stack/agent                           │
+│  ┌─────────────────────────────────────────────────────────────┐│
+│  │  对话管理 | 工具执行 | 流式响应 | 权限管控 | 高级编排       ││
+│  └─────────────────────────────────────────────────────────────┘│
 └─────────────────────────────────────────────────────────────────┘
                               │
-          ┌───────────────────┼───────────────────┐
-          ▼                   ▼                   ▼
-┌──────────────────┐ ┌──────────────────┐ ┌──────────────────┐
-│ OpenAI Adapter   │ │ Anthropic Adapter│ │ Google Adapter   │
-│ ┌──────────────┐ │ │ ┌──────────────┐ │ │ ┌──────────────┐ │
-│ │ 消息格式转换 │ │ │ │ 消息格式转换 │ │ │ │ 消息格式转换 │ │
-│ │ 工具格式转换 │ │ │ │ 工具格式转换 │ │ │ │ 工具格式转换 │ │
-│ │ 响应格式转换 │ │ │ │ 响应格式转换 │ │ │ │ 响应格式转换 │ │
-│ └──────────────┘ │ │ └──────────────┘ │ │ └──────────────┘ │
-└──────────────────┘ └──────────────────┘ └──────────────────┘
-          │                   │                   │
-          ▼                   ▼                   ▼
-   ┌────────────┐     ┌────────────┐     ┌────────────┐
-   │ OpenAI API │     │ Claude API │     │ Gemini API │
-   └────────────┘     └────────────┘     └────────────┘
-```
-
-**消息格式转换**：
-
-| 提供商 | 系统消息 | 角色命名 | 工具调用格式 |
-|--------|----------|----------|--------------|
-| OpenAI | 消息列表中 role='system' | user/assistant | tool_calls 数组 |
-| Anthropic | 独立 system 参数 | user/assistant | content 中 tool_use 块 |
-| Google | systemInstruction 参数 | user/model | functionCall 部分 |
-
-**工具格式转换**：
-
-```typescript
-// 统一格式 (OpenAI 兼容)
-interface UnifiedTool {
-  type: 'function';
-  function: {
-    name: string;
-    description: string;
-    parameters: JSONSchema;
-  };
-}
-
-// Anthropic 格式
-interface AnthropicTool {
-  name: string;
-  description: string;
-  input_schema: JSONSchema;
-}
-
-// Google 格式
-interface GoogleFunctionDeclaration {
-  name: string;
-  description: string;
-  parameters: JSONSchema;
-}
-```
-
-### 2.2 createOpenAIClient() 工厂函数 (传统 API)
-
-**职责**：封装 OpenAI API，提供类型安全的接口（向后兼容）
-
-```typescript
-// 创建实例
-const client = createOpenAIClient(config);
-
-// 返回 OpenAIClientInstance 接口
-interface OpenAIClientInstance {
-  // 核心方法
-  chat(messages, options)      // 同步聊天
-  chatStream(messages, options) // 流式聊天
-  embed(input, options)        // 文本嵌入
-  generateImage(prompt, options) // 图像生成
-  textToSpeech(input, options) // 文本转语音
-  speechToText(file, options)  // 语音转文本
-  moderate(input, options)     // 内容审核
-  listModels()                 // 列出模型
-}
-```
-
-### 2.3 消息构建辅助函数
-
-```typescript
-// 快速构建对话消息
-systemMessage(content)        // 系统消息
-userMessage(content)          // 用户消息
-userMessageWithImage(text, url) // 带图片的用户消息
-assistantMessage(content)     // 助手消息
-toolMessage(toolCallId, content) // 工具结果消息
-```
-
-### 2.4 工具定义辅助函数
-
-```typescript
-// 定义 Function Calling 工具
-defineTool(name, description, parameters)
-defineParameters(properties, required)
-```
-
-### 2.5 文本处理工具
-
-```typescript
-// Token 估算和文本分块
-estimateTokens(text)          // 估算 token 数
-truncateToTokens(text, max)   // 截断到指定 token
-chunkText(text, maxTokens)    // 按 token 分块
+        ┌─────────────────────┼─────────────────────┐
+        │                     │                     │
+        ▼                     ▼                     ▼
+┌───────────────┐   ┌───────────────┐   ┌───────────────┐
+│ @ai-stack/    │   │ @ai-stack/    │   │ @ai-stack/    │
+│ provider      │   │ mcp + skill   │   │ memory +      │
+│               │   │               │   │ knowledge     │
+│ LLM 调用      │   │ 工具系统      │   │ 持久化        │
+└───────────────┘   └───────────────┘   └───────────────┘
 ```
 
 ---
 
-## 3. @ai-stack/agent 业务逻辑
+## 2. Provider 业务逻辑
 
-### 3.1 createAgent() 工厂函数
-
-**职责**：提供完整的 AI Agent 功能
+### 2.1 统一多模型接口
 
 ```typescript
-// 创建实例
-const agent = createAgent(config);
+const provider = createProvider({
+  provider: 'openai',  // 或 'anthropic' | 'google' | 'openai-compatible'
+  apiKey: '...',
+});
 
-// 返回 AgentInstance 接口
-interface AgentInstance {
-  // 配置管理
-  configure(config)
-  getName()
-
-  // 工具管理
-  registerTool(tool)
-  registerTools(tools)
-  removeTool(name)
-  getTools()
-
-  // 对话管理
-  clearHistory()
-  getHistory()
-  addMessage(message)
-
-  // 核心对话方法
-  chat(input, options)         // 同步对话
-  stream(input, callbacks, options) // 流式对话
-  complete(prompt, systemPrompt) // 单轮补全
-}
+await provider.chat(messages, options);    // 同步聊天
+await provider.chatStream(messages, options); // 流式聊天
+await provider.embed(text);                // 文本嵌入
 ```
 
-### 3.2 对话流程
+### 2.2 消息格式自动转换
 
-#### 同步对话 (`chat` 方法)
+| 提供商 | 系统消息 | 工具调用格式 |
+|--------|----------|--------------|
+| OpenAI | `role='system'` | `tool_calls` 数组 |
+| Anthropic | 独立 `system` 参数 | `tool_use` 块 |
+| Google | `systemInstruction` | `functionCall` |
 
-```
-用户输入
-    │
-    ▼
-┌─────────────────────┐
-│ 1. 添加用户消息到历史 │
-└─────────────────────┘
-    │
-    ▼
-┌─────────────────────┐
-│ 2. 构建消息列表      │
-│   - 系统提示词       │
-│   - 对话历史        │
-└─────────────────────┘
-    │
-    ▼
-┌─────────────────────┐
-│ 3. 调用 OpenAI API  │
-└─────────────────────┘
-    │
-    ▼
-┌─────────────────────────┐
-│ 4. 检查是否有工具调用    │
-│   - 无: 返回响应        │
-│   - 有: 执行工具 → 循环  │
-└─────────────────────────┘
-    │
-    ▼
-返回 AgentResponse
+### 2.3 辅助函数
+
+```typescript
+// 消息构建
+systemMessage('...')
+userMessage('...')
+assistantMessage('...')
+toolMessage(toolCallId, '...')
+
+// 工具定义
+defineTool('name', 'description', parameters)
+defineParameters(properties, required)
+
+// Token 处理
+estimateTokens(text)
+truncateToTokens(text, max)
+chunkText(text, maxTokens)
 ```
 
-#### 流式对话 (`stream` 方法)
+---
+
+## 3. Agent 业务逻辑
+
+### 3.1 对话流程
 
 ```
 用户输入
     │
     ▼
-┌─────────────────────────┐
-│ 流式接收 tokens         │
-│ - onToken: 每个 token   │
-│ - onToolCall: 工具调用   │
-│ - onToolResult: 工具结果 │
-│ - onComplete: 完成      │
-│ - onError: 错误         │
-└─────────────────────────┘
+┌─────────────────────┐
+│ 1. 权限检查          │ ← Guardrail (输入验证)
+└─────────────────────┘
+    │
+    ▼
+┌─────────────────────┐
+│ 2. 上下文准备        │ ← Memory 检索 + Knowledge 搜索
+└─────────────────────┘
+    │
+    ▼
+┌─────────────────────┐
+│ 3. LLM 调用          │ ← 模型路由 + 流式/同步
+└─────────────────────┘
+    │
+    ▼
+┌─────────────────────┐
+│ 4. 工具执行 (循环)   │ ← 权限检查 + 并行执行
+└─────────────────────┘
+    │
+    ▼
+┌─────────────────────┐
+│ 5. 后处理            │ ← Memory 写入 + 输出验证
+└─────────────────────┘
+    │
+    ▼
+Agent 响应
 ```
 
-### 3.3 工具系统
+### 3.2 工具系统
 
-**Tool 接口** (增强版，基于 Anthropic "Poka-yoke" 原则)：
-
+**Tool 接口**：
 ```typescript
 interface Tool {
-  // 基础字段
-  name: string;           // 工具名称 (唯一，snake_case)
-  description: string;    // 工具描述
-  parameters: object;     // JSON Schema 参数
-  execute: (args) => Promise<string>; // 执行函数
+  name: string;
+  description: string;
+  parameters: object;           // JSON Schema
+  execute: (args) => Promise<string>;
 
-  // 增强文档字段 (可选，帮助 LLM 更好地使用工具)
-  examples?: ToolExample[];    // 使用示例
-  edgeCases?: string[];        // 边界情况
-  hints?: string[];            // 使用提示
-  returnFormat?: string;       // 返回格式说明
-  constraints?: string[];      // 约束条件
-  relatedTools?: string[];     // 相关工具
-  antiPatterns?: string[];     // 何时不使用
+  // 增强文档 (可选)
+  examples?: ToolExample[];     // 使用示例
+  hints?: string[];             // 使用提示
+  edgeCases?: string[];         // 边界情况
+  constraints?: string[];       // 约束条件
 }
-```
-
-**工具文档生成**：
-
-```
-┌─────────────────────────────────────────────────────────┐
-│               generateToolDescription()                  │
-│  ┌─────────────────────────────────────────────────┐    │
-│  │  基础描述                                        │    │
-│  │  + 返回格式说明                                  │    │
-│  │  + 使用示例 (input/output)                       │    │
-│  │  + 使用提示                                      │    │
-│  │  + 边界情况                                      │    │
-│  │  + 约束条件                                      │    │
-│  │  + 相关工具                                      │    │
-│  │  + 反模式 (何时不使用)                           │    │
-│  └─────────────────────────────────────────────────┘    │
-└─────────────────────────────────────────────────────────┘
-                           │
-                           ▼
-                  增强的工具描述 → LLM
 ```
 
 **工具执行流程**：
-
 ```
 LLM 返回 tool_calls
     │
-    ▼
-┌─────────────────────┐
-│ 1. 解析 tool_call   │
-│   - function.name   │
-│   - function.args   │
-└─────────────────────┘
+    ├─ 1. 权限检查 (auto/confirm/deny)
     │
-    ▼
-┌─────────────────────┐
-│ 2. 查找注册的工具    │
-└─────────────────────┘
+    ├─ 2. 工具查找 (本地/MCP/Skill)
     │
-    ▼
-┌─────────────────────┐
-│ 3. 执行 execute()   │
-└─────────────────────┘
+    ├─ 3. 并行执行 (超时控制)
     │
-    ▼
-┌─────────────────────┐
-│ 4. 将结果添加到消息  │
-│    继续对话循环      │
-└─────────────────────┘
+    └─ 4. 结果处理 → 继续对话
 ```
 
-### 3.4 并行工具执行
-
-Agent 支持并行执行多个工具调用，提高效率：
-
-**配置选项**：
+**并行执行配置**：
 ```typescript
-interface ToolExecutionConfig {
-  maxConcurrentTools?: number;  // 最大并发数 (默认: Infinity)
-  toolTimeout?: number;         // 单个工具超时 (默认: 30s)
-  parallelExecution?: boolean;  // 是否启用并行 (默认: true)
-}
-
 const agent = createAgent({
   toolExecution: {
+    parallelExecution: true,
     maxConcurrentTools: 5,
     toolTimeout: 30000,
-    parallelExecution: true,
   },
 });
 ```
 
-**执行流程**：
-```
-LLM 返回多个 tool_calls
-    │
-    ▼
-┌─────────────────────────────────┐
-│ 1. 检查并行执行是否启用          │
-│    - parallelExecution: true   │
-└─────────────────────────────────┘
-    │
-    ▼
-┌─────────────────────────────────┐
-│ 2. 创建带超时的执行任务          │
-│    - withTimeout(execute, ms)  │
-└─────────────────────────────────┘
-    │
-    ▼
-┌─────────────────────────────────┐
-│ 3. 执行带并发限制的 Promise.all │
-│    - executeWithConcurrencyLimit │
-└─────────────────────────────────┘
-    │
-    ▼
-┌─────────────────────────────────┐
-│ 4. 收集所有结果                  │
-│    - 失败的工具返回错误消息       │
-└─────────────────────────────────┘
+### 3.3 停止条件
+
+```typescript
+interface StopConditions {
+  maxIterations?: number;        // 迭代限制
+  maxToolCalls?: number;         // 工具调用限制
+  maxTotalTokens?: number;       // Token 限制
+  maxDurationMs?: number;        // 时间限制
+  maxCost?: number;              // 成本限制
+  stopPatterns?: string[];       // 停止模式
+  maxConsecutiveFailures?: number; // 连续失败限制
+  customCondition?: () => boolean; // 自定义条件
+}
 ```
 
-### 3.5 可观测性 (Telemetry)
+**软停止 vs 硬停止**：
+- **软停止** (可覆盖): 迭代限制、工具调用限制
+- **硬停止** (不可覆盖): Token 限制、时间限制、成本限制
 
-Agent 提供事件驱动的可观测性系统：
+### 3.4 可观测性
 
 **事件类型**：
-| 事件 | 触发时机 | 数据 |
-|------|----------|------|
-| `tool:start` | 工具执行开始 | toolName, args, toolCallId |
-| `tool:end` | 工具执行完成 | toolName, result, durationMs |
-| `tool:error` | 工具执行错误 | toolName, error, durationMs |
-| `llm:request` | LLM 请求发送 | model, messageCount, toolCount |
-| `llm:response` | LLM 响应接收 | hasToolCalls, usage, durationMs |
-| `iteration:start` | 迭代开始 | iteration, maxIterations |
-| `iteration:end` | 迭代结束 | iteration, toolCallCount, durationMs |
-| `thinking:start` | 思考开始 | - |
-| `thinking:update` | 思考更新 | thought, category |
-| `thinking:end` | 思考结束 | summary |
-| `plan:created` | 计划创建 | goal, steps, reasoning |
-| `plan:step:start` | 步骤开始 | stepId, description |
-| `plan:step:complete` | 步骤完成 | stepId, result |
-| `plan:step:failed` | 步骤失败 | stepId, error, willRetry |
-| `plan:updated` | 计划更新 | reason, addedSteps, removedStepIds |
+```typescript
+'tool:start' | 'tool:end' | 'tool:error'
+'llm:request' | 'llm:response'
+'iteration:start' | 'iteration:end'
+'thinking:start' | 'thinking:update' | 'thinking:end'
+'plan:created' | 'plan:step:start' | 'plan:step:complete'
+```
 
 **使用示例**：
 ```typescript
@@ -395,444 +185,47 @@ const agent = createAgent({
   telemetry: {
     enabled: true,
     onEvent: (event) => {
-      // 自定义事件处理
-      if (event.type === 'tool:end') {
-        console.log(`[TOOL] ${event.toolName}: ${event.durationMs}ms`);
-      }
+      console.log(`[${event.type}] ${event.durationMs}ms`);
     },
-    logLevel: 'info', // 'none' | 'error' | 'warn' | 'info' | 'debug'
-  },
-});
-
-// 动态设置事件监听器
-agent.setEventListener((event) => {
-  // 处理事件...
-});
-```
-
-### 3.6 停止条件 (Stop Conditions)
-
-基于 Anthropic "Building Effective Agents" 最佳实践，提供灵活的执行控制：
-
-**停止条件检查流程**：
-
-```
-每次迭代后
-    │
-    ▼
-┌─────────────────────────────────────────┐
-│         createStopChecker.check()        │
-│  ┌─────────────────────────────────────┐ │
-│  │ 1. 检查迭代限制 (maxIterations)      │ │
-│  │ 2. 检查工具调用限制 (maxToolCalls)   │ │
-│  │ 3. 检查 token 限制 (maxTotalTokens)  │ │
-│  │ 4. 检查时间限制 (maxDurationMs)      │ │
-│  │ 5. 检查成本限制 (maxCost)            │ │
-│  │ 6. 检查停止模式 (stopPatterns)       │ │
-│  │ 7. 检查连续失败 (maxConsecutiveFailures)│
-│  │ 8. 检查自定义条件 (customCondition)  │ │
-│  └─────────────────────────────────────┘ │
-└─────────────────────────────────────────┘
-    │
-    ├── shouldStop=false → 继续
-    │
-    └── shouldStop=true
-            │
-            ├── type='hard' → 强制停止
-            │
-            └── type='soft' → onStopCondition 回调
-                    │
-                    ├── return true  → 继续执行
-                    └── return false → 停止
-```
-
-**软停止 vs 硬停止**：
-| 类型 | 可覆盖 | 示例 |
-|------|--------|------|
-| soft | 是 | 迭代限制、工具调用限制、模式匹配 |
-| hard | 否 | token 限制、时间限制、成本限制 |
-
-### 3.7 透明度/规划 (Planning & Transparency)
-
-支持 Agent 执行计划的可视化和跟踪：
-
-**规划模式**：
-| 模式 | 说明 |
-|------|------|
-| `implicit` | 从 LLM 自然响应中提取计划 |
-| `explicit` | 通过系统提示词要求结构化计划 |
-| `tool` | 使用专用规划工具 |
-
-**计划解析流程**：
-
-```
-LLM 响应
-    │
-    ▼
-┌─────────────────────────────────────────┐
-│           parsePlan()                    │
-│  ┌─────────────────────────────────────┐ │
-│  │ 匹配 [PLAN]...[/PLAN] 块            │ │
-│  │ 提取 Goal                            │ │
-│  │ 提取 Steps (编号、描述、工具)        │ │
-│  └─────────────────────────────────────┘ │
-└─────────────────────────────────────────┘
-    │
-    ▼
-┌─────────────────────────────────────────┐
-│      detectStepCompletion()              │
-│  ┌─────────────────────────────────────┐ │
-│  │ 匹配 ✓/✅/[DONE] Step N             │ │
-│  │ 匹配 ✗/❌/[FAILED] Step N           │ │
-│  │ 匹配 [SKIPPED] Step N               │ │
-│  └─────────────────────────────────────┘ │
-└─────────────────────────────────────────┘
-    │
-    ▼
-更新 PlanStep 状态 → 触发 StreamCallbacks
-
-```
-
-**StreamCallbacks 透明度回调**：
-```typescript
-stream(input, {
-  onPlan: (plan) => {
-    // 显示执行计划
-    console.log(`Goal: ${plan.goal}`);
-    plan.steps.forEach(s => console.log(`- ${s.description}`));
-  },
-  onPlanStepStart: (step) => {
-    console.log(`▶ Starting: ${step.description}`);
-  },
-  onPlanStepComplete: (stepId, result) => {
-    console.log(`✓ ${stepId}: ${result}`);
   },
 });
 ```
 
-### 3.8 CLI 应用
-
-**命令结构**：
-
-```bash
-# 交互式聊天
-ai-stack chat [--config PATH] [--model NAME] [--mcp PATH] [--skill DIR]
-
-# 单次执行任务
-ai-stack run "<task>" [--config PATH] [--model NAME] [--yes] [--json]
-
-# 工具管理
-ai-stack tools list [--config PATH]
-ai-stack tools info <name> [--config PATH]
-
-# 配置管理
-ai-stack config init [--force]
-ai-stack config show [--config PATH]
-```
-
-**交互式聊天流程**：
-
-```
-启动 ai-stack chat
-    │
-    ▼
-┌─────────────────────────┐
-│ 加载配置文件            │
-│ (agent.json)     │
-└─────────────────────────┘
-    │
-    ▼
-┌─────────────────────────┐
-│ 初始化 Agent            │
-│ - 连接 MCP 服务器       │
-│ - 加载 Skills           │
-└─────────────────────────┘
-    │
-    ▼
-┌─────────────────────────┐◄────┐
-│ 等待用户输入            │     │
-│ - /tools: 列出工具      │     │
-│ - /clear: 清除历史      │     │
-│ - /help: 显示帮助       │     │
-│ - exit: 退出            │     │
-└─────────────────────────┘     │
-    │                           │
-    ▼                           │
-┌─────────────────────────┐     │
-│ 流式输出响应            │     │
-│ - onToken → stdout      │     │
-│ - onToolCall → 日志     │     │
-│ - onToolResult → 日志   │     │
-└─────────────────────────┘     │
-    │                           │
-    └───────────────────────────┘
-```
-
-**配置文件格式** (`agent.json`):
-
-```json
-{
-  "model": "gpt-4o",
-  "temperature": 0.7,
-  "maxTokens": 4096,
-  "systemPrompt": "You are a helpful assistant...",
-  "skill": {
-    "directories": ["./skills"],
-    "autoLoad": true
-  },
-  "mcp": {
-    "configPath": ".mcp.json",
-    "autoConnect": true
-  }
-}
-```
-
 ---
 
-## 4. 配置项说明
+## 4. MCP 业务逻辑
 
-### 4.1 AgentConfig
-
-```typescript
-interface AgentConfig {
-  name?: string;          // Agent 名称，默认 'Agent'
-  systemPrompt?: string;  // 系统提示词
-  model?: string;         // 模型，默认 'gpt-4o'
-  temperature?: number;   // 温度，默认 0.7
-  maxTokens?: number;     // 最大 token，默认 4096
-  apiKey?: string;        // API Key
-  baseURL?: string;       // 自定义 API 地址
-}
-```
-
-### 4.2 OpenAIClientConfig
+### 4.1 连接管理
 
 ```typescript
-interface OpenAIClientConfig {
-  apiKey?: string;        // 默认读取 OPENAI_API_KEY
-  baseURL?: string;       // 自定义端点
-  organization?: string;  // 组织 ID
-  project?: string;       // 项目 ID
-  timeout?: number;       // 超时，默认 60000ms
-  maxRetries?: number;    // 重试次数，默认 2
-}
+const manager = createMCPClientManager();
+await manager.initialize('.mcp.json');
+await manager.connectAll();
+
+// 获取工具
+const tools = createMCPToolProvider(manager).getTools();
 ```
 
----
-
-## 5. 错误处理
-
-### 5.1 统一错误系统
-
-AI Stack 提供统一的错误处理基类和特定错误类型：
-
-**错误基类**：
-```typescript
-class AIStackError extends Error {
-  readonly code: ErrorCode;       // 错误码
-  readonly source: ErrorSource;   // 来源 ('agent' | 'provider' | 'mcp' | ...)
-  readonly recoverable: boolean;  // 是否可恢复
-  readonly cause?: Error;         // 原始错误
-  readonly context?: Record<string, unknown>;  // 上下文信息
-}
-```
-
-**错误类型**：
-| 错误类 | 错误码 | 可恢复 | 说明 |
-|--------|--------|--------|------|
-| `AgentInitError` | `AGENT_INIT_FAILED` | ✗ | Agent 初始化失败 |
-| `ProviderAuthError` | `PROVIDER_AUTH_FAILED` | ✗ | API Key 无效 |
-| `ProviderRateLimitError` | `PROVIDER_RATE_LIMITED` | ✓ | 超出速率限制 |
-| `ToolNotFoundError` | `TOOL_NOT_FOUND` | ✗ | 工具未找到 |
-| `ToolExecutionError` | `TOOL_EXECUTION_FAILED` | 取决于 | 工具执行失败 |
-| `ToolTimeoutError` | `TOOL_TIMEOUT` | ✓ | 工具执行超时 |
-| `ConfigValidationError` | `CONFIG_VALIDATION_FAILED` | ✗ | 配置校验失败 |
-| `MCPConnectionError` | `MCP_CONNECTION_FAILED` | ✓ | MCP 连接失败 |
-| `MemoryStoreError` | `MEMORY_STORE_ERROR` | ✓ | Memory 存储错误 |
-
-**Provider 特定错误**：
-```typescript
-// @ai-stack/provider 错误
-class ProviderError extends AIStackError { ... }
-class AuthenticationError extends ProviderError { ... }
-class RateLimitError extends ProviderError { ... }
-class InvalidRequestError extends ProviderError { ... }
-class ModelNotFoundError extends ProviderError { ... }
-class ContentFilterError extends ProviderError { ... }
-class APIConnectionError extends ProviderError { ... }
-class StreamError extends ProviderError { ... }
-```
-
-### 5.2 错误恢复
-
-可恢复错误支持自动重试：
-
-```typescript
-// 检查是否可恢复
-if (error instanceof AIStackError && error.recoverable) {
-  // 可以重试
-  await delay(1000);
-  return retry();
-}
-
-// 检查是否是特定错误
-if (error instanceof ProviderRateLimitError) {
-  // 等待重试
-  await delay(error.retryAfter ?? 5000);
-}
-```
-
-### 5.3 工具执行错误
-
-```typescript
-try {
-  const result = await tool.execute(args);
-} catch (error) {
-  // 错误被捕获并作为工具结果返回给 LLM
-  const errorResult = `Error executing tool: ${error.message}`;
-  messages.push(toolMessage(toolCall.id, errorResult));
-}
-```
-
-### 5.4 迭代限制
-
-```typescript
-// 防止无限循环
-if (iterations >= maxIterations) {
-  throw new Error(`Max iterations (${maxIterations}) reached`);
-}
-```
-
-### 5.5 请求取消
-
-```typescript
-// 支持 AbortSignal
-if (signal?.aborted) {
-  throw new Error('Request aborted');
-}
-```
-
----
-
-## 6. @ai-stack/mcp 业务逻辑
-
-### 6.1 createMCPClientManager() 工厂函数
-
-**职责**：管理多个 MCP 服务器连接
-
-```typescript
-const manager = createMCPClientManager(options);
-
-// 返回 MCPClientManagerInstance 接口
-interface MCPClientManagerInstance {
-  // 生命周期
-  initialize(config)     // 初始化配置
-  connectAll()           // 连接所有服务器
-  connect(serverName)    // 连接单个服务器
-  disconnect(serverName) // 断开连接
-  close()                // 关闭所有连接
-
-  // 工具操作
-  listTools(serverName)      // 列出服务器工具
-  listAllTools()             // 列出所有工具
-  callTool(server, name, args) // 调用工具
-
-  // 资源操作
-  listResources(serverName)  // 列出资源
-  readResource(server, uri)  // 读取资源
-
-  // 提示词操作
-  listPrompts(serverName)    // 列出提示词
-  getPrompt(server, name)    // 获取提示词
-}
-```
-
-### 6.2 createMCPToolProvider() 工厂函数
-
-**职责**：将 MCP 工具桥接为 Agent Tool 接口
-
-```typescript
-const provider = createMCPToolProvider(manager, options);
-
-// 返回 MCPToolProviderInstance 接口
-interface MCPToolProviderInstance {
-  getTools()                    // 获取所有桥接工具
-  getToolsFromServer(server)    // 获取特定服务器工具
-  refresh()                     // 刷新工具列表
-  findTool(name)                // 查找工具
-  getResourceAccessor()         // 获取资源访问器
-}
-```
-
-### 6.3 MCP 连接流程
+### 4.2 工具桥接
 
 ```
-配置加载 (.mcp.json)
-    │
-    ▼
-┌─────────────────────┐
-│ 解析服务器配置       │
-│ - stdio: command    │
-│ - http: url         │
-└─────────────────────┘
-    │
-    ▼
-┌─────────────────────┐
-│ 创建传输层          │
-│ - StdioTransport    │
-│ - HttpTransport     │
-└─────────────────────┘
-    │
-    ▼
-┌─────────────────────┐
-│ 连接 MCP 服务器      │
-│ - 初始化会话         │
-│ - 获取能力列表       │
-└─────────────────────┘
-    │
-    ▼
-┌─────────────────────┐
-│ 刷新工具/资源/提示词  │
-└─────────────────────┘
+MCP Tool                        Agent Tool
+┌─────────────────┐             ┌──────────────────────┐
+│ name: search    │     →       │ name: mcp__server__  │
+│ inputSchema: {} │             │       search         │
+└─────────────────┘             └──────────────────────┘
 ```
 
-### 6.4 工具桥接流程
-
-```
-MCP Tool
-    │
-    ├─ name: "search_docs"
-    ├─ description: "..."
-    └─ inputSchema: {...}
-    │
-    ▼
-┌─────────────────────────┐
-│ 工具名转换              │
-│ mcp__server__search_docs │
-└─────────────────────────┘
-    │
-    ▼
-Agent Tool
-    │
-    ├─ name: "mcp__server__search_docs"
-    ├─ description: "..."
-    ├─ parameters: {...}
-    └─ execute: async (args) => {
-         return manager.callTool(server, name, args);
-       }
-```
-
-### 6.5 MCP 配置格式
+### 4.3 配置格式
 
 ```json
 {
   "mcpServers": {
     "filesystem": {
       "command": "npx",
-      "args": ["-y", "@modelcontextprotocol/server-filesystem", "/path"],
-      "env": { "DEBUG": "true" }
+      "args": ["-y", "@modelcontextprotocol/server-filesystem", "/path"]
     },
-    "remote-api": {
+    "remote": {
       "type": "http",
       "url": "https://api.example.com/mcp"
     }
@@ -842,1230 +235,337 @@ Agent Tool
 
 ---
 
-## 7. 使用示例
+## 5. Skill 业务逻辑
 
-### 7.1 基础对话
-
-```typescript
-import { createAgent } from '@ai-stack/agent';
-
-const agent = createAgent({
-  model: 'gpt-4o',
-  systemPrompt: 'You are a helpful assistant.',
-});
-
-const response = await agent.chat('Hello!');
-console.log(response.content);
-```
-
-### 7.2 注册工具
-
-```typescript
-agent.registerTool({
-  name: 'get_weather',
-  description: 'Get the current weather for a location',
-  parameters: {
-    type: 'object',
-    properties: {
-      location: { type: 'string', description: 'City name' },
-    },
-    required: ['location'],
-  },
-  execute: async (args) => {
-    return `Weather in ${args.location}: Sunny, 25°C`;
-  },
-});
-
-const response = await agent.chat('What is the weather in Tokyo?');
-```
-
-### 7.3 流式响应
-
-```typescript
-await agent.stream('Tell me a story', {
-  onToken: (token) => process.stdout.write(token),
-  onComplete: (response) => console.log('\nDone!'),
-});
-```
-
-### 7.4 使用 MCP 工具 (内置集成)
-
-```typescript
-import { createAgent } from '@ai-stack/agent';
-
-// 方式 1: 使用配置文件，手动初始化
-const agent = createAgent({
-  name: 'MCP Agent',
-  mcp: { configPath: './.mcp.json' }
-});
-await agent.initializeMCP();
-
-// 方式 2: 使用配置文件，自动连接
-const agent2 = createAgent({
-  mcp: { configPath: './.mcp.json', autoConnect: true }
-});
-// 首次调用 chat() 时自动初始化 MCP
-
-// 方式 3: 内联配置
-const agent3 = createAgent({
-  mcp: {
-    servers: {
-      'openai-docs': {
-        type: 'http',
-        url: 'https://developers.openai.com/mcp'
-      }
-    },
-    autoConnect: true
-  }
-});
-
-// 使用 Agent
-const response = await agent.chat('搜索 OpenAI 文档');
-console.log(response.content);
-
-// 清理
-await agent.closeMCP();
-```
-
-### 7.5 使用 MCP 工具 (手动集成)
-
-如果需要更精细的控制，可以手动集成：
-
-```typescript
-import { createAgent, createMCPClientManager, createMCPToolProvider } from '@ai-stack/agent';
-
-const mcpManager = createMCPClientManager();
-await mcpManager.initialize('./.mcp.json');
-await mcpManager.connectAll();
-
-const toolProvider = createMCPToolProvider(mcpManager, {
-  nameTransformer: (server, tool) => `mcp__${server}__${tool}`,
-});
-
-const agent = createAgent({ name: 'MCP Agent' });
-agent.registerTools(toolProvider.getTools());
-
-const response = await agent.chat('搜索 OpenAI 文档');
-await mcpManager.close();
-```
-
----
-
-## 8. @ai-stack/skill 业务逻辑
-
-### 8.1 createSkillManager() 工厂函数
-
-**职责**：管理 Skill 生命周期和状态
-
-```typescript
-const manager = createSkillManager(options);
-
-// 返回 SkillManagerInstance 接口
-interface SkillManagerInstance {
-  // 初始化
-  initialize(config)     // 初始化配置
-
-  // 生命周期
-  loadAll()              // 加载所有 skill
-  load(skillName)        // 加载单个 skill
-  unload(skillName)      // 卸载 skill
-  activate(skillName)    // 激活 skill
-  deactivate(skillName)  // 停用 skill
-  close()                // 关闭所有 skill
-
-  // 目录发现
-  discoverAndLoad(directory) // 发现并加载目录中的 skills
-
-  // 工具访问
-  getTools()             // 获取所有工具
-  getToolsFromSkill(name) // 获取特定 skill 的工具
-
-  // 状态查询
-  getSkillNames()        // 获取 skill 名称列表
-  getSkill(name)         // 获取 skill 信息
-  getState(name)         // 获取 skill 状态
-  isLoaded(name)         // 检查是否已加载
-  isActive(name)         // 检查是否激活
-}
-```
-
-### 8.2 createSkillToolProvider() 工厂函数
-
-**职责**：将 Skill 工具桥接为 Agent Tool 接口
-
-```typescript
-const provider = createSkillToolProvider(manager, options);
-
-// 返回 SkillToolProviderInstance 接口
-interface SkillToolProviderInstance {
-  getTools()                    // 获取所有桥接工具
-  getToolsFromSkill(skillName)  // 获取特定 skill 工具
-  refresh()                     // 刷新工具列表
-  findTool(name)                // 查找工具
-}
-```
-
-### 8.3 Skill 加载流程
+### 5.1 加载流程
 
 ```
-配置加载 (skills.json 或目录发现)
+skill.json
     │
-    ▼
-┌─────────────────────┐
-│ 解析 skill 配置      │
-│ - path: 本地路径    │
-│ - package: npm 包   │
-└─────────────────────┘
+    ├─ 1. 解析配置
     │
-    ▼
-┌─────────────────────┐
-│ 加载 skill.json     │
-│ - name             │
-│ - tools[]          │
-│ - hooks            │
-└─────────────────────┘
+    ├─ 2. 动态 import 处理函数
     │
-    ▼
-┌─────────────────────┐
-│ 解析工具处理函数     │
-│ - ./handler.js#fn  │
-│ - 动态 import      │
-└─────────────────────┘
+    ├─ 3. 执行 onLoad 钩子
     │
-    ▼
-┌─────────────────────┐
-│ 执行 onLoad 钩子    │
-└─────────────────────┘
-    │
-    ▼
-┌─────────────────────┐
-│ 状态: loaded        │
-└─────────────────────┘
+    └─ 4. 状态: loaded → active
 ```
 
-### 8.4 Skill 状态机
+### 5.2 状态机
 
 ```
-unloaded ──────► loading ──────► loaded ◄─────► active
-    ▲               │              │               │
-    │               ▼              │               │
-    │            error             │               │
-    │               │              │               │
-    └───────────────┴──────────────┴───────────────┘
-                 (unload)
+unloaded → loading → loaded ↔ active
+                │           │
+                └── error ←─┘
 ```
 
-### 8.5 Skill 配置格式
+### 5.3 Skill 定义
 
-**skills.json** (配置文件):
-```json
-{
-  "skills": {
-    "web-search": {
-      "path": "./skills/web-search",
-      "enabled": true
-    },
-    "my-npm-skill": {
-      "package": "@my/skill-package"
-    }
-  },
-  "autoLoad": true
-}
-```
-
-**skill.json** (Skill 定义):
 ```json
 {
   "name": "web-search",
-  "version": "1.0.0",
-  "description": "Web search capabilities",
-  "tools": [
-    {
-      "name": "search",
-      "description": "Search the web",
-      "parameters": {
-        "type": "object",
-        "properties": {
-          "query": { "type": "string" }
-        },
-        "required": ["query"]
-      },
-      "handler": "./handlers.js#search"
-    }
-  ],
-  "hooks": {
-    "onLoad": "./handlers.js#onLoad"
-  }
+  "tools": [{
+    "name": "search",
+    "description": "Search the web",
+    "parameters": { ... },
+    "handler": "./handlers.js#search"
+  }]
 }
-```
-
-### 8.6 使用示例
-
-```typescript
-import { createAgent } from '@ai-stack/agent';
-
-// 方式 1: 使用配置文件
-const agent = createAgent({
-  name: 'Skill Agent',
-  skill: {
-    configPath: './skills.json',
-    autoLoad: true
-  }
-});
-await agent.initializeSkills();
-
-// 方式 2: 目录自动发现
-const agent2 = createAgent({
-  skill: {
-    directories: ['./skills/', './my-skills/'],
-    autoLoad: true
-  }
-});
-
-// 方式 3: 内联配置
-const agent3 = createAgent({
-  skill: {
-    skills: {
-      'web-search': { path: './skills/web-search' }
-    }
-  }
-});
-await agent3.initializeSkills();
-
-// 使用
-const response = await agent.chat('Search for TypeScript tips');
-
-// 动态管理
-const skillManager = agent.getSkillManager();
-await skillManager.activate('new-skill');
-
-// 清理
-await agent.closeSkills();
 ```
 
 ---
 
-## 9. @ai-stack/memory 业务逻辑
+## 6. Memory 业务逻辑
 
-### 9.1 createMemoryManager() 工厂函数
+### 6.1 五层记忆架构
 
-**职责**：管理持久化记忆的完整生命周期
+| 层级 | 存储 | 优先级 | 用途 |
+|------|------|--------|------|
+| Profile | ProfileStore | 最高 | 用户偏好 |
+| TaskState | TaskStateStore | 高 | 当前任务 |
+| Summary | SummaryStore | 中 | 滚动摘要 |
+| Episodic | EventStore | 低 | 事件日志 |
+| Semantic | SemanticStore | 最低 | 可检索内容 |
+
+### 6.2 策略层
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                    MemoryPolicy (主策略)                      │
+├─────────────────────────────────────────────────────────────┤
+│  RetrievalPolicy  │  WritePolicy  │  BudgetPolicy           │
+│  何时检索/检索什么 │  何时写入/写什么│  Token 预算分配        │
+└─────────────────────────────────────────────────────────────┘
+```
+
+### 6.3 检索排序
+
+**时间衰减**：
+```
+score × e^(-λ × ageInDays)
+λ = ln(2) / halfLifeDays
+```
+
+**MMR 去重**：
+```
+MMR = λ × relevance - (1-λ) × max_similarity
+```
+
+### 6.4 上下文压缩
+
+```
+Context Compaction 流程:
+
+Token 使用量 → 检查阈值
+    │
+    ├─ < 60%: 正常运行
+    ├─ 60-80%: 准备 flush
+    ├─ 80-95%: 立即 flush
+    └─ > 95%: 强制 compaction
+
+Flush 内容:
+- decisions (决策)
+- facts (事实)
+- todos (待办)
+- preferences (偏好)
+- summary (摘要)
+```
+
+### 6.5 使用示例
 
 ```typescript
-const manager = createMemoryManager(config);
-
-// 返回 MemoryManagerInstance 接口
-interface MemoryManagerInstance {
-  // 生命周期
-  initialize()             // 初始化数据库和存储
-  close()                  // 关闭连接
-
-  // 会话管理
-  getSessionId()           // 获取当前会话ID
-  setSessionId(id)         // 设置会话ID
-  newSession()             // 开始新会话
-
-  // 事件操作
-  recordEvent(event)       // 记录事件
-  onEvent(callback)        // 订阅事件
-
-  // 任务操作
-  createTask(task)         // 创建任务
-  updateTask(id, update)   // 更新任务
-  getCurrentTask()         // 获取当前任务
-
-  // 配置操作
-  setProfile(item)         // 设置用户偏好
-  getProfile(key)          // 获取用户偏好
-  getAllProfiles()         // 获取所有偏好
-
-  // 检索
-  retrieve(options)        // 检索 MemoryBundle
-  inject(bundle)           // 注入到 prompt
-
-  // 摘要
-  summarize(sessionId)     // 生成摘要
-
-  // 语义
-  addChunk(chunk)          // 添加语义块
-  searchChunks(query)      // 语义搜索
-}
-```
-
-### 9.2 五层记忆存储
-
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                        MemoryBundle                              │
-├─────────────────────────────────────────────────────────────────┤
-│  Profile (200 tokens)     用户偏好，优先级最高                   │
-│  TaskState (300 tokens)   当前任务状态                          │
-│  Summary (400 tokens)     滚动摘要                              │
-│  RecentEvents (500 tokens) 最近事件                             │
-│  SemanticChunks (800 tokens) 语义检索结果                       │
-└─────────────────────────────────────────────────────────────────┘
-```
-
-### 9.3 Agent 集成
-
-```typescript
-import { createAgent } from '@ai-stack/agent';
-
-// 启用 Memory
 const agent = createAgent({
-  name: 'Memory Agent',
   memory: {
     enabled: true,
-    dbPath: 'memory/sqlite.db',
+    dbPath: './memory/sqlite.db',
     autoInitialize: true,
     autoInject: true,
-  }
+    tokenBudget: {
+      profile: 200,
+      taskState: 300,
+      recentEvents: 500,
+      semanticChunks: 800,
+      total: 2200,
+    },
+  },
 });
 
-// 对话自动记录到 memory
-const response = await agent.chat('Hello!');
-
-// 手动检索 memory
-const bundle = await agent.retrieveMemory('search query');
-const context = await agent.getMemoryContext('search query');
-
-// 会话管理
-const sessionId = agent.newSession();
-
 // 任务管理
-const task = await agent.createTask('Implement feature X', {
+const task = await agent.createTask('Implement feature', {
   plan: [
     { id: '1', description: 'Step 1', status: 'pending' },
     { id: '2', description: 'Step 2', status: 'pending' },
   ],
 });
+
 await agent.completeTaskStep('1', 'Done');
-const progress = await agent.getTaskProgress(); // { percentage: 50, done: 1, total: 2 }
-
-// Profile 管理
-await agent.setProfile('language', 'Chinese', { explicit: true });
-const lang = await agent.getProfile('language'); // 'Chinese'
-
-// 清理
-await agent.close();  // 关闭所有资源 (MCP, Skill, Memory)
-```
-
-### 9.4 Memory 配置
-
-```json
-{
-  "memory": {
-    "enabled": true,
-    "dbPath": "memory/sqlite.db",
-    "autoInitialize": true,
-    "autoInject": true,
-    "tokenBudget": {
-      "profile": 200,
-      "taskState": 300,
-      "recentEvents": 500,
-      "semanticChunks": 800,
-      "summary": 400,
-      "total": 2200
-    },
-    "writePolicy": {
-      "autoSummarize": true,
-      "summarizeEveryNEvents": 20,
-      "conflictStrategy": "latest"
-    },
-    "retrieval": {
-      "maxRecentEvents": 10,
-      "maxSemanticChunks": 5,
-      "enableSemanticSearch": true
-    }
-  }
-}
-```
-
-### 9.5 搜索结果排序
-
-Memory 系统提供搜索结果后处理管道：
-
-#### 9.5.1 嵌入缓存
-
-避免重复计算嵌入向量，减少 API 调用：
-
-```typescript
-// 配置
-{
-  "embeddingCache": {
-    "enabled": true,
-    "maxEntries": 50000,
-    "ttlMs": 604800000  // 7 天
-  }
-}
-
-// 缓存键: hash(text) + provider + model
-// 支持批量操作: getBatch, setBatch
-```
-
-#### 9.5.2 时间衰减
-
-优先返回最近的内容：
-
-```typescript
-import { applyTemporalDecay, createRankingPipeline } from '@ai-stack/memory';
-
-// 公式: score × e^(-λ × ageInDays)
-// λ = ln(2) / halfLifeDays
-
-const decayed = applyTemporalDecay(results, {
-  enabled: true,
-  halfLifeDays: 30,        // 30 天后分数减半
-  minMultiplier: 0.1,      // 最低保留 10% 分数
-  decayType: 'exponential' // 或 'linear', 'step'
-});
-```
-
-#### 9.5.3 MMR 多样性去重
-
-避免返回相似内容：
-
-```typescript
-import { applyMMR } from '@ai-stack/memory';
-
-// 公式: MMR = λ × relevance - (1-λ) × max_similarity_to_selected
-
-const diverse = applyMMR(results, 10, {
-  enabled: true,
-  lambda: 0.7,              // 0.7 relevance, 0.3 diversity
-  similarityFunction: 'jaccard',
-  duplicateThreshold: 0.8,  // 相似度超过 0.8 视为重复
-  useEmbeddings: true       // 优先使用向量相似度
-});
-```
-
-#### 9.5.4 组合管道
-
-```typescript
-import { createRankingPipeline, rankResults } from '@ai-stack/memory';
-
-// 方式 1: 快速使用
-const ranked = rankResults(results, {
-  limit: 10,
-  temporalDecay: { halfLifeDays: 30 },
-  mmr: { lambda: 0.7 },
-  minScore: 0.1
-});
-
-// 方式 2: 可复用管道
-const pipeline = createRankingPipeline({
-  temporalDecay: { enabled: true, halfLifeDays: 30 },
-  mmr: { enabled: true, lambda: 0.7 },
-  limit: 10,
-  minScore: 0.1
-});
-
-const result = pipeline(searchResults);
-// result.results: 排序后的结果
-// result.metadata: { temporalDecayApplied, mmrApplied, filteredCount, ... }
-```
-
-### 9.6 Context Compaction 自动 Memory Flush
-
-在接近上下文窗口限制时，自动将重要内容持久化到长期记忆：
-
-#### 9.6.1 Memory Flush
-
-```typescript
-import { createMemoryFlush } from '@ai-stack/memory';
-
-const flush = createMemoryFlush({
-  enabled: true,
-  softThresholdTokens: 4000,   // 触发 flush 的软阈值
-  hardThresholdTokens: 8000,   // 强制 flush 的硬阈值
-  minEventsSinceFlush: 5,      // 最少事件数
-  includeSummary: true,
-});
-
-// 检查是否需要 flush
-const check = flush.checkFlush(currentTokens, eventsSinceFlush);
-if (check.shouldFlush) {
-  console.log(`Flush needed: ${check.reason}, urgency: ${check.urgency}`);
-}
-
-// 提取要保存的内容
-const content = await flush.extractFlushContent(events, { sessionId });
-// content: { decisions, facts, todos, preferences, summary, chunks }
-```
-
-#### 9.6.2 Compaction Manager
-
-完整的 compaction 管理：
-
-```typescript
-import { createCompactionManager } from '@ai-stack/memory';
-
-const compaction = createCompactionManager({
-  flush: { softThresholdTokens: 4000, hardThresholdTokens: 8000 },
-  maxContextTokens: 128000,
-  reserveTokens: 4000,
-  autoCompact: true,
-  onCompaction: (result) => {
-    console.log(`Compacted: ${result.tokensBefore} → ${result.tokensAfter}`);
-  },
-});
-
-// 每轮更新 token 使用量
-compaction.updateTokenCount(tokenUsage);
-
-// 记录事件
-compaction.recordEvent(event);
-
-// 检查上下文健康状态
-const health = compaction.checkHealth();
-// { healthy, usage, remaining, urgency, recommendation }
-
-// 自动判断是否需要 compaction
-if (compaction.shouldCompact()) {
-  const result = await compaction.compact(events, {
-    sessionId,
-    writeChunks: (chunks) => semanticStore.addBatch(chunks),
-    createSummary: (content) => summaryStore.add(content),
-  });
-}
-```
-
-#### 9.6.3 LLM 辅助提取
-
-可以使用 LLM 进行更智能的内容提取：
-
-```typescript
-const compaction = createCompactionManager({
-  llmExtractor: async (events, prompt) => {
-    const response = await agent.complete(prompt + '\n\nEvents:\n' +
-      events.map(e => e.summary).join('\n'));
-    return response;
-  },
-});
-```
-
-#### 9.6.4 健康检查建议
-
-| 使用率 | 建议 | 操作 |
-|--------|------|------|
-| < 60% | `none` | 正常运行 |
-| 60-80% | `flush_soon` | 准备 flush |
-| 80-95% | `flush_now` | 立即 flush |
-| > 95% | `critical` | 强制 compaction |
-
-### 9.7 会话转录索引
-
-将会话对话存储为 JSONL 格式并索引到语义存储：
-
-#### 9.7.1 Session Transcript
-
-```typescript
-import { createSessionTranscript, formatTranscript } from '@ai-stack/memory';
-
-const transcript = createSessionTranscript('session-123');
-
-// 从 MemoryEvent 追加
-transcript.appendFromEvent(userMessageEvent);
-transcript.appendFromEvent(assistantMessageEvent);
-
-// 序列化为 JSONL
-const jsonl = transcript.toJSONL();
-// {"type":"message","timestamp":1234,"message":{"role":"user","content":"Hello"}}
-// {"type":"message","timestamp":1235,"message":{"role":"assistant","content":"Hi!"}}
-
-// 生成索引块
-const chunks = transcript.generateChunks({
-  maxTokensPerChunk: 400,
-  overlapTokens: 80,
-});
-
-// 格式化显示
-console.log(formatTranscript(transcript.getEntries()));
-// [USER]: Hello
-// [ASSISTANT]: Hi!
-```
-
-#### 9.7.2 Transcript Indexer
-
-```typescript
-import { createTranscriptIndexer } from '@ai-stack/memory';
-
-const indexer = createTranscriptIndexer(semanticStore, {
-  watchEnabled: true,
-  watchDebounceMs: 1500,
-  chunkTokens: 400,
-  overlapTokens: 80,
-});
-
-// 索引单个转录
-const result = await indexer.indexTranscript(transcript);
-// { success, chunksAdded, chunksRemoved, durationMs }
-
-// 批量同步
-await indexer.syncAll(transcripts, {
-  force: false,
-  progress: (current, total) => console.log(`${current}/${total}`),
-});
-
-// 搜索转录
-const results = await indexer.searchTranscripts('TypeScript', {
-  sessionIds: ['session-1', 'session-2'],
-  roles: ['user', 'assistant'],
-  limit: 10,
-});
-```
-
-### 9.8 完整读写流程管道
-
-统一的读写流程，集成所有功能：
-
-#### 9.8.1 写入流程
-
-```
-Agent 调用 → Write Pipeline
-    │
-    ├─ 1. 内容提取 (Event/Chunk/Transcript/Flush)
-    │
-    ├─ 2. 自动分块 (400 tokens, 80 overlap)
-    │
-    ├─ 3. 生成嵌入 (如果 embedFunction 可用)
-    │
-    └─ 4. 存储索引 (SemanticStore)
-```
-
-```typescript
-import { createMemoryPipeline } from '@ai-stack/memory';
-
-const pipeline = createMemoryPipeline(stores, {
-  embedFunction: async (text) => openai.embed(text),
-});
-
-// 写入内容
-const writeResult = await pipeline.write({
-  type: 'chunk',              // 'event' | 'chunk' | 'transcript' | 'flush'
-  content: 'TypeScript is a typed superset of JavaScript.',
-  sessionId: 'session-123',
-  tags: ['programming'],
-});
-// { success, chunks, chunkCount, embeddingsGenerated, durationMs }
-```
-
-#### 9.8.2 读取流程
-
-```
-查询 → Read Pipeline
-    │
-    ├─ 1. 混合搜索 (FTS + Vector)
-    │
-    ├─ 2. 结果合并 (fts: 0.3, vector: 0.7)
-    │
-    ├─ 3. 时间衰减 (halfLife: 30 days)
-    │
-    ├─ 4. MMR 去重 (lambda: 0.7)
-    │
-    └─ 5. 返回片段 (snippet + metadata)
-```
-
-```typescript
-const readResult = await pipeline.read({
-  query: 'TypeScript programming',
-  sessionId: 'session-123',
-  limit: 10,
-});
-
-// readResult.results[0]:
-// {
-//   chunk: SemanticChunk,
-//   score: 0.85,
-//   matchType: 'hybrid',
-//   snippet: '...TypeScript is a typed superset...',
-//   metadata: { originalScore, decayedScore, mmrScore, ageInDays }
-// }
-
-// readResult.stages: { fts: true, vector: true, temporalDecay: true, mmr: true }
-```
-
-#### 9.8.3 Pipeline 配置
-
-```typescript
-// 写入配置
-pipeline.setWriteConfig({
-  autoChunk: true,
-  chunkTokens: 400,
-  overlapTokens: 80,
-  autoEmbed: true,
-  minContentLength: 20,
-});
-
-// 读取配置
-pipeline.setReadConfig({
-  hybridSearch: true,
-  ftsWeight: 0.3,
-  vectorWeight: 0.7,
-  temporalDecay: true,
-  temporalDecayConfig: { halfLifeDays: 30 },
-  mmrEnabled: true,
-  mmrConfig: { lambda: 0.7 },
-  maxResults: 10,
-  minScore: 0.1,
-});
-```
-
-#### 9.8.4 一体化操作
-
-```typescript
-// 写入后立即检索 (RAG 场景)
-const { write, read } = await pipeline.writeAndRead(
-  { type: 'chunk', content: newDocument, sessionId },
-  { query: userQuestion }
-);
-
-// 索引转录
-await pipeline.indexTranscript(transcript);
-
-// 处理 Flush 内容
-await pipeline.processFlush(flushContent, sessionId);
+const progress = await agent.getTaskProgress();
 ```
 
 ---
 
-## 10. @ai-stack/knowledge 业务逻辑
+## 7. Knowledge 业务逻辑
 
-### 10.1 Knowledge 集成模式
-
-Knowledge 功能采用混合方案，参照 Memory 的设计：
+### 7.1 索引模式
 
 ```
-┌─────────────────────────────────────────────────────────────┐
-│                         Agent                                │
-│                                                              │
-│  ┌─────────────────┐    ┌─────────────────────────────────┐ │
-│  │ MemoryManager   │    │ KnowledgeManager                │ │
-│  │ (内嵌)          │    │ (内嵌，核心检索)                 │ │
-│  │                 │    │                                  │ │
-│  │ - retrieve()    │    │ - search()      ← 自动检索      │ │
-│  │ - inject()      │    │ - inject()      ← 上下文注入    │ │
-│  └─────────────────┘    └─────────────────────────────────┘ │
-│           │                         │                        │
-└───────────┼─────────────────────────┼────────────────────────┘
-            │                         │
-            ▼                         ▼
-┌─────────────────────┐    ┌─────────────────────────────────┐
-│ @ai-stack-skill/    │    │ @ai-stack-skill/knowledge       │
-│ memory              │    │ (显式管理工具)                   │
-│                     │    │                                  │
-│ - search            │    │ - search_code   ← 代码搜索      │
-│ - upsert            │    │ - search_docs   ← 文档搜索      │
-│ - delete            │    │ - index_code    ← 索引代码      │
-└─────────────────────┘    │ - add_doc       ← 添加文档源    │
-                           │ - crawl_docs    ← 爬取文档      │
-                           └─────────────────────────────────┘
+┌───────────────────────────────────────────────────────────────┐
+│                      KnowledgeManager                          │
+├───────────────────────────────────────────────────────────────┤
+│  CodeIndexer          │  DocIndexer          │  HybridSearch  │
+│  - AST 解析           │  - URL 爬取          │  - FTS + Vector│
+│  - 智能切分           │  - HTML → Markdown   │  - 时间衰减    │
+│  - 文件监听           │  - 章节提取          │  - MMR 去重    │
+└───────────────────────────────────────────────────────────────┘
 ```
 
-### 10.2 Agent Knowledge 配置
-
-```typescript
-const agent = createAgent({
-  knowledge: {
-    enabled: true,
-    dbPath: 'knowledge/sqlite.db', // 索引数据库路径
-    code: {
-      enabled: true,
-      rootDir: './src',
-      include: ['**/*.ts', '**/*.tsx'],
-      watch: true,          // 启用文件监听
-    },
-    doc: {
-      enabled: true,
-      sources: [
-        { name: 'React Docs', url: 'https://react.dev', type: 'url', tags: ['react'] },
-      ],
-    },
-    search: {
-      autoSearch: true,     // 自动检索
-      autoInject: true,     // 自动注入上下文
-      maxResults: 5,
-      minScore: 0.3,
-    },
-  },
-});
-```
-
-### 10.3 索引状态持久化
-
-Knowledge 使用独立的 SQLite 数据库持久化索引状态，避免每次启动重新索引：
-
-**数据库结构**：
-```
-memory/
-  └── sqlite.db           # Memory 系统数据库
-knowledge/
-  └── sqlite.db           # Knowledge 独立数据库 (完全自包含)
-      ├── code_index_status   # 代码文件索引状态
-      ├── doc_sources         # 文档源
-      ├── doc_pages           # 文档页面
-      ├── semantic_chunks     # 语义 chunks (FTS5)
-      └── vec_chunks          # 向量索引 (sqlite-vec)
-```
-
-**初始化流程**：
-```
-应用启动
-    │
-    ▼
-┌─────────────────────────────────────┐
-│ 1. 检测已有索引                       │
-│    - hasIndexedFiles(rootDir)        │
-│    - hasIndexedSources()             │
-└─────────────────────────────────────┘
-    │ 存在已有索引
-    ▼
-┌─────────────────────────────────────┐
-│ 2. 调用 onExistingIndex 回调         │
-│    - 返回已有索引摘要信息            │
-│    - 让用户选择操作                   │
-└─────────────────────────────────────┘
-    │
-    ▼
-┌─────────────────────────────────────┐
-│ 3. 根据用户选择执行                   │
-│    - reindex_all: 清除后重新索引     │
-│    - incremental: 仅索引新增/变更    │
-│    - skip: 跳过索引                  │
-└─────────────────────────────────────┘
-```
-
-**用户交互回调示例**：
-```typescript
-const manager = createKnowledgeManager({
-  code: {
-    rootDir: './src',
-    onExistingIndex: async (info) => {
-      console.log(`Found ${info.summary.totalItems} indexed files`);
-
-      // CLI 场景: 使用 inquirer
-      const { action } = await inquirer.prompt([{
-        type: 'list',
-        name: 'action',
-        message: 'Existing index found. What to do?',
-        choices: [
-          { name: 'Update incrementally', value: 'incremental' },
-          { name: 'Re-index everything', value: 'reindex_all' },
-          { name: 'Skip indexing', value: 'skip' },
-        ],
-      }]);
-
-      return action;
-    },
-    defaultAction: 'incremental', // 无回调时的默认行为
-  },
-});
-```
-
----
-
-### 10.4 自动检索流程
-
-当 `autoSearch` 和 `autoInject` 启用时，Agent 在每次对话中自动：
+### 7.2 自动检索流程
 
 ```
 用户输入
     │
-    ▼
-┌─────────────────────────────────────┐
-│ 1. 自动初始化 Knowledge (首次)       │
-│    - 创建 KnowledgeManager           │
-│    - 连接 SemanticStore              │
-│    - 设置 Knowledge 数据库           │
-└─────────────────────────────────────┘
+    ├─ 1. 自动检索代码 (searchCode)
     │
-    ▼
-┌─────────────────────────────────────┐
-│ 2. 自动检索相关知识                  │
-│    - searchKnowledge(input)          │
-│    - 混合搜索 (FTS + Vector)         │
-│    - 时间衰减 + MMR 去重             │
-└─────────────────────────────────────┘
+    ├─ 2. 自动检索文档 (searchDocs)
     │
-    ▼
-┌─────────────────────────────────────┐
-│ 3. 注入上下文到 System Prompt       │
-│    - 代码片段 (文件路径 + 行号)      │
-│    - 文档片段 (URL + 章节)           │
-└─────────────────────────────────────┘
+    ├─ 3. 注入上下文到 System Prompt
     │
-    ▼
-┌─────────────────────────────────────┐
-│ 4. 调用 LLM                          │
-│    - System Prompt 包含知识上下文    │
-└─────────────────────────────────────┘
+    └─ 4. LLM 调用
 ```
 
-### 10.5 Knowledge Skill 工具
-
-通过 `@ai-stack-skill/knowledge` 提供显式管理工具：
-
-| 工具 | 用途 | 触发方式 |
-|------|------|----------|
-| `search_code` | 搜索代码库 | Agent 调用 |
-| `search_docs` | 搜索文档 | Agent 调用 |
-| `index_code` | 索引代码库 | `/index` 命令 |
-| `add_doc_source` | 添加文档源 | `/doc add <url>` |
-| `remove_doc_source` | 移除文档源 | `/doc remove <id>` |
-| `crawl_docs` | 爬取文档 | `/doc crawl` |
-| `get_knowledge_stats` | 获取统计 | `/doc status` |
-
-### 10.6 使用示例
+### 7.3 使用示例
 
 ```typescript
-import { createAgent } from '@ai-stack/agent';
-
-// 启用 Knowledge 自动检索
 const agent = createAgent({
   knowledge: {
     enabled: true,
-    code: { rootDir: './src', watch: true },
-    search: { autoSearch: true, autoInject: true },
+    code: {
+      rootDir: './src',
+      include: ['**/*.ts'],
+      watch: true,
+    },
+    doc: { enabled: true },
+    search: {
+      autoSearch: true,
+      autoInject: true,
+    },
   },
 });
 
-// 首次对话时自动初始化并索引
-const response = await agent.chat('这个项目的架构是怎样的？');
-// Agent 自动检索代码并注入上下文
-
-// 手动搜索代码
-const codeResults = await agent.searchCode('createAgent', { limit: 5 });
-
 // 添加文档源
 await agent.addDocSource({
-  name: 'OpenAI Docs',
-  url: 'https://platform.openai.com/docs',
+  name: 'React Docs',
+  url: 'https://react.dev',
   type: 'url',
-  tags: ['openai', 'api'],
 });
 
-// 爬取并索引文档
 await agent.crawlDocs();
-
-// 搜索文档
-const docResults = await agent.searchDocs('function calling', { limit: 5 });
-
-// 获取统计信息
-const stats = await agent.getKnowledgeStats();
-console.log(stats);
-// {
-//   code: { enabled: true, totalFiles: 50, totalChunks: 200 },
-//   doc: { enabled: true, totalSources: 1, totalPages: 10, totalChunks: 50 }
-// }
 ```
 
 ---
 
-## 11. 权限管控系统
+## 8. 权限管控
 
-### 11.1 权限级别
+### 8.1 权限级别
 
-| 级别 | 说明 | 行为 |
-|------|------|------|
-| `auto` | 自动批准 | 直接执行，无需确认 |
-| `confirm` | 需要确认 | 执行前请求用户确认 |
-| `deny` | 拒绝执行 | 直接拒绝，返回错误 |
+| 级别 | 行为 |
+|------|------|
+| `auto` | 直接执行 |
+| `confirm` | 请求用户确认 |
+| `deny` | 拒绝执行 |
 
-### 11.2 工具分类
-
-| 分类 | 说明 | 默认级别 |
-|------|------|---------|
-| `read` | 只读操作 (搜索、查询) | `auto` |
-| `write` | 写入操作 (创建、修改) | `confirm` |
-| `execute` | 命令执行 (bash) | `confirm` |
-| `network` | 网络操作 (fetch) | `confirm` |
-| `git` | Git 操作 | 读: `auto`, 写: `confirm` |
-| `admin` | 管理操作 (删除) | `confirm` |
-
-### 11.3 权限检查流程
+### 8.2 检查流程
 
 ```
-工具调用请求
-    │
-    ▼
-┌─────────────────────────────┐
-│ 1. 检查 Session 记忆        │
-│    (是否本会话已批准)       │
-└─────────────────────────────┘
-    │ 未批准
-    ▼
-┌─────────────────────────────┐
-│ 2. 匹配权限规则             │
-│    (按顺序，首个匹配生效)   │
-└─────────────────────────────┘
-    │ 未匹配
-    ▼
-┌─────────────────────────────┐
-│ 3. 检查分类默认权限         │
-└─────────────────────────────┘
-    │ 未配置
-    ▼
-┌─────────────────────────────┐
-│ 4. 使用全局默认权限         │
-│    (默认: confirm)          │
-└─────────────────────────────┘
-    │
-    ▼
-┌─────────────────────────────┐
-│ 权限决策                    │
-│ - auto: 直接执行            │
-│ - confirm: 请求确认         │
-│ - deny: 拒绝执行            │
-└─────────────────────────────┘
+工具调用 → Session 记忆 → 规则匹配 → 分类默认 → 全局默认
+                                                    │
+                                                    ▼
+                                              权限决策
 ```
 
-### 11.4 使用示例
+### 8.3 规则配置
 
 ```typescript
-import { createAgent } from '@ai-stack/agent';
-
-// 基础用法 - 启用权限检查
 const agent = createAgent({
   permission: {
     enabled: true,
-    defaultLevel: 'confirm',
-    onConfirm: async (request) => {
-      // 在 CLI 中显示确认提示
-      console.log(`\nTool: ${request.toolName}`);
-      console.log(`Args: ${JSON.stringify(request.args, null, 2)}`);
-      const answer = await readline.question('Allow? (y/n/a): ');
-
-      return {
-        allowed: answer.toLowerCase() !== 'n',
-        rememberForSession: answer.toLowerCase() === 'a', // 'a' = always
-      };
-    },
-  },
-});
-
-// 高级用法 - 自定义规则
-const agent2 = createAgent({
-  permission: {
-    enabled: true,
     rules: [
-      // 自动批准所有读取操作
-      { tool: '*_read*', level: 'auto', category: 'read' },
-      { tool: '*_get*', level: 'auto', category: 'read' },
-      { tool: '*_list*', level: 'auto', category: 'read' },
-
-      // Git 读操作自动批准
-      { tool: 'mcp__git__git_status', level: 'auto' },
-      { tool: 'mcp__git__git_log', level: 'auto' },
-      { tool: 'mcp__git__git_diff*', level: 'auto' },
-
-      // Git 写操作需要确认
-      { tool: 'mcp__git__git_commit', level: 'confirm' },
-      { tool: 'mcp__git__git_add', level: 'confirm' },
-
-      // 禁止删除操作
+      { tool: '*_read*', level: 'auto' },
+      { tool: '*_write*', level: 'confirm' },
       { tool: '*_delete*', level: 'deny' },
-      { tool: '*_remove*', level: 'deny' },
-
-      // Bash 执行需要确认
-      { tool: 'bash_*', level: 'confirm', category: 'execute' },
     ],
-    categoryDefaults: {
-      read: 'auto',
-      write: 'confirm',
-      execute: 'confirm',
-      admin: 'deny',
-    },
     onConfirm: async (request) => {
       // 自定义确认逻辑
       return { allowed: true, rememberForSession: true };
     },
-    onDeny: (toolName, args, reason) => {
-      console.log(`Denied: ${toolName} - ${reason}`);
-    },
-    onExecute: (toolName, args, result, allowed) => {
-      // 审计日志
-      console.log(`[AUDIT] ${toolName}: ${allowed ? 'executed' : 'denied'}`);
-    },
   },
 });
-
-// 动态管理规则
-agent.addPermissionRule({ tool: 'new_tool', level: 'auto' });
-agent.removePermissionRule('old_tool');
-
-// 清除会话批准记录
-agent.clearSessionApprovals();
-
-// 获取审计日志
-const auditLog = agent.getPermissionAuditLog();
-```
-
-### 11.5 规则匹配语法
-
-| 模式 | 说明 | 示例 |
-|------|------|------|
-| 精确匹配 | 完全相同 | `bash_execute` |
-| Glob 模式 | `*` 匹配任意字符 | `mcp__git__*`, `*_read*` |
-| 正则表达式 | 以 `^` 开头 | `^mcp__.*__list.*$` |
-
-### 11.6 内置默认规则
-
-框架内置了合理的默认规则：
-
-**自动批准 (auto)**:
-- `*_read*`, `*_get*`, `*_list*`, `*_search*`, `*_query*`
-- `bash_pwd`, `bash_which`, `bash_env`
-- Git 读操作: `git_status`, `git_log`, `git_diff*`, `git_branch`, `git_show`
-
-**需要确认 (confirm)**:
-- `*_write*`, `*_create*`, `*_update*`, `*_edit*`
-- `*_delete*`, `*_remove*`
-- `bash_execute`, `bash_script`, `bash_background`, `bash_kill`, `bash_cd`
-- Git 写操作: `git_commit`, `git_add`, `git_reset`, `git_checkout`
-- 网络操作: `mcp__fetch__*`
-
-### 11.7 配置文件格式
-
-```json
-{
-  "permission": {
-    "enabled": true,
-    "defaultLevel": "confirm",
-    "sessionMemory": true,
-    "rules": [
-      { "tool": "*_read*", "level": "auto", "category": "read" },
-      { "tool": "bash_execute", "level": "confirm", "category": "execute" },
-      { "tool": "*_delete*", "level": "deny", "category": "admin" }
-    ],
-    "categoryDefaults": {
-      "read": "auto",
-      "write": "confirm",
-      "execute": "confirm",
-      "network": "confirm",
-      "git": "confirm",
-      "admin": "confirm"
-    }
-  }
-}
 ```
 
 ---
 
-## 12. @ai-stack/code 工具系统
+## 9. 高级编排
 
-基于 Anthropic "Building Effective Agents" 文章的工具优化。
-
-### 12.1 Read 工具 (增强)
-
-支持多种输出格式：
-
-| 格式 | 说明 | 用途 |
-|------|------|------|
-| `numbered` | `N \| content` 格式 | 后续编辑时定位行 |
-| `plain` | 纯文本无行号 | 仅理解内容 |
+### 9.1 状态机
 
 ```
-Read 输出示例 (numbered):
+idle → planning → executing → completed
+            ↓           ↓
+         paused ←→ waiting
+            ↓           ↓
+         error ←────────┘
+```
+
+### 9.2 恢复策略
+
+**退避策略**：
+| 策略 | 公式 |
+|------|------|
+| fixed | `delay` |
+| linear | `delay × attempt` |
+| exponential | `delay × 2^(attempt-1)` |
+| fibonacci | `delay × fib(attempt)` |
+
+**熔断器**：
+```
+closed → 失败达阈值 → open → 超时 → half-open → 成功 → closed
+```
+
+### 9.3 计划 DAG
+
+```typescript
+const dag = createPlanDAG();
+dag.addNode({ id: 'A', description: 'Task A' });
+dag.addNode({ id: 'B', description: 'Task B', dependsOn: ['A'] });
+dag.addNode({ id: 'C', description: 'Task C', dependsOn: ['A'] });
+dag.addNode({ id: 'D', description: 'Task D', dependsOn: ['B', 'C'] });
+
+// 获取可并行执行的任务
+const ready = dag.getReadyNodes(); // ['A']
+dag.markCompleted('A');
+const nextReady = dag.getReadyNodes(); // ['B', 'C'] - 可并行
+```
+
+### 9.4 模型路由
+
+| 任务类型 | 推荐模型层级 |
+|----------|-------------|
+| tool_selection | fast |
+| classification | fast |
+| code_generation | strong |
+| reasoning | strong |
+| conversation | standard |
+
+### 9.5 评估器
+
+```typescript
+const evaluator = createEvaluator({
+  dimensions: {
+    accuracy: 0.25,
+    completeness: 0.25,
+    relevance: 0.20,
+    safety: 0.15,
+    coherence: 0.10,
+    helpfulness: 0.05,
+  },
+  passThreshold: 0.7,
+});
+
+const result = await evaluator.evaluate(response, context);
+if (!result.passed) {
+  // 重试
+}
+```
+
+### 9.6 Guardrail
+
+**内置规则**：
+- PII 检测
+- 密钥检测
+- 危险命令检测
+- Prompt 注入检测
+- 长度限制
+
+```typescript
+const agent = createAgent({
+  guardrail: {
+    enabled: true,
+    enableBuiltInRules: true,
+    customRules: [
+      { id: 'custom', type: 'output', check: (text) => ... },
+    ],
+  },
+});
+```
+
+---
+
+## 10. Code Agent 工具
+
+### 10.1 Read 工具
+
+```
+输出格式 (numbered):
 
   1 | import { foo } from "./foo";
   2 |
@@ -2074,229 +574,193 @@ Read 输出示例 (numbered):
   5 | }
 ```
 
-### 12.2 Grep 工具 (增强)
+### 10.2 Edit 工具
 
-优化输出格式，使用 `>` 标记匹配行：
+**模式**：
+| 模式 | 参数 |
+|------|------|
+| exact | `old_string`, `new_string` |
+| line | `start_line`, `end_line`, `new_content` |
+| fuzzy | `search_pattern`, `replacement` |
 
-```
-Found 2 match(es) in 2 file(s)
-
-src/utils.ts:
-  13 | // Helper functions
-  14 |
-> 15 | export function helper() {
-  16 |   return 42;
-  17 | }
-```
-
-### 12.3 Edit 工具 (多模式)
-
-支持三种编辑模式：
-
-| 模式 | 参数 | 说明 |
-|------|------|------|
-| `exact` | `old_string`, `new_string` | 精确字符串替换 |
-| `line` | `start_line`, `end_line`, `new_content` | 行号替换 |
-| `fuzzy` | `search_pattern`, `replacement` | 通配符模式 |
-
-**模式选择流程**：
-
-```
-用户参数
-    │
-    ├── start_line/new_content 存在 → line 模式
-    │
-    ├── search_pattern 存在 → fuzzy 模式
-    │
-    └── 其他 → exact 模式 (默认)
-```
-
-**使用示例**：
+### 10.3 Undo/Redo
 
 ```typescript
-// Exact 模式 - 精确替换
-await edit({
-  file_path: '/src/index.ts',
-  old_string: 'const x = 1;',
-  new_string: 'const x = 2;',
-});
+// SQLite 持久化历史
+const history = createFileHistoryStore({ dbPath: '.ai-code/history.db' });
 
-// Line 模式 - 基于行号 (从 Read 输出获取)
-await edit({
-  file_path: '/src/index.ts',
-  start_line: 10,
-  end_line: 12,
-  new_content: 'function newImpl() {\n  return 42;\n}',
-});
-
-// Fuzzy 模式 - 通配符匹配
-await edit({
-  file_path: '/src/index.ts',
-  search_pattern: 'function * {',
-  replacement: 'const $1 = () => {',
-  replace_all: true,
-});
+// 操作
+await history.recordChange(change);
+await history.undo(); // 撤销
+await history.redo(); // 重做
+await history.createCheckpoint('my-checkpoint');
+await history.restoreCheckpoint('my-checkpoint');
 ```
-
-### 12.4 工具增强文档字段
-
-所有工具支持 Anthropic "Poka-yoke" 原则的增强文档：
-
-| 字段 | 说明 |
-|------|------|
-| `examples` | 使用示例 (input/output 对) |
-| `hints` | 使用提示和最佳实践 |
-| `edgeCases` | 边界情况说明 |
-| `constraints` | 约束和限制 |
-| `returnFormat` | 返回格式说明 |
-| `relatedTools` | 相关工具推荐 |
-| `antiPatterns` | 何时不应使用 |
 
 ---
 
-## 13. Agent 架构扩展模块
+## 11. Assistant 特性
 
-### 13.1 状态机 (State Machine)
+### 11.1 Markdown Memory
 
-**职责**：管理 Agent 执行状态，支持暂停/恢复和检查点
-
-**状态流转**：
 ```
-idle → planning → executing → completed
-                ↓           ↓
-              paused ←→ waiting
-                ↓           ↓
-              error ←───────┘
+Source of Truth (Markdown)
+         │
+         ├─ MEMORY.md (长期记忆)
+         └─ memory/YYYY-MM-DD.md (每日日志)
+                  │
+                  ▼
+         Derived Index (SQLite)
+         ├─ FTS5 索引
+         └─ sqlite-vec 向量索引 (可选)
 ```
 
-**核心功能**：
-- 状态转换验证 (只允许有效转换)
-- 工作内存管理 (临时数据存储)
-- 检查点创建/恢复 (持久化支持)
-- 状态订阅机制 (UI 更新)
+**MEMORY.md 格式**：
+```markdown
+# Assistant Memory
 
-### 13.2 恢复策略 (Recovery Policy)
+## Profile
+- **Name**: Alice
+- **Timezone**: Asia/Shanghai
 
-**职责**：处理执行错误，提供自动重试和恢复机制
+## Facts
+- User prefers concise responses
 
-**退避策略**：
-| 策略 | 公式 | 适用场景 |
-|------|------|----------|
-| `none` | 0 | 测试 |
-| `fixed` | `delay` | 简单重试 |
-| `linear` | `delay × attempt` | 渐进增加 |
-| `exponential` | `delay × 2^(attempt-1)` | API 调用 |
-| `fibonacci` | `delay × fib(attempt)` | 长时任务 |
+## Todos
+- [ ] Review PR #123
 
-**熔断器模式**：
-- `closed` (正常) → 失败次数达阈值 → `open` (熔断)
-- `open` → 超时后 → `half-open` (试探)
-- `half-open` → 成功达阈值 → `closed`
+## Notes
+User mentioned interest in Rust.
+```
 
-### 13.3 计划 DAG (Plan DAG)
+### 11.2 多通道网关
 
-**职责**：管理任务依赖关系，支持并行执行
+```
+┌─────────────────────────────────────────────┐
+│                   Gateway                     │
+├─────────────────────────────────────────────┤
+│  CLI Adapter  │ Telegram Adapter │ Discord  │
+└─────────────────────────────────────────────┘
+```
 
-**节点状态**：
-- `pending` → `ready` → `executing` → `completed`/`failed`/`skipped`
+### 11.3 调度器
 
-**核心算法**：
-- Kahn 算法：拓扑排序确定执行顺序
-- 关键路径：计算最长执行路径
-- 并行批次：获取可并行执行的节点组
-
-### 13.4 评估器 (Evaluator)
-
-**职责**：评估 Agent 输出质量，决定是否重试
-
-**评估维度**：
-| 维度 | 权重 | 说明 |
-|------|------|------|
-| accuracy | 0.25 | 信息准确性 |
-| completeness | 0.25 | 回答完整性 |
-| relevance | 0.20 | 内容相关性 |
-| safety | 0.15 | 安全合规性 |
-| coherence | 0.10 | 逻辑一致性 |
-| helpfulness | 0.05 | 实用帮助度 |
-
-**自检机制**：
-- 验证回答与工具结果的一致性
-- 检测逻辑矛盾
-- 识别未经验证的声明
-
-### 13.5 模型路由器 (Model Router)
-
-**职责**：根据任务类型智能选择模型，优化成本
-
-**任务路由映射**：
-| 任务类型 | 默认层级 | 说明 |
-|----------|----------|------|
-| tool_selection | fast | 工具选择 |
-| classification | fast | 分类任务 |
-| formatting | fast | 格式化 |
-| conversation | standard | 对话 |
-| summarization | standard | 摘要 |
-| code_generation | strong | 代码生成 |
-| reasoning | strong | 推理 |
-| planning | strong | 规划 |
-
-**成本优化策略**：
-1. 上下文长度检查 → 选择足够大的模型
-2. 能力降级 → 尝试更便宜的模型
-3. 预算限制 → 强制使用最便宜模型
-
-### 13.6 指标聚合器 (Metrics Aggregator)
-
-**职责**：收集执行指标，提供可观测性
-
-**指标类型**：
-- 延迟：p50, p90, p95, p99, avg, min, max
-- 成本：按模型、按操作汇总
-- 吞吐：每分钟请求数、Token 数
-- 错误：按类型、按操作统计，错误率
-- 工具：调用次数、平均时长、成功率
-
-**告警机制**：
 ```typescript
-{
-  name: 'high_error_rate',
-  metric: 'error_rate',
-  operator: 'gt',
-  threshold: 0.1,
-  severity: 'critical'
+// Cron 定时
+scheduler.addJob({
+  id: 'daily-summary',
+  schedule: '0 9 * * *',
+  action: async () => { ... },
+});
+
+// 一次性提醒
+scheduler.addReminder({
+  at: Date.now() + 3600000,
+  message: 'Meeting in 1 hour',
+});
+
+// 文件监听触发
+scheduler.watchFile('./config.json', async () => {
+  console.log('Config changed');
+});
+```
+
+---
+
+## 12. 错误处理
+
+### 12.1 错误类型
+
+| 错误类 | 可恢复 |
+|--------|--------|
+| `ProviderAuthError` | 否 |
+| `ProviderRateLimitError` | 是 |
+| `ToolNotFoundError` | 否 |
+| `ToolExecutionError` | 取决于 |
+| `ToolTimeoutError` | 是 |
+| `ConfigValidationError` | 否 |
+| `MCPConnectionError` | 是 |
+
+### 12.2 错误恢复
+
+```typescript
+try {
+  await agent.chat(input);
+} catch (error) {
+  if (error instanceof ProviderRateLimitError) {
+    await delay(error.retryAfter);
+    return retry();
+  }
+  if (error.recoverable) {
+    return retry();
+  }
+  throw error;
 }
 ```
 
-### 13.7 Guardrail (安全检查)
+---
 
-**职责**：验证输入/输出内容的安全性
+## 13. 配置示例
 
-**内置规则**：
-| 规则 ID | 类型 | 说明 |
-|---------|------|------|
-| builtin_pii | output | PII 检测 |
-| builtin_secrets | output | 密钥检测 |
-| builtin_dangerous_commands | tool | 危险命令 |
-| builtin_injection | input | Prompt 注入 |
-| builtin_length | all | 长度限制 |
+### 13.1 Agent 配置
 
-**检查流程**：
+```json
+{
+  "name": "My Agent",
+  "model": "gpt-4o",
+  "temperature": 0.7,
+  "maxTokens": 4096,
+  "systemPrompt": "You are a helpful assistant.",
+  "mcp": {
+    "configPath": "./mcp.json",
+    "autoConnect": true
+  },
+  "skill": {
+    "directories": ["./skills"],
+    "autoLoad": true
+  },
+  "memory": {
+    "enabled": true,
+    "dbPath": "./memory/sqlite.db",
+    "autoInject": true
+  },
+  "knowledge": {
+    "enabled": true,
+    "code": { "rootDir": "./src" },
+    "search": { "autoSearch": true }
+  },
+  "permission": {
+    "enabled": true,
+    "defaultLevel": "confirm"
+  },
+  "toolExecution": {
+    "parallelExecution": true,
+    "maxConcurrentTools": 5
+  },
+  "telemetry": {
+    "enabled": true
+  }
+}
 ```
-输入 → 输入规则检查 → Agent 处理 → 输出规则检查 → 输出
-                               ↓
-                        工具调用规则检查
+
+### 13.2 Code Agent 配置
+
+```json
+{
+  "model": "gpt-4o",
+  "safety": {
+    "workingDir": ".",
+    "allowedPaths": ["**/*"],
+    "blockedPaths": ["**/node_modules/**", "**/.git/**"],
+    "blockSecrets": true
+  },
+  "history": {
+    "enabled": true,
+    "dbPath": ".ai-code/history.db"
+  },
+  "tasks": {
+    "enabled": true,
+    "dbPath": ".ai-code/tasks.db"
+  }
+}
 ```
-
-### 13.8 子 Agent 管理器 (Sub-Agent Manager)
-
-**职责**：编排多个子 Agent 协作执行
-
-**执行模式**：
-1. 单任务执行：`execute(task)`
-2. 并行执行：`executeParallel(tasks)` (带并发限制)
-3. DAG 编排：`orchestrate(dag)` (按依赖顺序)
-
-**资源管理**：
-- 最大并发数限制
-- 任务超时控制
-- 结果缓存 (可选)
