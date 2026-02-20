@@ -7,8 +7,8 @@
 import { existsSync, readFileSync, statSync } from 'fs';
 import { resolve, relative, isAbsolute, normalize } from 'path';
 import picomatch from 'picomatch';
-import type { Tool } from '@ai-stack/agent';
-import type { ReadParams, ToolContext } from '../types.js';
+import type { Tool, ToolExample } from '@ai-stack/agent';
+import type { ReadParams, ReadFormat, ToolContext } from '../types.js';
 import { FileNotFoundError, FileTooLargeError } from '../errors.js';
 
 /**
@@ -22,18 +22,16 @@ const DEFAULT_LIMIT = 2000;
 const MAX_LINE_LENGTH = 2000;
 
 /**
- * Create the Read tool
+ * Create the Read tool (enhanced with multiple output formats)
  */
 export function createReadTool(context: ToolContext): Tool {
   return {
     name: 'Read',
-    description: `Read a file from the filesystem. Returns content with line numbers.
-Usage:
-- file_path: Absolute path to the file (required)
-- offset: Line number to start from (1-based, optional)
-- limit: Number of lines to read (default: ${DEFAULT_LIMIT})
+    description: `Read a file from the filesystem. Output includes line numbers for easy reference.
 
-The output format shows line numbers: "   1→content of line 1"`,
+**Output Formats**:
+- \`numbered\` (default): Line numbers with separator, ideal for subsequent edits
+- \`plain\`: Raw content without line numbers, for understanding content only`,
     parameters: {
       type: 'object',
       properties: {
@@ -49,12 +47,66 @@ The output format shows line numbers: "   1→content of line 1"`,
           type: 'number',
           description: `Number of lines to read (default: ${DEFAULT_LIMIT})`,
         },
+        format: {
+          type: 'string',
+          enum: ['numbered', 'plain'],
+          description: 'Output format (default: numbered)',
+        },
       },
       required: ['file_path'],
     },
+
+    // Enhanced documentation (Anthropic's Poka-yoke principle)
+    examples: [
+      {
+        input: { file_path: '/src/index.ts' },
+        output: '  1 | import { foo } from "./foo";\n  2 | \n  3 | export function main() {',
+        description: 'Read file with numbered format (default)',
+      },
+      {
+        input: { file_path: '/src/index.ts', offset: 10, limit: 5 },
+        output: '[Lines 10-14 of 100]\n 10 | function helper() {\n 11 |   return 42;',
+        description: 'Read specific line range',
+      },
+      {
+        input: { file_path: '/src/index.ts', format: 'plain' },
+        output: 'import { foo } from "./foo";\n\nexport function main() {',
+        description: 'Read with plain format (no line numbers)',
+      },
+    ] as ToolExample[],
+
+    hints: [
+      'Always use absolute paths, not relative paths',
+      'Use numbered format when you need to make subsequent edits',
+      'Use plain format for quick content review',
+      'For large files, use offset/limit to read in chunks',
+      'Line numbers in output correspond directly to Edit tool parameters',
+    ],
+
+    edgeCases: [
+      'Returns error message if file does not exist',
+      'Binary files return "[Binary file - content not displayed]"',
+      'Empty files return empty string with no line numbers',
+      'Lines longer than 2000 characters are truncated with "... (truncated)"',
+    ],
+
+    returnFormat: 'Line-numbered content: "  N | content" or plain text based on format',
+
+    constraints: [
+      `Max lines per request: ${DEFAULT_LIMIT}`,
+      `Max line length: ${MAX_LINE_LENGTH} characters`,
+    ],
+
+    relatedTools: ['Edit', 'Write', 'Glob', 'Grep'],
+
+    antiPatterns: [
+      'Do not use for binary files (images, executables)',
+      'Do not read entire large files - use offset/limit to paginate',
+      'Prefer Grep for searching content instead of reading and parsing manually',
+    ],
     async execute(args: Record<string, unknown>): Promise<string> {
       const params = args as unknown as ReadParams;
-      const { file_path, offset = 1, limit = DEFAULT_LIMIT } = params;
+      const { file_path, offset = 1, limit = DEFAULT_LIMIT, format = 'numbered' } = params;
 
       // Validate path
       const { normalizedPath } = context.safety.workingDir
@@ -84,7 +136,22 @@ The output format shows line numbers: "   1→content of line 1"`,
       const endIndex = Math.min(lines.length, startIndex + limit);
       const selectedLines = lines.slice(startIndex, endIndex);
 
-      // Format with line numbers
+      // Plain format - no line numbers
+      if (format === 'plain') {
+        const plainLines = selectedLines.map((line) => {
+          return line.length > MAX_LINE_LENGTH
+            ? line.slice(0, MAX_LINE_LENGTH) + '... (truncated)'
+            : line;
+        });
+
+        let result = plainLines.join('\n');
+        if (startIndex > 0 || endIndex < lines.length) {
+          result = `[Lines ${offset}-${endIndex} of ${lines.length}]\n${result}`;
+        }
+        return result;
+      }
+
+      // Numbered format (default) - with clear visual separator
       const maxLineNum = endIndex;
       const lineNumWidth = String(maxLineNum).length;
 
@@ -96,7 +163,8 @@ The output format shows line numbers: "   1→content of line 1"`,
           line.length > MAX_LINE_LENGTH
             ? line.slice(0, MAX_LINE_LENGTH) + '... (truncated)'
             : line;
-        return `${paddedNum}→${truncatedLine}`;
+        // Use ' | ' separator for better readability (natural text format)
+        return `${paddedNum} | ${truncatedLine}`;
       });
 
       // Add info header if paginated

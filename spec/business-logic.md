@@ -245,15 +245,46 @@ interface AgentInstance {
 
 ### 3.3 工具系统
 
-**Tool 接口**：
+**Tool 接口** (增强版，基于 Anthropic "Poka-yoke" 原则)：
 
 ```typescript
 interface Tool {
-  name: string;           // 工具名称 (唯一)
+  // 基础字段
+  name: string;           // 工具名称 (唯一，snake_case)
   description: string;    // 工具描述
   parameters: object;     // JSON Schema 参数
   execute: (args) => Promise<string>; // 执行函数
+
+  // 增强文档字段 (可选，帮助 LLM 更好地使用工具)
+  examples?: ToolExample[];    // 使用示例
+  edgeCases?: string[];        // 边界情况
+  hints?: string[];            // 使用提示
+  returnFormat?: string;       // 返回格式说明
+  constraints?: string[];      // 约束条件
+  relatedTools?: string[];     // 相关工具
+  antiPatterns?: string[];     // 何时不使用
 }
+```
+
+**工具文档生成**：
+
+```
+┌─────────────────────────────────────────────────────────┐
+│               generateToolDescription()                  │
+│  ┌─────────────────────────────────────────────────┐    │
+│  │  基础描述                                        │    │
+│  │  + 返回格式说明                                  │    │
+│  │  + 使用示例 (input/output)                       │    │
+│  │  + 使用提示                                      │    │
+│  │  + 边界情况                                      │    │
+│  │  + 约束条件                                      │    │
+│  │  + 相关工具                                      │    │
+│  │  + 反模式 (何时不使用)                           │    │
+│  └─────────────────────────────────────────────────┘    │
+└─────────────────────────────────────────────────────────┘
+                           │
+                           ▼
+                  增强的工具描述 → LLM
 ```
 
 **工具执行流程**：
@@ -349,6 +380,14 @@ Agent 提供事件驱动的可观测性系统：
 | `llm:response` | LLM 响应接收 | hasToolCalls, usage, durationMs |
 | `iteration:start` | 迭代开始 | iteration, maxIterations |
 | `iteration:end` | 迭代结束 | iteration, toolCallCount, durationMs |
+| `thinking:start` | 思考开始 | - |
+| `thinking:update` | 思考更新 | thought, category |
+| `thinking:end` | 思考结束 | summary |
+| `plan:created` | 计划创建 | goal, steps, reasoning |
+| `plan:step:start` | 步骤开始 | stepId, description |
+| `plan:step:complete` | 步骤完成 | stepId, result |
+| `plan:step:failed` | 步骤失败 | stepId, error, willRetry |
+| `plan:updated` | 计划更新 | reason, addedSteps, removedStepIds |
 
 **使用示例**：
 ```typescript
@@ -371,7 +410,107 @@ agent.setEventListener((event) => {
 });
 ```
 
-### 3.6 CLI 应用
+### 3.6 停止条件 (Stop Conditions)
+
+基于 Anthropic "Building Effective Agents" 最佳实践，提供灵活的执行控制：
+
+**停止条件检查流程**：
+
+```
+每次迭代后
+    │
+    ▼
+┌─────────────────────────────────────────┐
+│         createStopChecker.check()        │
+│  ┌─────────────────────────────────────┐ │
+│  │ 1. 检查迭代限制 (maxIterations)      │ │
+│  │ 2. 检查工具调用限制 (maxToolCalls)   │ │
+│  │ 3. 检查 token 限制 (maxTotalTokens)  │ │
+│  │ 4. 检查时间限制 (maxDurationMs)      │ │
+│  │ 5. 检查成本限制 (maxCost)            │ │
+│  │ 6. 检查停止模式 (stopPatterns)       │ │
+│  │ 7. 检查连续失败 (maxConsecutiveFailures)│
+│  │ 8. 检查自定义条件 (customCondition)  │ │
+│  └─────────────────────────────────────┘ │
+└─────────────────────────────────────────┘
+    │
+    ├── shouldStop=false → 继续
+    │
+    └── shouldStop=true
+            │
+            ├── type='hard' → 强制停止
+            │
+            └── type='soft' → onStopCondition 回调
+                    │
+                    ├── return true  → 继续执行
+                    └── return false → 停止
+```
+
+**软停止 vs 硬停止**：
+| 类型 | 可覆盖 | 示例 |
+|------|--------|------|
+| soft | 是 | 迭代限制、工具调用限制、模式匹配 |
+| hard | 否 | token 限制、时间限制、成本限制 |
+
+### 3.7 透明度/规划 (Planning & Transparency)
+
+支持 Agent 执行计划的可视化和跟踪：
+
+**规划模式**：
+| 模式 | 说明 |
+|------|------|
+| `implicit` | 从 LLM 自然响应中提取计划 |
+| `explicit` | 通过系统提示词要求结构化计划 |
+| `tool` | 使用专用规划工具 |
+
+**计划解析流程**：
+
+```
+LLM 响应
+    │
+    ▼
+┌─────────────────────────────────────────┐
+│           parsePlan()                    │
+│  ┌─────────────────────────────────────┐ │
+│  │ 匹配 [PLAN]...[/PLAN] 块            │ │
+│  │ 提取 Goal                            │ │
+│  │ 提取 Steps (编号、描述、工具)        │ │
+│  └─────────────────────────────────────┘ │
+└─────────────────────────────────────────┘
+    │
+    ▼
+┌─────────────────────────────────────────┐
+│      detectStepCompletion()              │
+│  ┌─────────────────────────────────────┐ │
+│  │ 匹配 ✓/✅/[DONE] Step N             │ │
+│  │ 匹配 ✗/❌/[FAILED] Step N           │ │
+│  │ 匹配 [SKIPPED] Step N               │ │
+│  └─────────────────────────────────────┘ │
+└─────────────────────────────────────────┘
+    │
+    ▼
+更新 PlanStep 状态 → 触发 StreamCallbacks
+
+```
+
+**StreamCallbacks 透明度回调**：
+```typescript
+stream(input, {
+  onPlan: (plan) => {
+    // 显示执行计划
+    console.log(`Goal: ${plan.goal}`);
+    plan.steps.forEach(s => console.log(`- ${s.description}`));
+  },
+  onPlanStepStart: (step) => {
+    console.log(`▶ Starting: ${step.description}`);
+  },
+  onPlanStepComplete: (stepId, result) => {
+    console.log(`✓ ${stepId}: ${result}`);
+  },
+});
+```
+
+### 3.8 CLI 应用
 
 **命令结构**：
 
@@ -1909,3 +2048,106 @@ const auditLog = agent.getPermissionAuditLog();
   }
 }
 ```
+
+---
+
+## 12. @ai-stack/code 工具系统
+
+基于 Anthropic "Building Effective Agents" 文章的工具优化。
+
+### 12.1 Read 工具 (增强)
+
+支持多种输出格式：
+
+| 格式 | 说明 | 用途 |
+|------|------|------|
+| `numbered` | `N \| content` 格式 | 后续编辑时定位行 |
+| `plain` | 纯文本无行号 | 仅理解内容 |
+
+```
+Read 输出示例 (numbered):
+
+  1 | import { foo } from "./foo";
+  2 |
+  3 | export function main() {
+  4 |   return foo();
+  5 | }
+```
+
+### 12.2 Grep 工具 (增强)
+
+优化输出格式，使用 `>` 标记匹配行：
+
+```
+Found 2 match(es) in 2 file(s)
+
+src/utils.ts:
+  13 | // Helper functions
+  14 |
+> 15 | export function helper() {
+  16 |   return 42;
+  17 | }
+```
+
+### 12.3 Edit 工具 (多模式)
+
+支持三种编辑模式：
+
+| 模式 | 参数 | 说明 |
+|------|------|------|
+| `exact` | `old_string`, `new_string` | 精确字符串替换 |
+| `line` | `start_line`, `end_line`, `new_content` | 行号替换 |
+| `fuzzy` | `search_pattern`, `replacement` | 通配符模式 |
+
+**模式选择流程**：
+
+```
+用户参数
+    │
+    ├── start_line/new_content 存在 → line 模式
+    │
+    ├── search_pattern 存在 → fuzzy 模式
+    │
+    └── 其他 → exact 模式 (默认)
+```
+
+**使用示例**：
+
+```typescript
+// Exact 模式 - 精确替换
+await edit({
+  file_path: '/src/index.ts',
+  old_string: 'const x = 1;',
+  new_string: 'const x = 2;',
+});
+
+// Line 模式 - 基于行号 (从 Read 输出获取)
+await edit({
+  file_path: '/src/index.ts',
+  start_line: 10,
+  end_line: 12,
+  new_content: 'function newImpl() {\n  return 42;\n}',
+});
+
+// Fuzzy 模式 - 通配符匹配
+await edit({
+  file_path: '/src/index.ts',
+  search_pattern: 'function * {',
+  replacement: 'const $1 = () => {',
+  replace_all: true,
+});
+```
+
+### 12.4 工具增强文档字段
+
+所有工具支持 Anthropic "Poka-yoke" 原则的增强文档：
+
+| 字段 | 说明 |
+|------|------|
+| `examples` | 使用示例 (input/output 对) |
+| `hints` | 使用提示和最佳实践 |
+| `edgeCases` | 边界情况说明 |
+| `constraints` | 约束和限制 |
+| `returnFormat` | 返回格式说明 |
+| `relatedTools` | 相关工具推荐 |
+| `antiPatterns` | 何时不应使用 |

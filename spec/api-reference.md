@@ -477,6 +477,8 @@ const agent = createAgent(config?: AgentConfig): AgentInstance
 | `skill` | `AgentSkillConfig` | - | Skill 配置 |
 | `toolExecution` | `ToolExecutionConfig` | - | 工具执行配置 (并行/超时) |
 | `telemetry` | `TelemetryConfig` | - | 遥测/可观测性配置 |
+| `stopConditions` | `StopConditions` | - | 停止条件配置 |
+| `planning` | `PlanningConfig` | - | 规划/透明度配置 |
 
 **ToolExecutionConfig** (新增):
 
@@ -493,6 +495,35 @@ const agent = createAgent(config?: AgentConfig): AgentInstance
 | `enabled` | `boolean` | `false` | 是否启用事件发射 |
 | `onEvent` | `AgentEventListener` | - | 事件监听回调 |
 | `logLevel` | `'none' \| 'error' \| 'warn' \| 'info' \| 'debug'` | `'none'` | 日志级别 |
+
+**StopConditions** (新增，基于 Anthropic 最佳实践):
+
+| 参数 | 类型 | 默认值 | 描述 |
+|------|------|--------|------|
+| `maxIterations` | `number` | `10` | 最大 LLM 调用迭代 |
+| `maxToolCalls` | `number` | - | 最大工具调用次数 |
+| `maxTotalTokens` | `number` | - | 最大总 token 数 |
+| `maxCompletionTokens` | `number` | - | 最大输出 token 数 |
+| `maxDurationMs` | `number` | `300000` | 最大执行时间 (5分钟) |
+| `maxCost` | `number` | - | 最大成本 (USD) |
+| `pricing` | `{ promptTokenCost, completionTokenCost }` | - | 定价配置 |
+| `stopPatterns` | `(string \| RegExp)[]` | - | 停止模式匹配 |
+| `stopOnTools` | `string[]` | - | 调用特定工具时停止 |
+| `maxConsecutiveFailures` | `number` | `3` | 连续失败次数限制 |
+| `customCondition` | `(ctx) => boolean` | - | 自定义停止条件 |
+| `onStopCondition` | `(result, ctx) => Promise<boolean>` | - | 停止条件触发回调 |
+| `onProgress` | `(ctx) => void` | - | 进度回调 |
+
+**PlanningConfig** (新增，透明度支持):
+
+| 参数 | 类型 | 默认值 | 描述 |
+|------|------|--------|------|
+| `enabled` | `boolean` | `false` | 是否启用规划 |
+| `mode` | `'implicit' \| 'explicit' \| 'tool'` | `'implicit'` | 规划模式 |
+| `showPlanBeforeExecution` | `boolean` | `false` | 执行前显示计划 |
+| `requireApproval` | `boolean` | `false` | 需要用户批准 |
+| `allowDynamicReplanning` | `boolean` | `true` | 允许动态调整计划 |
+| `planningPrompt` | `string` | - | 自定义规划提示词 |
 
 **AgentMCPConfig**:
 
@@ -585,15 +616,43 @@ removeTool(name: string): boolean
 getTools(): Tool[]
 ```
 
-**Tool 接口**:
+**Tool 接口** (增强版，基于 Anthropic "Poka-yoke your tools" 原则):
 
 ```typescript
 interface Tool {
-  name: string;
-  description: string;
-  parameters: Record<string, unknown>;
+  // 基础字段
+  name: string;                                    // 工具名称 (snake_case)
+  description: string;                             // 工具描述
+  parameters: Record<string, unknown>;             // JSON Schema 参数
   execute: (args: Record<string, unknown>) => Promise<string>;
+
+  // 增强文档字段 (可选)
+  examples?: ToolExample[];                        // 使用示例
+  edgeCases?: string[];                            // 边界情况说明
+  hints?: string[];                                // 使用提示
+  returnFormat?: string;                           // 返回格式说明
+  constraints?: string[];                          // 约束条件
+  relatedTools?: string[];                         // 相关工具
+  antiPatterns?: string[];                         // 何时不使用此工具
 }
+
+interface ToolExample {
+  input: Record<string, unknown>;                  // 示例输入
+  output: string;                                  // 示例输出
+  description?: string;                            // 示例说明
+}
+```
+
+**工具文档生成器**:
+
+```typescript
+import { generateToolDescription, toolToFunctionDef } from '@ai-stack/agent';
+
+// 生成增强的工具描述
+const description = generateToolDescription(tool);
+
+// 转换为 OpenAI 函数定义
+const functionDef = toolToFunctionDef(tool, true);  // enhanced=true
 ```
 
 ---
@@ -689,15 +748,40 @@ async stream(
 ): Promise<AgentResponse>
 ```
 
-**StreamCallbacks**:
+**StreamCallbacks** (增强版，支持透明度):
 
 ```typescript
 {
+  // 基础回调
   onToken?: (token: string) => void;
   onToolCall?: (name: string, args: Record<string, unknown>) => void;
   onToolResult?: (name: string, result: string) => void;
   onComplete?: (response: AgentResponse) => void;
   onError?: (error: Error) => void;
+
+  // 透明度回调 (新增)
+  onThinkingStart?: () => void;
+  onThinking?: (thought: string, category?: 'analysis' | 'planning' | 'decision' | 'reflection') => void;
+  onThinkingEnd?: (summary?: string) => void;
+  onPlan?: (plan: AgentPlan) => void;
+  onPlanStepStart?: (step: PlanStep) => void;
+  onPlanStepComplete?: (stepId: string, result: string) => void;
+  onPlanStepFail?: (stepId: string, error: string) => void;
+  onPlanUpdate?: (update: { reason: string; steps: PlanStep[] }) => void;
+}
+```
+
+**PlanStep**:
+
+```typescript
+interface PlanStep {
+  id: string;
+  description: string;
+  status: 'pending' | 'in_progress' | 'completed' | 'failed' | 'skipped';
+  toolsToUse?: string[];
+  estimatedDuration?: string;
+  result?: string;
+  error?: string;
 }
 ```
 
@@ -716,7 +800,105 @@ async complete(
 
 ---
 
-### 2.2 配置函数
+### 2.2 工具文档生成器
+
+基于 Anthropic "Building Effective Agents" 文章的 "Poka-yoke your tools" 原则。
+
+#### generateToolDescription()
+
+生成增强的工具描述，包含示例、提示、边界情况等。
+
+```typescript
+function generateToolDescription(tool: Tool): string
+```
+
+#### toolToFunctionDef()
+
+转换为 OpenAI 函数定义。
+
+```typescript
+function toolToFunctionDef(tool: Tool, enhanced?: boolean): OpenAIFunctionDef
+```
+
+#### optimizeToolsForBudget()
+
+优化工具描述以适应 token 预算。
+
+```typescript
+function optimizeToolsForBudget(
+  tools: Tool[],
+  maxTokens: number
+): { tools: Tool[]; enhanced: boolean }
+```
+
+---
+
+### 2.3 停止条件检查器
+
+提供灵活的执行控制。
+
+#### createStopChecker()
+
+创建停止条件检查器实例。
+
+```typescript
+function createStopChecker(conditions?: StopConditions): StopCheckerInstance
+
+interface StopCheckerInstance {
+  check(context: ExecutionContext): Promise<StopCheckResult>;
+  handleStop(result: StopCheckResult, context: ExecutionContext): Promise<boolean>;
+  getElapsed(): number;
+  recordFailure(failed: boolean): void;
+}
+```
+
+**使用示例**:
+
+```typescript
+const checker = createStopChecker({
+  maxIterations: 20,
+  maxCost: 1.00,
+  pricing: { promptTokenCost: 0.01, completionTokenCost: 0.03 },
+  onStopCondition: async (result, ctx) => {
+    console.log(`Stop condition: ${result.reason}`);
+    return result.type === 'soft'; // Override soft stops
+  },
+});
+```
+
+---
+
+### 2.4 计划解析器
+
+支持透明度，从 LLM 响应中提取执行计划。
+
+#### parsePlan()
+
+从内容中解析 [PLAN]...[/PLAN] 块。
+
+```typescript
+function parsePlan(content: string): AgentPlan | null
+```
+
+#### createPlanTracker()
+
+创建计划跟踪器实例。
+
+```typescript
+function createPlanTracker(): PlanTrackerInstance
+
+interface PlanTrackerInstance {
+  getPlan(): AgentPlan | null;
+  setPlan(plan: AgentPlan): void;
+  processContent(content: string): { stepStarted?: string; stepsCompleted: StepCompletion[] };
+  getProgress(): { total: number; completed: number; failed: number; pending: number };
+  isComplete(): boolean;
+}
+```
+
+---
+
+### 2.5 配置函数
 
 #### loadConfig()
 
@@ -1802,6 +1984,25 @@ export {
   ConfigNotFoundError,
   ConfigValidationError,
 
+  // 工具文档生成器 (Anthropic Poka-yoke)
+  generateToolDescription,
+  toolToFunctionDef,
+  toolsToFunctionDefs,
+  optimizeToolsForBudget,
+
+  // 停止条件检查器
+  createStopChecker,
+  createExecutionContext,
+  type StopCheckerInstance,
+
+  // 计划解析器 (透明度)
+  parsePlan,
+  detectStepCompletion,
+  detectStepStart,
+  createPlanTracker,
+  DEFAULT_PLANNING_PROMPT,
+  type PlanTrackerInstance,
+
   // 类型
   type AgentConfig,
   type AgentStackConfig,
@@ -1810,6 +2011,7 @@ export {
   type SecurityConfigSection,
   type LoadConfigResult,
   type Tool,
+  type ToolExample,
   type AgentResponse,
   type ToolCallResult,
   type StreamCallbacks,
@@ -1817,6 +2019,12 @@ export {
   type Message,
   type ToolExecutionConfig,
   type TelemetryConfig,
+  type StopConditions,
+  type ExecutionContext,
+  type StopCheckResult,
+  type PlanningConfig,
+  type PlanStep,
+  type AgentPlan,
   type AgentEvent,
   type AgentEventType,
   type AgentEventListener,

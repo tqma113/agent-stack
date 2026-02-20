@@ -9,6 +9,34 @@ export { createAgent, type AgentInstance } from './agent.js';
 export * from './types.js';
 export * from './config.js';
 
+// Tool documentation (Anthropic's "Poka-yoke your tools")
+export {
+  generateToolDescription,
+  toolToFunctionDef,
+  toolsToFunctionDefs,
+  generateMinimalDescription,
+  estimateToolDescriptionTokens,
+  optimizeToolsForBudget,
+} from './tool-docs.js';
+
+// Stop condition checker
+export {
+  createStopChecker,
+  createExecutionContext,
+  type StopCheckerInstance,
+} from './stop-checker.js';
+
+// Plan parser (transparency support)
+export {
+  parsePlan,
+  detectStepCompletion,
+  detectStepStart,
+  createPlanTracker,
+  DEFAULT_PLANNING_PROMPT,
+  type StepCompletion,
+  type PlanTrackerInstance,
+} from './plan-parser.js';
+
 // Built-in tools
 export {
   createAskUserTool,

@@ -93,6 +93,11 @@ export interface CodeConfig {
 // =============================================================================
 
 /**
+ * Read output format
+ */
+export type ReadFormat = 'numbered' | 'plain' | 'snippet';
+
+/**
  * Read tool parameters
  */
 export interface ReadParams {
@@ -102,6 +107,8 @@ export interface ReadParams {
   offset?: number;
   /** Number of lines to read */
   limit?: number;
+  /** Output format (default: 'numbered') */
+  format?: ReadFormat;
 }
 
 /**
@@ -115,17 +122,48 @@ export interface WriteParams {
 }
 
 /**
- * Edit tool parameters
+ * Edit mode for smart editing
+ */
+export type EditMode = 'exact' | 'fuzzy' | 'line' | 'instruction';
+
+/**
+ * Edit tool parameters (enhanced with multiple modes)
  */
 export interface EditParams {
   /** Absolute path to the file to edit */
   file_path: string;
-  /** Text to replace */
-  old_string: string;
+
+  // Mode 1: Exact replacement (default)
+  /** Text to replace (exact match) */
+  old_string?: string;
   /** Replacement text */
-  new_string: string;
+  new_string?: string;
+
+  // Mode 2: Line-based replacement
+  /** Starting line number (1-indexed) */
+  start_line?: number;
+  /** Ending line number (inclusive) */
+  end_line?: number;
+  /** New content to replace the lines */
+  new_content?: string;
+
+  // Mode 3: Fuzzy matching
+  /** Pattern to search (supports * wildcard) */
+  search_pattern?: string;
+  /** Replacement for fuzzy match */
+  replacement?: string;
+
+  // Mode 4: Instruction-based (natural language)
+  /** Natural language edit instruction */
+  instruction?: string;
+
+  // Options
+  /** Edit mode (auto-detected if not specified) */
+  mode?: EditMode;
   /** Replace all occurrences */
   replace_all?: boolean;
+  /** Show diff without applying changes */
+  preview_only?: boolean;
 }
 
 /**

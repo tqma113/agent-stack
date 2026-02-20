@@ -86,6 +86,13 @@ export function getDiffSummary(oldContent: string, newContent: string): string {
 }
 
 /**
+ * Create a unified diff patch string
+ */
+export function createPatch(filename: string, oldContent: string, newContent: string): string {
+  return Diff.createPatch(filename, oldContent, newContent, 'old', 'new');
+}
+
+/**
  * Create a word-level diff for display
  */
 export function wordDiff(oldContent: string, newContent: string): string {

@@ -8,7 +8,7 @@ import { readFileSync, statSync, readdirSync } from 'fs';
 import { resolve, relative, join, extname } from 'path';
 import { glob } from 'glob';
 import picomatch from 'picomatch';
-import type { Tool } from '@ai-stack/agent';
+import type { Tool, ToolExample } from '@ai-stack/agent';
 import type { GrepParams, GrepOutputMode, ToolContext } from '../types.js';
 
 /**
@@ -27,23 +27,17 @@ const MAX_MATCHES = 200;
 const MAX_FILE_SIZE = 1048576;
 
 /**
- * Create the Grep tool
+ * Create the Grep tool (enhanced with better output formatting)
  */
 export function createGrepTool(context: ToolContext): Tool {
   return {
     name: 'Grep',
-    description: `Search file contents using regex patterns.
-Usage:
-- pattern: Regular expression to search for (required)
-- path: Directory or file to search in (default: working directory)
-- glob: File pattern filter like "*.ts" (optional)
-- output_mode: 'content' | 'files_with_matches' | 'count' (default: 'files_with_matches')
-- context: Number of lines before/after matches (only for content mode)
-- case_insensitive: Ignore case (default: false)
+    description: `Search file contents using regex patterns. Returns matches with surrounding context for understanding.
 
-Examples:
-- Search for function definitions: pattern="function\\s+\\w+"
-- Search in TypeScript files: pattern="import", glob="*.ts"`,
+**Output Modes**:
+- \`files_with_matches\` (default): List matching file paths
+- \`content\`: Show matching lines with context, ">" marks the match
+- \`count\`: Show match count per file`,
     parameters: {
       type: 'object',
       properties: {
@@ -57,7 +51,7 @@ Examples:
         },
         glob: {
           type: 'string',
-          description: 'File pattern filter (e.g., "*.ts")',
+          description: 'File pattern filter (e.g., "*.ts", "**/*.tsx")',
         },
         output_mode: {
           type: 'string',
@@ -66,15 +60,72 @@ Examples:
         },
         context: {
           type: 'number',
-          description: 'Lines of context around matches (content mode only)',
+          description: 'Lines of context around matches (content mode only, default: 2)',
         },
         case_insensitive: {
           type: 'boolean',
-          description: 'Case insensitive search',
+          description: 'Case insensitive search (default: false)',
         },
       },
       required: ['pattern'],
     },
+
+    // Enhanced documentation (Anthropic's Poka-yoke principle)
+    examples: [
+      {
+        input: { pattern: 'function.*export', path: 'src', context: 2, output_mode: 'content' },
+        output: `Found 2 match(es) in 2 file(s)
+
+src/utils.ts:15
+  13 | // Helper functions
+  14 |
+> 15 | export function helper() {
+  16 |   return 42;
+  17 | }`,
+        description: 'Search with context lines, ">" marks matching line',
+      },
+      {
+        input: { pattern: 'import.*react', glob: '*.tsx', case_insensitive: true },
+        output: 'Found 5 match(es) in 3 file(s):\nsrc/App.tsx\nsrc/components/Button.tsx',
+        description: 'Find React imports in TSX files',
+      },
+      {
+        input: { pattern: 'TODO', output_mode: 'count' },
+        output: 'Found 8 match(es) in 4 file(s):\nsrc/api.ts: 3\nsrc/utils.ts: 2',
+        description: 'Count TODOs per file',
+      },
+    ] as ToolExample[],
+
+    hints: [
+      'Use regex patterns for flexible matching (e.g., "class\\s+\\w+")',
+      'Add context lines (context: 2-3) to understand matches better',
+      'Use glob filter to search specific file types (e.g., "*.ts")',
+      'Results show file:line for easy navigation to source',
+      'Use files_with_matches mode first to find relevant files, then content mode for details',
+    ],
+
+    edgeCases: [
+      'Returns "No matches found" if pattern not found',
+      'Skips binary files automatically',
+      'Skips files larger than 1MB',
+      'Maximum 200 matches returned (use more specific patterns if exceeded)',
+    ],
+
+    returnFormat: 'Matches grouped by file. In content mode, ">" marks the matching line, context lines are indented.',
+
+    constraints: [
+      `Max files to search: ${MAX_FILES}`,
+      `Max matches returned: ${MAX_MATCHES}`,
+      `Max file size: ${MAX_FILE_SIZE / 1024}KB`,
+    ],
+
+    relatedTools: ['Read', 'Glob', 'Edit'],
+
+    antiPatterns: [
+      'Do not use for finding files by name - use Glob instead',
+      'Do not use overly broad patterns that match everything',
+      'Avoid searching in node_modules or build directories',
+    ],
     async execute(args: Record<string, unknown>): Promise<string> {
       const params = args as unknown as GrepParams;
       const {
@@ -245,7 +296,9 @@ function searchFile(content: string, regex: RegExp, contextLines: number): Searc
 }
 
 /**
- * Format search results
+ * Format search results with natural, readable output
+ *
+ * Based on Anthropic's recommendation: "Keep formats close to naturally occurring internet text"
  */
 function formatOutput(
   results: SearchResult[],
@@ -269,19 +322,39 @@ function formatOutput(
 
     case 'content': {
       const parts: string[] = [header];
+
       for (const result of results) {
-        parts.push(`\n${result.file}:`);
+        // File header with location hint
+        parts.push('');
+        parts.push(`${result.file}:`);
+
         for (const match of result.matches) {
-          if (match.context) {
-            for (const line of match.context.before) {
-              parts.push(`  ${line}`);
-            }
+          // Calculate line number padding
+          const maxLine = match.context
+            ? match.line + (match.context.after?.length || 0)
+            : match.line;
+          const lineWidth = String(maxLine).length;
+
+          // Context lines before (indented, no marker)
+          if (match.context?.before) {
+            match.context.before.forEach((line, i) => {
+              const lineNum = match.line - match.context!.before.length + i;
+              const paddedNum = String(lineNum).padStart(lineWidth, ' ');
+              parts.push(`  ${paddedNum} | ${line}`);
+            });
           }
-          parts.push(`${match.line}: ${match.content}`);
-          if (match.context) {
-            for (const line of match.context.after) {
-              parts.push(`  ${line}`);
-            }
+
+          // Matching line (marked with ">")
+          const paddedMatchNum = String(match.line).padStart(lineWidth, ' ');
+          parts.push(`> ${paddedMatchNum} | ${match.content}`);
+
+          // Context lines after (indented, no marker)
+          if (match.context?.after) {
+            match.context.after.forEach((line, i) => {
+              const lineNum = match.line + i + 1;
+              const paddedNum = String(lineNum).padStart(lineWidth, ' ');
+              parts.push(`  ${paddedNum} | ${line}`);
+            });
           }
         }
       }
