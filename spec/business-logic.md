@@ -2151,3 +2151,152 @@ await edit({
 | `returnFormat` | 返回格式说明 |
 | `relatedTools` | 相关工具推荐 |
 | `antiPatterns` | 何时不应使用 |
+
+---
+
+## 13. Agent 架构扩展模块
+
+### 13.1 状态机 (State Machine)
+
+**职责**：管理 Agent 执行状态，支持暂停/恢复和检查点
+
+**状态流转**：
+```
+idle → planning → executing → completed
+                ↓           ↓
+              paused ←→ waiting
+                ↓           ↓
+              error ←───────┘
+```
+
+**核心功能**：
+- 状态转换验证 (只允许有效转换)
+- 工作内存管理 (临时数据存储)
+- 检查点创建/恢复 (持久化支持)
+- 状态订阅机制 (UI 更新)
+
+### 13.2 恢复策略 (Recovery Policy)
+
+**职责**：处理执行错误，提供自动重试和恢复机制
+
+**退避策略**：
+| 策略 | 公式 | 适用场景 |
+|------|------|----------|
+| `none` | 0 | 测试 |
+| `fixed` | `delay` | 简单重试 |
+| `linear` | `delay × attempt` | 渐进增加 |
+| `exponential` | `delay × 2^(attempt-1)` | API 调用 |
+| `fibonacci` | `delay × fib(attempt)` | 长时任务 |
+
+**熔断器模式**：
+- `closed` (正常) → 失败次数达阈值 → `open` (熔断)
+- `open` → 超时后 → `half-open` (试探)
+- `half-open` → 成功达阈值 → `closed`
+
+### 13.3 计划 DAG (Plan DAG)
+
+**职责**：管理任务依赖关系，支持并行执行
+
+**节点状态**：
+- `pending` → `ready` → `executing` → `completed`/`failed`/`skipped`
+
+**核心算法**：
+- Kahn 算法：拓扑排序确定执行顺序
+- 关键路径：计算最长执行路径
+- 并行批次：获取可并行执行的节点组
+
+### 13.4 评估器 (Evaluator)
+
+**职责**：评估 Agent 输出质量，决定是否重试
+
+**评估维度**：
+| 维度 | 权重 | 说明 |
+|------|------|------|
+| accuracy | 0.25 | 信息准确性 |
+| completeness | 0.25 | 回答完整性 |
+| relevance | 0.20 | 内容相关性 |
+| safety | 0.15 | 安全合规性 |
+| coherence | 0.10 | 逻辑一致性 |
+| helpfulness | 0.05 | 实用帮助度 |
+
+**自检机制**：
+- 验证回答与工具结果的一致性
+- 检测逻辑矛盾
+- 识别未经验证的声明
+
+### 13.5 模型路由器 (Model Router)
+
+**职责**：根据任务类型智能选择模型，优化成本
+
+**任务路由映射**：
+| 任务类型 | 默认层级 | 说明 |
+|----------|----------|------|
+| tool_selection | fast | 工具选择 |
+| classification | fast | 分类任务 |
+| formatting | fast | 格式化 |
+| conversation | standard | 对话 |
+| summarization | standard | 摘要 |
+| code_generation | strong | 代码生成 |
+| reasoning | strong | 推理 |
+| planning | strong | 规划 |
+
+**成本优化策略**：
+1. 上下文长度检查 → 选择足够大的模型
+2. 能力降级 → 尝试更便宜的模型
+3. 预算限制 → 强制使用最便宜模型
+
+### 13.6 指标聚合器 (Metrics Aggregator)
+
+**职责**：收集执行指标，提供可观测性
+
+**指标类型**：
+- 延迟：p50, p90, p95, p99, avg, min, max
+- 成本：按模型、按操作汇总
+- 吞吐：每分钟请求数、Token 数
+- 错误：按类型、按操作统计，错误率
+- 工具：调用次数、平均时长、成功率
+
+**告警机制**：
+```typescript
+{
+  name: 'high_error_rate',
+  metric: 'error_rate',
+  operator: 'gt',
+  threshold: 0.1,
+  severity: 'critical'
+}
+```
+
+### 13.7 Guardrail (安全检查)
+
+**职责**：验证输入/输出内容的安全性
+
+**内置规则**：
+| 规则 ID | 类型 | 说明 |
+|---------|------|------|
+| builtin_pii | output | PII 检测 |
+| builtin_secrets | output | 密钥检测 |
+| builtin_dangerous_commands | tool | 危险命令 |
+| builtin_injection | input | Prompt 注入 |
+| builtin_length | all | 长度限制 |
+
+**检查流程**：
+```
+输入 → 输入规则检查 → Agent 处理 → 输出规则检查 → 输出
+                               ↓
+                        工具调用规则检查
+```
+
+### 13.8 子 Agent 管理器 (Sub-Agent Manager)
+
+**职责**：编排多个子 Agent 协作执行
+
+**执行模式**：
+1. 单任务执行：`execute(task)`
+2. 并行执行：`executeParallel(tasks)` (带并发限制)
+3. DAG 编排：`orchestrate(dag)` (按依赖顺序)
+
+**资源管理**：
+- 最大并发数限制
+- 任务超时控制
+- 结果缓存 (可选)

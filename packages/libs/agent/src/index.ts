@@ -37,6 +37,169 @@ export {
   type PlanTrackerInstance,
 } from './plan-parser.js';
 
+// State machine (Orchestrator layer)
+export {
+  createStateMachine,
+  VALID_TRANSITIONS,
+  DEFAULT_STATE_MACHINE_CONFIG,
+  type StateMachineInstance,
+  type AgentStatus,
+  type AgentState,
+  type AgentError,
+  type StateTransition,
+  type StateMachineConfig,
+  type CheckpointInfo,
+  type CheckpointStorage,
+  type PlanDAGRef,
+  type SerializedMessage,
+} from './state-machine/index.js';
+
+// Recovery policy (Orchestrator layer)
+export {
+  createRecoveryPolicy,
+  createApiRecoveryPolicy,
+  createToolRecoveryPolicy,
+  createResilientRecoveryPolicy,
+  ERROR_PATTERNS,
+  DEFAULT_RECOVERY_CONFIG,
+  DEFAULT_CIRCUIT_BREAKER_CONFIG,
+  type RecoveryPolicyInstance,
+  type BackoffStrategy,
+  type BackoffFunction,
+  type RecoveryAction,
+  type RecoveryContext,
+  type ErrorCategory,
+  type ErrorClassifier,
+  type RecoveryPolicyConfig,
+  type CircuitState,
+  type CircuitBreakerConfig,
+  type CircuitBreakerState,
+} from './recovery/index.js';
+
+// Planner (Planner layer)
+export {
+  createPlanDAG,
+  createPlanner,
+  createRuleBasedPlanner,
+  DEFAULT_PLAN_PROMPT,
+  REPLAN_PROMPT,
+  DECOMPOSE_PROMPT,
+  DEFAULT_PLANNER_CONFIG,
+  type PlanDAGInstance,
+  type PlannerInstance,
+  type LLMChatFn,
+  type PlanNodeStatus,
+  type PlanNode,
+  type PlanStatus,
+  type PlanDAG,
+  type PlanProgress,
+  type PlanningMode,
+  type PlannerConfig,
+  type PlanContext,
+  type PlanEventType,
+  type PlanEvent,
+  type PlanEventListener,
+} from './planner/index.js';
+
+// Evaluator (Evaluator layer)
+export {
+  createEvaluator,
+  createSimpleEvaluator,
+  createRuleBasedEvaluator,
+  DEFAULT_EVAL_PROMPT,
+  DEFAULT_SELF_CHECK_PROMPT,
+  DEFAULT_CRITERIA,
+  DEFAULT_EVALUATOR_CONFIG,
+  type EvaluatorInstance,
+  type EvaluationDimension,
+  type CustomCriterion,
+  type EvaluationCriteria,
+  type ToolResultForEval,
+  type EvalContext,
+  type EvaluationResult,
+  type SelfCheckResult,
+  type EvaluatorConfig,
+} from './evaluator/index.js';
+
+// Model Router (Model layer)
+export {
+  createModelRouter,
+  createOpenAIRouter,
+  createAnthropicRouter,
+  DEFAULT_TASK_TIER_MAP,
+  DEFAULT_MODEL_TIERS,
+  type ModelRouterInstance,
+  type TaskComplexity,
+  type TaskType,
+  type ModelTierName,
+  type ModelTier,
+  type RoutingContext,
+  type RoutingDecision,
+  type TokenUsage,
+  type TierCostStats,
+  type CostStats,
+  type ModelRouterConfig,
+} from './router/index.js';
+
+// Metrics (Observability layer)
+export {
+  createMetricsAggregator,
+  DEFAULT_METRICS_CONFIG,
+  type MetricsAggregatorInstance,
+  type MetricPoint,
+  type LatencyPoint,
+  type CostPoint,
+  type ErrorPoint,
+  type ToolCallPoint,
+  type TokenPoint,
+  type LatencyStats,
+  type CostMetrics,
+  type ThroughputMetrics,
+  type ErrorMetrics,
+  type ToolMetrics,
+  type AggregatedMetrics,
+  type AlertSeverity,
+  type AlertCondition,
+  type Alert,
+  type MetricsConfig,
+} from './metrics/index.js';
+
+// Guardrail (Safety layer)
+export {
+  createGuardrail,
+  createPIIRule,
+  createSecretsRule,
+  createDangerousCommandsRule,
+  createInjectionRule,
+  createLengthRule,
+  getBuiltInRules,
+  DEFAULT_GUARDRAIL_CONFIG,
+  type GuardrailInstance,
+  type GuardrailRuleType,
+  type GuardrailSeverity,
+  type GuardrailContext,
+  type GuardrailResult,
+  type GuardrailRule,
+  type GuardrailConfig,
+  type BuiltInRuleCategory,
+  type BuiltInRuleOptions,
+} from './guardrail/index.js';
+
+// Sub-Agent (Orchestration layer)
+export {
+  createSubAgentManager,
+  DEFAULT_SUB_AGENT_MANAGER_CONFIG,
+  type SubAgentManagerInstance,
+  type AgentFactory,
+  type SubAgentLike,
+  type SubAgentConfig,
+  type SubAgentTask,
+  type SubAgentTaskStatus,
+  type SubAgentResult,
+  type SubAgentDAG,
+  type SubAgentManagerConfig,
+} from './sub-agent/index.js';
+
 // Built-in tools
 export {
   createAskUserTool,

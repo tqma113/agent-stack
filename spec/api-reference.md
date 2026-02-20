@@ -3175,3 +3175,342 @@ export {
   type DailyLogEntry,
 };
 ```
+
+---
+
+## 9. 新增 Agent 架构模块
+
+### 9.1 状态机 (State Machine)
+
+提供 Agent 执行状态管理，支持暂停/恢复和检查点功能。
+
+```typescript
+import { createStateMachine, type StateMachineInstance } from '@ai-stack/agent';
+
+const stateMachine = createStateMachine({
+  checkpointPath: './checkpoints',
+  autoCheckpoint: true,
+  checkpointInterval: 5,
+  onStateChange: (state, transition) => {
+    console.log(`State: ${state.status}, Transition: ${transition.type}`);
+  },
+});
+
+// 状态转换
+stateMachine.transition({ type: 'START', input: 'user message' });
+stateMachine.transition({ type: 'PLAN_CREATED', plan: planDAGRef });
+stateMachine.transition({ type: 'COMPLETE', result: 'final result' });
+
+// 检查点操作
+const checkpointId = await stateMachine.checkpoint('before_risky_op');
+await stateMachine.restore(checkpointId);
+
+// 状态订阅
+const unsubscribe = stateMachine.subscribe((state) => {
+  console.log('State updated:', state.status);
+});
+```
+
+**AgentStatus 状态**:
+- `idle` - 空闲，等待输入
+- `planning` - 规划中
+- `executing` - 执行中
+- `waiting` - 等待用户/外部输入
+- `paused` - 暂停
+- `error` - 错误
+- `completed` - 完成
+
+---
+
+### 9.2 恢复策略 (Recovery Policy)
+
+提供错误恢复策略，支持多种退避算法和熔断器模式。
+
+```typescript
+import { createRecoveryPolicy, createApiRecoveryPolicy } from '@ai-stack/agent';
+
+const recovery = createRecoveryPolicy({
+  maxRetries: 3,
+  backoffStrategy: 'exponential', // none, fixed, linear, exponential, fibonacci
+  initialDelayMs: 1000,
+  maxDelayMs: 30000,
+  circuitBreaker: {
+    failureThreshold: 5,
+    resetTimeoutMs: 30000,
+  },
+});
+
+// 执行带恢复策略的操作
+const result = await recovery.execute('api_call', async () => {
+  return await fetch('/api/data');
+});
+
+// 预设配置
+const apiRecovery = createApiRecoveryPolicy({ maxRetries: 3 });
+const toolRecovery = createToolRecoveryPolicy({ maxRetries: 2 });
+```
+
+---
+
+### 9.3 计划 DAG (Plan DAG)
+
+提供 DAG 风格的任务分解和依赖管理。
+
+```typescript
+import { createPlanDAG, createPlanner, type PlanDAGInstance } from '@ai-stack/agent';
+
+// 手动创建 DAG
+const dag = createPlanDAG('Analyze and summarize document');
+
+dag.addNode({
+  id: 'step_1',
+  description: 'Read the document',
+  tool: 'read_file',
+  args: { path: 'doc.md' },
+  dependsOn: [],
+  parallel: true,
+});
+
+dag.addNode({
+  id: 'step_2',
+  description: 'Summarize content',
+  dependsOn: ['step_1'],
+});
+
+// 获取可执行的节点
+const readyNodes = dag.getReadyNodes();
+const parallelBatch = dag.getParallelBatch(3);
+
+// 进度跟踪
+const progress = dag.getProgress();
+console.log(`Progress: ${progress.percentage}%`);
+
+// LLM 驱动的计划生成
+const planner = createPlanner(
+  { mode: 'plan-execute', maxSteps: 20 },
+  async (prompt) => llm.chat(prompt)
+);
+
+const plan = await planner.plan('Build a REST API', {
+  availableTools: [{ name: 'write_file', description: '...' }],
+});
+```
+
+---
+
+### 9.4 评估器 (Evaluator)
+
+提供输出质量评估和自检功能。
+
+```typescript
+import { createEvaluator, createSimpleEvaluator } from '@ai-stack/agent';
+
+const evaluator = createEvaluator(
+  {
+    passThreshold: 0.7,
+    useLLMEval: true,
+    evalModel: 'gpt-4o-mini', // 可用更便宜的模型
+    criteria: {
+      accuracy: 0.3,
+      completeness: 0.3,
+      relevance: 0.2,
+      safety: 0.2,
+    },
+  },
+  async (prompt, model) => llm.chat(prompt, { model })
+);
+
+// 评估输出
+const result = await evaluator.evaluate(output, {
+  originalRequest: userQuestion,
+  toolResults: [...],
+});
+
+console.log(`Score: ${result.score}, Passed: ${result.passed}`);
+console.log(`Issues: ${result.issues.join(', ')}`);
+
+// 自检
+const selfCheck = await evaluator.selfCheck(response, context);
+if (!selfCheck.consistent) {
+  console.log('Problems:', selfCheck.problems);
+}
+```
+
+---
+
+### 9.5 模型路由器 (Model Router)
+
+智能模型路由，基于任务类型和成本优化。
+
+```typescript
+import { createModelRouter, createOpenAIRouter, createAnthropicRouter } from '@ai-stack/agent';
+
+const router = createModelRouter({
+  fast: { model: 'gpt-4o-mini', inputCostPer1K: 0.00015, ... },
+  standard: { model: 'gpt-4o', inputCostPer1K: 0.0025, ... },
+  strong: { model: 'gpt-4o', inputCostPer1K: 0.0025, ... },
+  costOptimization: true,
+  dailyCostLimit: 10.0,
+});
+
+// 基于任务类型路由
+const decision = router.route('code_generation', {
+  estimatedTokens: 5000,
+  canDowngrade: true,
+});
+console.log(`Using: ${decision.model} (${decision.tier})`);
+
+// 基于复杂度路由
+const simpleTask = router.routeByComplexity('simple');
+const complexTask = router.routeByComplexity('complex');
+
+// 成本跟踪
+router.recordUsage('standard', { input: 1000, output: 500 });
+const stats = router.getCostStats();
+console.log(`Total cost: $${stats.totalCost.toFixed(4)}`);
+
+// 预设配置
+const openaiRouter = createOpenAIRouter({ dailyCostLimit: 5.0 });
+const anthropicRouter = createAnthropicRouter({ costOptimization: true });
+```
+
+---
+
+### 9.6 指标聚合器 (Metrics Aggregator)
+
+收集和聚合执行指标，支持告警。
+
+```typescript
+import { createMetricsAggregator } from '@ai-stack/agent';
+
+const metrics = createMetricsAggregator({
+  enabled: true,
+  retentionPeriodMs: 3600000, // 1 hour
+  autoExportIntervalMs: 60000,
+  onExport: (aggregated) => sendToMonitoring(aggregated),
+  onAlert: (alert) => notifyTeam(alert),
+  alerts: [
+    { name: 'high_error_rate', metric: 'error_rate', operator: 'gt', threshold: 0.1, severity: 'critical' },
+    { name: 'high_latency', metric: 'latency_p95', operator: 'gt', threshold: 5000, severity: 'warning' },
+  ],
+});
+
+// 记录指标
+metrics.recordLatency('chat', 1500);
+metrics.recordCost('gpt-4o', 'chat', 0.05, 1000, 500);
+metrics.recordToolCall('read_file', 200, true);
+metrics.recordError('chat', 'rate_limit');
+
+// 获取聚合指标
+const aggregated = metrics.getMetrics();
+console.log(`P95 Latency: ${aggregated.latency.p95}ms`);
+console.log(`Error Rate: ${aggregated.errors.rate}`);
+console.log(`Top Tools:`, aggregated.tools.topTools);
+
+// 启动自动导出
+metrics.startAutoExport();
+```
+
+---
+
+### 9.7 Guardrail (安全检查)
+
+提供输入/输出内容的安全检查。
+
+```typescript
+import { createGuardrail, getBuiltInRules } from '@ai-stack/agent';
+
+const guardrail = createGuardrail({
+  enableBuiltInRules: true,
+  blockOnViolation: true,
+  onViolation: (result, content) => {
+    console.log(`Violation: ${result.ruleId} - ${result.message}`);
+  },
+});
+
+// 检查输入
+const inputResults = await guardrail.checkInput(userInput);
+if (guardrail.shouldBlock(inputResults)) {
+  throw new Error('Input blocked');
+}
+
+// 检查输出
+const outputResults = await guardrail.checkOutput(agentOutput);
+
+// 检查工具调用
+const toolResults = await guardrail.checkToolCall('bash', { command: 'rm -rf /' });
+
+// 自定义规则
+guardrail.addRule({
+  id: 'custom_check',
+  name: 'Custom validation',
+  type: 'output',
+  severity: 'warn',
+  check: (content) => ({
+    passed: !content.includes('TODO'),
+    ruleId: 'custom_check',
+    message: 'Output contains TODO',
+  }),
+});
+```
+
+**内置规则**:
+- `builtin_pii` - PII 检测 (邮箱、电话、SSN、信用卡)
+- `builtin_secrets` - 密钥检测 (API keys, passwords, tokens)
+- `builtin_dangerous_commands` - 危险命令检测
+- `builtin_injection` - Prompt 注入检测
+- `builtin_length` - 内容长度限制
+
+---
+
+### 9.8 子 Agent 管理器 (Sub-Agent Manager)
+
+编排多个子 Agent 的执行。
+
+```typescript
+import { createSubAgentManager, type SubAgentConfig } from '@ai-stack/agent';
+
+// 创建管理器
+const manager = createSubAgentManager(
+  (config) => createAgent({ systemPrompt: config.systemPrompt, model: config.model }),
+  { maxConcurrent: 5, defaultTimeoutMs: 60000 }
+);
+
+// 注册子 Agent
+manager.register({
+  id: 'researcher',
+  name: 'Research Agent',
+  systemPrompt: 'You are a research assistant...',
+  tools: ['web_search', 'read_url'],
+  model: 'gpt-4o-mini',
+});
+
+manager.register({
+  id: 'writer',
+  name: 'Writer Agent',
+  systemPrompt: 'You are a technical writer...',
+  model: 'gpt-4o',
+});
+
+// 执行单个任务
+const result = await manager.execute({
+  agentId: 'researcher',
+  input: 'Research the latest AI trends',
+});
+
+// 并行执行
+const results = await manager.executeParallel([
+  { agentId: 'researcher', input: 'Research topic A' },
+  { agentId: 'researcher', input: 'Research topic B' },
+]);
+
+// DAG 编排
+const dagResults = await manager.orchestrate({
+  id: 'report_generation',
+  tasks: [
+    { agentId: 'researcher', input: 'Research AI trends' },
+    { agentId: 'writer', input: 'Write report', dependsOn: ['task_1'] },
+  ],
+  edges: [{ from: 'task_1', to: 'task_2' }],
+});
+```

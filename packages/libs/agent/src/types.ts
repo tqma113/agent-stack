@@ -155,6 +155,10 @@ export interface AgentConfig {
   stopConditions?: StopConditions;
   /** Planning configuration for transparency */
   planning?: PlanningConfig;
+  /** State machine configuration for pause/resume/checkpoint */
+  stateMachine?: AgentStateMachineConfig;
+  /** Recovery policy configuration for error handling */
+  recovery?: AgentRecoveryConfig;
 
   /**
    * Callback for user interaction (enables AskUser tool)
@@ -870,4 +874,78 @@ export interface PlanningConfig {
 
   /** Custom system prompt addition for planning */
   planningPrompt?: string;
+}
+
+// =============================================================================
+// State Machine Configuration (Orchestrator layer)
+// =============================================================================
+
+/**
+ * State machine configuration for agent execution
+ * Enables pause/resume and checkpoint functionality
+ */
+export interface AgentStateMachineConfig {
+  /** Enable state machine for execution tracking (default: false) */
+  enabled?: boolean;
+
+  /** Whether to auto-save checkpoints */
+  autoCheckpoint?: boolean;
+
+  /** Checkpoint interval (every N steps) */
+  checkpointInterval?: number;
+
+  /** Checkpoint storage path */
+  checkpointPath?: string;
+
+  /** State change callback */
+  onStateChange?: (state: unknown, transition: unknown) => void;
+
+  /** Maximum working memory entries */
+  maxWorkingMemorySize?: number;
+
+  /** Include conversation history in state */
+  includeConversationHistory?: boolean;
+
+  /** Debug mode */
+  debug?: boolean;
+}
+
+// =============================================================================
+// Recovery Policy Configuration (Orchestrator layer)
+// =============================================================================
+
+/**
+ * Recovery policy configuration for error handling
+ */
+export interface AgentRecoveryConfig {
+  /** Enable recovery policy (default: true) */
+  enabled?: boolean;
+
+  /** Maximum retry attempts */
+  maxRetries?: number;
+
+  /** Backoff strategy */
+  backoffStrategy?: 'none' | 'fixed' | 'linear' | 'exponential' | 'fibonacci';
+
+  /** Initial delay in milliseconds */
+  initialDelayMs?: number;
+
+  /** Maximum delay in milliseconds */
+  maxDelayMs?: number;
+
+  /** Enable circuit breaker */
+  circuitBreaker?: {
+    /** Number of failures before opening circuit */
+    failureThreshold?: number;
+    /** Time to wait before trying again (ms) */
+    resetTimeoutMs?: number;
+    /** Number of successes to close circuit */
+    successThreshold?: number;
+  };
+
+  /** Error callback */
+  onError?: (error: Error, operation: string, attempt: number) => void;
+
+  /** Recovery callback */
+  onRecovered?: (error: Error, operation: string, attempts: number) => void;
 }
