@@ -101,14 +101,18 @@ export {
   ttyShowConfirm,
   ttyShowSelect,
   ttyShowDiffView,
+  ttyShowQuestion,
   // Classic adapter
   classicShowConfirm,
   classicShowSelect,
   classicShowDiffView,
+  classicShowQuestion,
   readLine,
   createInteractiveLoop,
   // Auto-detecting functions
   showConfirm,
   showSelect,
   showDiffView,
+  showQuestion,
+  type QuestionOption,
 } from './adapters/index.js';

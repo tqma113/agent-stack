@@ -11,6 +11,7 @@ export {
   showConfirm as ttyShowConfirm,
   showSelect as ttyShowSelect,
   showDiffView as ttyShowDiffView,
+  showQuestion as ttyShowQuestion,
 } from './tty.js';
 
 // Classic adapter
@@ -18,6 +19,7 @@ export {
   showConfirm as classicShowConfirm,
   showSelect as classicShowSelect,
   showDiffView as classicShowDiffView,
+  showQuestion as classicShowQuestion,
   readLine,
   createInteractiveLoop,
   legacyColors,
@@ -67,4 +69,30 @@ export async function showDiffView(
     return tty.showDiffView(filename, oldContent, newContent);
   }
   return classic.showDiffView(filename, oldContent, newContent);
+}
+
+/**
+ * Question option for showQuestion
+ */
+export interface QuestionOption {
+  label: string;
+  value: string;
+  description?: string;
+}
+
+/**
+ * Show a question dialog and get user response (auto-detects environment)
+ */
+export async function showQuestion(
+  question: string,
+  options?: {
+    options?: QuestionOption[];
+    placeholder?: string;
+  }
+): Promise<string | null> {
+  const env = detectEnvironment();
+  if (env.mode === 'tty') {
+    return tty.showQuestion(question, options);
+  }
+  return classic.showQuestion(question, options);
 }

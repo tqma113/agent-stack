@@ -24,6 +24,12 @@ export interface SyncStatus {
   inProgress: boolean;
   /** Last error if any */
   lastError?: string;
+  /** Number of files checked (incremental sync) */
+  filesChecked?: number;
+  /** Number of files reindexed (incremental sync) */
+  filesReindexed?: number;
+  /** Number of files skipped - unchanged (incremental sync) */
+  filesSkipped?: number;
 }
 
 /**
@@ -59,4 +65,24 @@ export interface MemoryQueryOptions {
   };
   /** Minimum score threshold */
   minScore?: number;
+}
+
+/**
+ * Search mode for hybrid search
+ */
+export type SearchMode = 'bm25' | 'vector' | 'hybrid';
+
+/**
+ * Hybrid search options extending MemoryQueryOptions
+ */
+export interface HybridSearchOptions extends MemoryQueryOptions {
+  /** Search mode (default: 'hybrid' when vector search is enabled, 'bm25' otherwise) */
+  mode?: SearchMode;
+  /** Custom weights for hybrid search (overrides config defaults) */
+  weights?: {
+    /** FTS (BM25) weight */
+    fts: number;
+    /** Vector search weight */
+    vector: number;
+  };
 }

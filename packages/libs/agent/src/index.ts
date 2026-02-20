@@ -9,6 +9,14 @@ export { createAgent, type AgentInstance } from './agent.js';
 export * from './types.js';
 export * from './config.js';
 
+// Built-in tools
+export {
+  createAskUserTool,
+  type AskUserOption,
+  type AskUserParams,
+  type OnAskUserCallback,
+} from './tools/index.js';
+
 // Re-export TUI for convenience
 export {
   // Theme and colors

@@ -2,11 +2,11 @@
  * @ai-stack/assistant - SQLite Index
  *
  * Derived index from Markdown files for fast search.
- * Uses FTS5 for full-text search.
+ * Uses FTS5 for full-text search with incremental indexing support.
  */
 
-import { createSqliteStores } from '@ai-stack/memory-store-sqlite';
 import type { FactItem, TodoItem, DailyLogEntry, MemorySearchResult, MemoryQueryOptions } from './types.js';
+import type { FileMetadata } from './hash-utils.js';
 
 /**
  * Memory index entry types
@@ -23,6 +23,17 @@ interface IndexEntry {
   source: string;
   timestamp: number;
   metadata?: string; // JSON
+}
+
+/**
+ * Stored file metadata record
+ */
+export interface StoredFileMetadata {
+  path: string;
+  hash: string;
+  size: number;
+  mtime: number;
+  indexedAt: number;
 }
 
 /**
@@ -51,6 +62,18 @@ export interface SqliteIndexInstance {
   getCount(): Promise<number>;
   /** Get all entries by type */
   getByType(type: EntryType): Promise<MemorySearchResult[]>;
+
+  // Incremental indexing support
+  /** Get stored file metadata */
+  getFileMetadata(path: string): Promise<StoredFileMetadata | null>;
+  /** Update file metadata after indexing */
+  updateFileMetadata(metadata: FileMetadata): Promise<void>;
+  /** Delete file metadata and associated entries */
+  deleteFileEntries(source: string): Promise<void>;
+  /** Get all tracked file paths */
+  getTrackedFiles(): Promise<string[]>;
+  /** Check if file needs reindexing based on hash */
+  needsReindex(path: string, currentHash: string): Promise<boolean>;
 }
 
 /**
@@ -106,6 +129,16 @@ export function createSqliteIndex(dbPath: string): SqliteIndexInstance {
 
         CREATE INDEX IF NOT EXISTS idx_memory_type ON memory_index(type);
         CREATE INDEX IF NOT EXISTS idx_memory_timestamp ON memory_index(timestamp DESC);
+        CREATE INDEX IF NOT EXISTS idx_memory_source ON memory_index(source);
+
+        -- File metadata table for incremental indexing
+        CREATE TABLE IF NOT EXISTS file_metadata (
+          path TEXT PRIMARY KEY,
+          hash TEXT NOT NULL,
+          size INTEGER NOT NULL,
+          mtime INTEGER NOT NULL,
+          indexed_at INTEGER NOT NULL
+        );
       `);
     },
 
@@ -279,6 +312,68 @@ export function createSqliteIndex(dbPath: string): SqliteIndexInstance {
         timestamp: new Date(row.timestamp),
         metadata: row.metadata ? JSON.parse(row.metadata) : undefined,
       }));
+    },
+
+    // Incremental indexing methods
+
+    async getFileMetadata(path: string): Promise<StoredFileMetadata | null> {
+      if (!db) throw new Error('Index not initialized');
+
+      const row = db.prepare(`
+        SELECT path, hash, size, mtime, indexed_at
+        FROM file_metadata
+        WHERE path = ?
+      `).get(path) as { path: string; hash: string; size: number; mtime: number; indexed_at: number } | undefined;
+
+      if (!row) return null;
+
+      return {
+        path: row.path,
+        hash: row.hash,
+        size: row.size,
+        mtime: row.mtime,
+        indexedAt: row.indexed_at,
+      };
+    },
+
+    async updateFileMetadata(metadata: FileMetadata): Promise<void> {
+      if (!db) throw new Error('Index not initialized');
+
+      const stmt = db.prepare(`
+        INSERT OR REPLACE INTO file_metadata (path, hash, size, mtime, indexed_at)
+        VALUES (?, ?, ?, ?, ?)
+      `);
+
+      stmt.run(metadata.path, metadata.hash, metadata.size, metadata.mtime, Date.now());
+    },
+
+    async deleteFileEntries(source: string): Promise<void> {
+      if (!db) throw new Error('Index not initialized');
+
+      // Delete entries from memory_index (triggers will update FTS)
+      db.prepare('DELETE FROM memory_index WHERE source = ?').run(source);
+
+      // Delete file metadata
+      db.prepare('DELETE FROM file_metadata WHERE path = ?').run(source);
+    },
+
+    async getTrackedFiles(): Promise<string[]> {
+      if (!db) throw new Error('Index not initialized');
+
+      const rows = db.prepare('SELECT path FROM file_metadata').all() as { path: string }[];
+      return rows.map((row) => row.path);
+    },
+
+    async needsReindex(path: string, currentHash: string): Promise<boolean> {
+      if (!db) throw new Error('Index not initialized');
+
+      const stored = await this.getFileMetadata(path);
+
+      // File not tracked yet - needs indexing
+      if (!stored) return true;
+
+      // Hash changed - needs reindexing
+      return stored.hash !== currentHash;
     },
   };
 }

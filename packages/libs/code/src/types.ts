@@ -337,6 +337,15 @@ export interface CodeAgentInstance {
 // =============================================================================
 
 /**
+ * Option for AskUser tool
+ */
+export interface AskUserOption {
+  label: string;
+  value: string;
+  description?: string;
+}
+
+/**
  * Context passed to tools
  */
 export interface ToolContext {
@@ -352,4 +361,6 @@ export interface ToolContext {
   markFileRead: (filePath: string) => void;
   /** Confirm callback for destructive operations */
   onConfirm?: (message: string) => Promise<boolean>;
+  /** Ask user a question and get response */
+  onAskUser?: (question: string, options?: AskUserOption[]) => Promise<string | null>;
 }

@@ -8,6 +8,10 @@
     "mcp": {
       "configPath": "./mcp.json",
       "autoConnect": true
+    },
+    "skill": {
+      "directories": ["./skills"],
+      "autoLoad": true
     }
   },
   "memory": {

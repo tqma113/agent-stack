@@ -54,6 +54,7 @@ export interface ThemeIcons {
   taskPending: string;
   folder: string;
   file: string;
+  question: string;
 }
 
 /**

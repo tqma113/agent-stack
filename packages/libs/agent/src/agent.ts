@@ -83,6 +83,7 @@ import {
   type PermissionRule,
   type PermissionAuditEntry,
 } from './permission/index.js';
+import { createAskUserTool } from './tools/ask-user.js';
 import type { AgentEventListener as AgentEventListenerType } from './types.js';
 
 const DEFAULT_SYSTEM_PROMPT = `You are a helpful AI assistant. Be concise and helpful in your responses.`;
@@ -1818,6 +1819,11 @@ export function createAgent(config: AgentConfig = {}): AgentInstance {
       eventListener = listener ?? undefined;
     },
   };
+
+  // Register AskUser tool if callback is provided
+  if (config.onAskUser) {
+    instance.registerTool(createAskUserTool(config.onAskUser));
+  }
 
   return instance;
 }

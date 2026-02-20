@@ -3,7 +3,7 @@
  */
 
 import { existsSync, readFileSync, writeFileSync, mkdirSync } from 'fs';
-import { resolve, join, dirname } from 'path';
+import { resolve, join, dirname, isAbsolute } from 'path';
 import { homedir } from 'os';
 import type { AssistantConfig } from './types.js';
 
@@ -126,13 +126,25 @@ export function getDefaultConfig(): AssistantConfig {
 /**
  * Resolve paths relative to base directory
  */
-export function resolveConfig(config: AssistantConfig): AssistantConfig {
-  const baseDir = config.baseDir || DEFAULT_BASE_DIR;
+export function resolveConfig(config: AssistantConfig, configDir?: string): AssistantConfig {
+  // Use configDir (from config file location) or cwd
+  const workingDir = configDir || process.cwd();
+  const baseDir = config.baseDir
+    ? isAbsolute(config.baseDir)
+      ? config.baseDir
+      : resolve(workingDir, config.baseDir)
+    : resolve(workingDir, DEFAULT_BASE_DIR);
 
   // Ensure base directory exists
   if (!existsSync(baseDir)) {
     mkdirSync(baseDir, { recursive: true });
   }
+
+  // Helper to resolve paths relative to workingDir
+  const resolvePath = (p: string | undefined, defaultPath: string): string => {
+    if (!p) return join(baseDir, defaultPath);
+    return isAbsolute(p) ? p : resolve(workingDir, p);
+  };
 
   return {
     ...config,
@@ -140,15 +152,15 @@ export function resolveConfig(config: AssistantConfig): AssistantConfig {
     memory: config.memory
       ? {
           ...config.memory,
-          memoryFile: config.memory.memoryFile || join(baseDir, 'MEMORY.md'),
-          logsDir: config.memory.logsDir || join(baseDir, 'memory'),
-          dbPath: config.memory.dbPath || join(baseDir, 'index.db'),
+          memoryFile: resolvePath(config.memory.memoryFile, 'MEMORY.md'),
+          logsDir: resolvePath(config.memory.logsDir, 'memory'),
+          dbPath: resolvePath(config.memory.dbPath, 'index.db'),
         }
       : undefined,
     scheduler: config.scheduler
       ? {
           ...config.scheduler,
-          persistencePath: config.scheduler.persistencePath || join(baseDir, 'scheduler.json'),
+          persistencePath: resolvePath(config.scheduler.persistencePath, 'scheduler.json'),
         }
       : undefined,
   };

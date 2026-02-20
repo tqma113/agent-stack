@@ -18,7 +18,7 @@
   [ ] Corn Job
     [ ] AI 新闻、事件、仓库、论文、趋势
 [ ] code agent
-  [ ] LSP
+  [x] LSP
   [ ] undo redo
   [ ] /init 自动分析项目
 [ ] OpenClaw
@@ -29,8 +29,8 @@
 [ ] multi agent X model provider X MCP/Skill
 [x] 我们支持了 maxIterations，目前达到限制之后任务会自动停止，我希望当达到限制之后中止然后询问用户是否继续，而不是直接终止
 [ ] 终端并行任务管理 tux
-[ ] TUI
-[ ] 用户交互 question
+[x] TUI
+[x] 用户交互 question
 
 * 常规 Agent
   * chat gpt

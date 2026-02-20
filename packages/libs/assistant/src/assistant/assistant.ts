@@ -4,6 +4,7 @@
  * Personal AI assistant with Markdown memory, multi-channel gateway, and scheduler.
  */
 
+import { dirname } from 'path';
 import { createAgent, type AgentInstance, type AgentConfig } from '@ai-stack/agent';
 import type { AssistantConfig, IncomingMessage, MessageContent, Session } from '../types.js';
 import { loadConfig, resolveConfig, getDefaultConfig } from '../config.js';
@@ -64,12 +65,25 @@ export function createAssistant(config?: AssistantConfig | string): AssistantIns
   let resolvedConfig: AssistantConfig;
 
   if (typeof config === 'string') {
-    const { config: loadedConfig } = loadConfig(config);
-    resolvedConfig = resolveConfig(loadedConfig);
+    // Explicit config path provided
+    const { config: loadedConfig, configPath } = loadConfig(config);
+    // Pass config directory for relative path resolution
+    const configDir = configPath ? dirname(configPath) : undefined;
+    resolvedConfig = resolveConfig(loadedConfig, configDir);
   } else if (config) {
+    // Config object provided directly
     resolvedConfig = resolveConfig(config);
   } else {
-    resolvedConfig = resolveConfig(getDefaultConfig());
+    // No config provided - try to find config file, fall back to defaults
+    const { config: loadedConfig, configPath } = loadConfig();
+    if (configPath) {
+      // Found a config file - resolve paths relative to it
+      const configDir = dirname(configPath);
+      resolvedConfig = resolveConfig(loadedConfig, configDir);
+    } else {
+      // No config file found - use defaults
+      resolvedConfig = resolveConfig(getDefaultConfig());
+    }
   }
 
   // Build agent config

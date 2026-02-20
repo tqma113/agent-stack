@@ -127,6 +127,9 @@ importers:
       '@ai-stack/memory-store-sqlite':
         specifier: workspace:*
         version: link:../memory-store-sqlite
+      '@ai-stack/provider':
+        specifier: workspace:*
+        version: link:../provider
       '@ai-stack/tui':
         specifier: workspace:*
         version: link:../tui

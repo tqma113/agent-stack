@@ -26,6 +26,7 @@ import {
   createGrepTool,
   createUndoTool,
   createRedoTool,
+  createAskUserTool,
   createTaskTools,
   performUndo,
   performRedo,
@@ -39,6 +40,7 @@ import {
   isTTY,
   showConfirm,
   showDiffView,
+  showQuestion,
 } from '@ai-stack/tui';
 
 /**
@@ -102,6 +104,10 @@ export function createCodeAgent(config?: CodeConfig | string): CodeAgentInstance
     onConfirm: async (message: string) => {
       return showConfirm(message);
     },
+    // Implement onAskUser callback using TUI
+    onAskUser: async (question: string, options) => {
+      return showQuestion(question, { options });
+    },
   };
 
   const instance: CodeAgentInstance = {
@@ -129,6 +135,9 @@ export function createCodeAgent(config?: CodeConfig | string): CodeAgentInstance
       agent.registerTool(createEditTool(toolContext));
       agent.registerTool(createGlobTool(toolContext));
       agent.registerTool(createGrepTool(toolContext));
+
+      // Register user interaction tool
+      agent.registerTool(createAskUserTool(toolContext));
 
       // Register undo/redo tools if history is enabled
       if (historyStore) {

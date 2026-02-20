@@ -104,6 +104,61 @@ export function readLine(prompt: string): Promise<string> {
 }
 
 /**
+ * Classic question dialog (text mode)
+ */
+export function showQuestion(
+  question: string,
+  options?: {
+    options?: Array<{ label: string; value: string; description?: string }>;
+    placeholder?: string;
+  }
+): Promise<string | null> {
+  return new Promise(resolve => {
+    const rl = readline.createInterface({
+      input: process.stdin,
+      output: process.stdout,
+    });
+
+    console.log(`\n${legacyColors.cyan('?')} ${legacyColors.bold(question)}`);
+
+    if (options?.options && options.options.length > 0) {
+      // Selection mode
+      console.log('');
+      options.options.forEach((opt, i) => {
+        console.log(`  ${i + 1}. ${opt.label}${opt.description ? ` - ${legacyColors.gray(opt.description)}` : ''}`);
+      });
+      console.log('');
+
+      rl.question(`Enter number (1-${options.options.length}) or 'c' to cancel: `, answer => {
+        rl.close();
+        const trimmed = answer.trim().toLowerCase();
+
+        if (trimmed === 'c' || trimmed === 'cancel') {
+          resolve(null);
+          return;
+        }
+
+        const num = parseInt(trimmed, 10);
+        if (num >= 1 && num <= options.options!.length) {
+          resolve(options.options![num - 1].value);
+        } else {
+          // Invalid input, return first option as default
+          resolve(options.options![0].value);
+        }
+      });
+    } else {
+      // Text input mode
+      const placeholder = options?.placeholder || 'Your answer';
+      rl.question(`${placeholder}: `, answer => {
+        rl.close();
+        const trimmed = answer.trim();
+        resolve(trimmed || null);
+      });
+    }
+  });
+}
+
+/**
  * Classic interactive loop
  */
 export function createInteractiveLoop(options: {

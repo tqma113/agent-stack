@@ -150,6 +150,7 @@ memoryCmd
   .description('Search memory')
   .option('-c, --config <path>', 'Configuration file path')
   .option('-n, --limit <n>', 'Maximum results', '10')
+  .option('-m, --mode <mode>', 'Search mode: bm25, vector, or hybrid', 'hybrid')
   .action(async (query, options) => {
     await searchMemory(query, options);
   });
@@ -453,6 +454,7 @@ async function showDaemonLogs(options: DaemonOptions & { lines?: string }) {
 interface MemoryOptions {
   config?: string;
   limit?: string;
+  mode?: 'bm25' | 'vector' | 'hybrid';
 }
 
 async function syncMemory(options: MemoryOptions) {
@@ -468,12 +470,20 @@ async function syncMemory(options: MemoryOptions) {
 
   console.log('Syncing memory...');
   const status = await memory.sync();
-  console.log(`Synced ${status.itemCount} items.`);
+
+  // Show incremental sync stats
+  if (status.filesChecked !== undefined) {
+    console.log(`Files checked: ${status.filesChecked}`);
+    console.log(`Files reindexed: ${status.filesReindexed}`);
+    console.log(`Files skipped (unchanged): ${status.filesSkipped}`);
+  }
+  console.log(`Total items: ${status.itemCount}`);
 
   await assistant.close();
 }
 
 async function searchMemory(query: string, options: MemoryOptions) {
+  const ttyMode = isTTY();
   const assistant = createAssistant(options.config);
   await assistant.initialize();
 
@@ -485,15 +495,36 @@ async function searchMemory(query: string, options: MemoryOptions) {
   }
 
   const limit = parseInt(options.limit || '10', 10);
-  const results = await memory.search(query, { limit });
+  const mode = options.mode || 'hybrid';
+
+  // Use hybrid search if mode is specified, otherwise fall back to BM25
+  const results = await memory.searchHybrid(query, { limit, mode });
+
+  // Show search mode info
+  const vectorReady = memory.isVectorSearchReady();
+  const actualMode = vectorReady ? mode : 'bm25';
+  if (ttyMode) {
+    console.log(theme.muted(`Search mode: ${actualMode}${!vectorReady && mode !== 'bm25' ? ' (vector search not available)' : ''}\n`));
+  } else {
+    console.log(`Search mode: ${actualMode}${!vectorReady && mode !== 'bm25' ? ' (vector search not available)' : ''}\n`);
+  }
 
   if (results.length === 0) {
     console.log('No results found.');
   } else {
     console.log(`Found ${results.length} results:\n`);
     for (const result of results) {
-      console.log(`[${result.type}] ${result.content.slice(0, 100)}...`);
-      console.log(`  Score: ${result.score.toFixed(2)} | Source: ${result.source}`);
+      const contentPreview = result.content.length > 100
+        ? result.content.slice(0, 100) + '...'
+        : result.content;
+
+      if (ttyMode) {
+        console.log(theme.highlight(`[${result.type}]`) + ` ${contentPreview}`);
+        console.log(theme.muted(`  Score: ${result.score.toFixed(3)} | Source: ${result.source}`));
+      } else {
+        console.log(`[${result.type}] ${contentPreview}`);
+        console.log(`  Score: ${result.score.toFixed(3)} | Source: ${result.source}`);
+      }
       console.log();
     }
   }

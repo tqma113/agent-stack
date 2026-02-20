@@ -72,8 +72,25 @@ export interface MarkdownMemoryConfig {
   syncOnStartup?: boolean;
   /** Watch for file changes */
   watchFiles?: boolean;
-  /** Embedding model for semantic search */
+
+  // Vector Search Configuration
+  /** Enable vector search (default: false) */
+  enableVectorSearch?: boolean;
+  /** Embedding provider (default: 'openai') */
+  embeddingProvider?: 'openai' | 'google' | 'openai-compatible';
+  /** Embedding model (default: 'text-embedding-3-small') */
   embeddingModel?: string;
+  /** Vector dimensions (default: 1536 for OpenAI) */
+  vectorDimensions?: number;
+  /** Custom API base URL for embedding provider */
+  embeddingBaseURL?: string;
+  /** Hybrid search weights */
+  searchWeights?: {
+    /** FTS (BM25) weight (default: 0.3) */
+    fts: number;
+    /** Vector search weight (default: 0.7) */
+    vector: number;
+  };
 }
 
 /**

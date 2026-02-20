@@ -3,8 +3,9 @@
  */
 
 export { createMarkdownMemory, type MarkdownMemoryInstance } from './markdown-memory.js';
-export { createSqliteIndex, type SqliteIndexInstance } from './sqlite-index.js';
+export { createSqliteIndex, type SqliteIndexInstance, type StoredFileMetadata } from './sqlite-index.js';
 export { createSyncEngine, type SyncEngineInstance, type SyncEngineConfig } from './sync-engine.js';
+export { hashText, hashFile, getFileMetadata, hasFileChanged, getFilesMetadata, type FileMetadata } from './hash-utils.js';
 export {
   parseMemoryFile,
   parseDailyLogFile,
@@ -24,6 +25,7 @@ export {
   appendNotes,
   writeDailyLogEntry,
 } from './markdown-writer.js';
+export { mergeHybridResults, mergeWithRRF } from './hybrid-merge.js';
 export type {
   MemoryDocument,
   ProfileSection,
@@ -35,4 +37,6 @@ export type {
   SyncStatus,
   MemorySearchResult,
   MemoryQueryOptions,
+  SearchMode,
+  HybridSearchOptions,
 } from './types.js';

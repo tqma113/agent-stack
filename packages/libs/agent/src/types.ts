@@ -153,6 +153,21 @@ export interface AgentConfig {
   telemetry?: TelemetryConfig;
 
   /**
+   * Callback for user interaction (enables AskUser tool)
+   *
+   * When provided, the agent will have access to the AskUser tool,
+   * allowing it to ask questions and get responses from the user.
+   *
+   * @param question - The question to ask
+   * @param options - Optional choices for the user
+   * @returns User's response, or null if cancelled
+   */
+  onAskUser?: (
+    question: string,
+    options?: Array<{ label: string; value: string; description?: string }>
+  ) => Promise<string | null>;
+
+  /**
    * Multi-model provider configuration (optional)
    *
    * When specified, uses the new unified provider interface instead of

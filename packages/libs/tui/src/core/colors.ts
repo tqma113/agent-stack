@@ -49,6 +49,7 @@ export const icons = {
   taskPending: '\u2610', // ☐
   folder: '\u{1f4c1}', // 📁
   file: '\u{1f4c4}',   // 📄
+  question: '?',       // ?
 };
 
 /**

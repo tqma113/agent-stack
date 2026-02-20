@@ -11,6 +11,7 @@ import { defaultTheme } from '../theme/default.js';
 import type { Theme } from '../theme/types.js';
 import { Confirm, type ConfirmProps } from '../components/input/Confirm.js';
 import { Select, type SelectProps } from '../components/input/Select.js';
+import { Question, type QuestionOption } from '../components/input/Question.js';
 import { DiffView, type DiffViewProps } from '../components/code/DiffView.js';
 
 let currentInstance: Instance | null = null;
@@ -134,5 +135,39 @@ export function showDiffView(
     });
 
     render(component, options.theme);
+  });
+}
+
+/**
+ * Show a question dialog and get user response
+ */
+export function showQuestion(
+  question: string,
+  questionOptions?: {
+    options?: QuestionOption[];
+    placeholder?: string;
+    theme?: Theme;
+  }
+): Promise<string | null> {
+  return new Promise(resolve => {
+    const handleAnswer = (answer: string) => {
+      unmount();
+      resolve(answer);
+    };
+
+    const handleCancel = () => {
+      unmount();
+      resolve(null);
+    };
+
+    const component = React.createElement(Question, {
+      question,
+      options: questionOptions?.options,
+      placeholder: questionOptions?.placeholder,
+      onAnswer: handleAnswer,
+      onCancel: handleCancel,
+    });
+
+    render(component, questionOptions?.theme);
   });
 }

@@ -40,6 +40,7 @@
     "@ai-stack/agent": "workspace:*",
     "@ai-stack/memory": "workspace:*",
     "@ai-stack/memory-store-sqlite": "workspace:*",
+    "@ai-stack/provider": "workspace:*",
     "@ai-stack/tui": "workspace:*",
     "better-sqlite3": "^11.7.0",
     "chokidar": "^4.0.0",

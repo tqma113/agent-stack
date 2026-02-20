@@ -2776,3 +2776,194 @@ export {
   type PermissionPolicyInstance,
 };
 ```
+
+---
+
+## 8. @ai-stack/assistant
+
+### 8.1 Markdown Memory
+
+`@ai-stack/assistant` 提供基于 Markdown 文件的持久化记忆系统，支持 BM25 全文搜索和可选的向量语义搜索。
+
+#### createMarkdownMemory() 工厂函数
+
+```typescript
+const memory = createMarkdownMemory(config: MarkdownMemoryConfig): MarkdownMemoryInstance
+```
+
+**MarkdownMemoryConfig**:
+
+| 参数 | 类型 | 默认值 | 描述 |
+|------|------|--------|------|
+| `enabled` | `boolean` | `true` | 是否启用记忆系统 |
+| `memoryFile` | `string` | `'MEMORY.md'` | 记忆文件路径 |
+| `logsDir` | `string` | `'memory'` | 日志目录路径 |
+| `dbPath` | `string` | `'index.db'` | SQLite 索引路径 |
+| `syncOnStartup` | `boolean` | `true` | 启动时同步 |
+| `watchFiles` | `boolean` | `true` | 监听文件变化 |
+| `enableVectorSearch` | `boolean` | `false` | 启用向量搜索 |
+| `embeddingProvider` | `'openai' \| 'google' \| 'openai-compatible'` | `'openai'` | Embedding 提供者 |
+| `embeddingModel` | `string` | `'text-embedding-3-small'` | Embedding 模型 |
+| `vectorDimensions` | `number` | `1536` | 向量维度 |
+| `embeddingBaseURL` | `string` | - | 自定义 API 端点 |
+| `searchWeights` | `{ fts: number; vector: number }` | `{ fts: 0.3, vector: 0.7 }` | 混合搜索权重 |
+
+---
+
+#### 搜索方法
+
+```typescript
+// BM25 全文搜索
+async search(query: string, options?: MemoryQueryOptions): Promise<MemorySearchResult[]>
+
+// 混合搜索 (BM25 + 向量)
+async searchHybrid(query: string, options?: HybridSearchOptions): Promise<MemorySearchResult[]>
+```
+
+**HybridSearchOptions**:
+
+| 参数 | 类型 | 默认值 | 描述 |
+|------|------|--------|------|
+| `mode` | `'bm25' \| 'vector' \| 'hybrid'` | `'hybrid'` | 搜索模式 |
+| `weights` | `{ fts: number; vector: number }` | 配置默认 | 混合搜索权重 |
+| `limit` | `number` | `10` | 最大结果数 |
+| `types` | `('fact' \| 'todo' \| 'log' \| 'note')[]` | 全部 | 过滤类型 |
+| `minScore` | `number` | - | 最小分数阈值 |
+
+**MemorySearchResult**:
+
+```typescript
+{
+  type: 'fact' | 'todo' | 'log' | 'note';
+  content: string;
+  score: number;
+  source: string;
+  timestamp?: Date;
+  metadata?: Record<string, unknown>;
+}
+```
+
+---
+
+#### 向量搜索配置
+
+```typescript
+// 设置自定义 Embedding 函数
+setEmbedFunction(fn: EmbedFunction): void
+
+// 检查向量搜索是否就绪
+isVectorSearchReady(): boolean
+
+// 获取 SemanticStore (高级用法)
+getSemanticStore(): SemanticStoreInstance | null
+```
+
+**EmbedFunction**:
+
+```typescript
+type EmbedFunction = (text: string) => Promise<number[]>;
+```
+
+---
+
+#### 使用示例
+
+```typescript
+import { createMarkdownMemory } from '@ai-stack/assistant';
+
+// 纯 BM25 模式
+const memory = createMarkdownMemory({
+  memoryFile: './MEMORY.md',
+  dbPath: './index.db',
+});
+
+await memory.initialize();
+const results = await memory.search('user preferences');
+
+// 启用混合搜索
+const hybridMemory = createMarkdownMemory({
+  memoryFile: './MEMORY.md',
+  dbPath: './index.db',
+  enableVectorSearch: true,
+  embeddingProvider: 'openai',
+  embeddingModel: 'text-embedding-3-small',
+  searchWeights: { fts: 0.3, vector: 0.7 },
+});
+
+await hybridMemory.initialize();
+
+// 混合搜索 (自动选择最佳模式)
+const hybridResults = await hybridMemory.searchHybrid('what does the user like');
+
+// 强制向量模式
+const vectorResults = await hybridMemory.searchHybrid('semantic query', {
+  mode: 'vector',
+  limit: 5,
+});
+```
+
+---
+
+#### CLI 搜索命令
+
+```bash
+# BM25 搜索
+ai-assistant memory search "query" --mode bm25
+
+# 向量搜索
+ai-assistant memory search "query" --mode vector
+
+# 混合搜索 (默认)
+ai-assistant memory search "query" --mode hybrid
+
+# 限制结果数
+ai-assistant memory search "query" -n 5
+```
+
+---
+
+### 8.2 配置示例
+
+```json
+{
+  "memory": {
+    "enabled": true,
+    "enableVectorSearch": true,
+    "embeddingProvider": "openai",
+    "embeddingModel": "text-embedding-3-small",
+    "vectorDimensions": 1536,
+    "searchWeights": {
+      "fts": 0.3,
+      "vector": 0.7
+    }
+  }
+}
+```
+
+---
+
+### 8.3 从 @ai-stack/assistant 导出
+
+```typescript
+export {
+  // Memory 工厂函数
+  createMarkdownMemory,
+  type MarkdownMemoryInstance,
+
+  // 搜索辅助函数
+  mergeHybridResults,
+  mergeWithRRF,
+
+  // 类型
+  type MarkdownMemoryConfig,
+  type MemorySearchResult,
+  type MemoryQueryOptions,
+  type HybridSearchOptions,
+  type SearchMode,
+  type SyncStatus,
+  type MemoryDocument,
+  type FactItem,
+  type TodoItem,
+  type DailyLogEntry,
+};
+```
