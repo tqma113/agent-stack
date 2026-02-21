@@ -26,6 +26,20 @@ export {
   type StopCheckerInstance,
 } from './stop-checker.js';
 
+// Task completion detector
+export {
+  createTaskCompletionDetector,
+  DEFAULT_COMPLETION_PATTERNS,
+  DEFAULT_INCOMPLETE_PATTERNS,
+  DEFAULT_TASK_COMPLETION_CONFIG,
+  COMPLETION_DETECTION_PROMPT,
+  type TaskCompletionDetectorInstance,
+  type TaskCompletionDetectorConfig,
+  type TaskCompletionResult,
+  type TaskCompletionContext,
+  type CompletionLLMFn,
+} from './task-completion.js';
+
 // Plan parser (transparency support)
 export {
   parsePlan,
@@ -207,6 +221,21 @@ export {
   type AskUserParams,
   type OnAskUserCallback,
 } from './tools/index.js';
+
+// Tool Orchestrator
+export {
+  createToolOrchestrator,
+  DEFAULT_TOOL_ORCHESTRATOR_CONFIG,
+  type PlannerLLMFn,
+  type ToolOrchestratorConfig,
+  type ToolOrchestratorInstance,
+  type ToolChain,
+  type ToolChainStep,
+  type ToolChainResult,
+  type ToolMetadata,
+  type PlanningContext,
+  type ExecutionContext as OrchestratorExecutionContext,
+} from './tool-orchestrator/index.js';
 
 // Re-export TUI for convenience
 export {

@@ -500,6 +500,41 @@ const agent = createAgent(config?: AgentConfig): AgentInstance
 | `telemetry` | `TelemetryConfig` | - | 遥测/可观测性配置 |
 | `stopConditions` | `StopConditions` | - | 停止条件配置 |
 | `planning` | `PlanningConfig` | - | 规划/透明度配置 |
+| `superLoop` | `SuperLoopConfig` | - | Super Loop 配置 (无限循环) |
+| `selfReflection` | `AgentSelfReflectionConfig` | - | 自我反思配置 |
+| `compaction` | `AgentCompactionConfig` | - | 上下文压缩配置 |
+**SuperLoopConfig** (Super Agent 增强):
+
+| 参数 | 类型 | 默认值 | 描述 |
+|------|------|--------|------|
+| `infiniteLoop` | `boolean` | `false` | 启用无限循环模式 |
+| `qualityThreshold` | `number` | `0.7` | 任务完成质量阈值 |
+| `detectTaskCompletion` | `boolean` | `true` | 启用任务完成检测 |
+| `completionPatterns` | `(string \| RegExp)[]` | 默认模式 | 完成模式匹配 |
+| `checkpointInterval` | `number` | `5` | 检查点创建间隔 |
+| `enableProgressReporting` | `boolean` | `true` | 启用进度报告 |
+
+**AgentSelfReflectionConfig** (Super Agent 增强):
+
+| 参数 | 类型 | 默认值 | 描述 |
+|------|------|--------|------|
+| `enabled` | `boolean` | `false` | 启用自我反思 |
+| `passThreshold` | `number` | `0.7` | 通过阈值 |
+| `maxRetries` | `number` | `1` | 最大重试次数 |
+| `enableSelfCheck` | `boolean` | `true` | 启用一致性自检 |
+| `evalModel` | `string` | - | 评估使用的模型 |
+| `includeFeedback` | `boolean` | `true` | 重试时包含反馈 |
+
+**AgentCompactionConfig** (Super Agent 增强):
+
+| 参数 | 类型 | 默认值 | 描述 |
+|------|------|--------|------|
+| `enabled` | `boolean` | `true` | 启用自动压缩 |
+| `softThreshold` | `number` | `0.6` | 软阈值 (警告) |
+| `hardThreshold` | `number` | `0.8` | 硬阈值 (压缩) |
+| `maxContextTokens` | `number` | `128000` | 最大上下文 tokens |
+| `reserveTokens` | `number` | `4000` | 预留响应 tokens |
+| `onCompaction` | `(result) => void` | - | 压缩完成回调 |
 
 **ToolExecutionConfig** (新增):
 

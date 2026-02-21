@@ -170,6 +170,15 @@ export interface AgentConfig {
   /** Guardrail configuration for safety checks */
   guardrail?: AgentGuardrailConfig;
 
+  /** Super loop configuration for infinite agentic loop */
+  superLoop?: SuperLoopConfig;
+
+  /** Self-reflection configuration for automatic quality evaluation */
+  selfReflection?: AgentSelfReflectionConfig;
+
+  /** Compaction configuration for automatic context management */
+  compaction?: AgentCompactionConfig;
+
   /**
    * Callback for user interaction (enables AskUser tool)
    *
@@ -505,6 +514,7 @@ export type AgentEventType =
   | 'llm:stream:end'
   | 'memory:retrieve'
   | 'memory:record'
+  | 'memory:compaction'
   | 'iteration:start'
   | 'iteration:end'
   // Transparency events
@@ -515,7 +525,15 @@ export type AgentEventType =
   | 'plan:step:start'
   | 'plan:step:complete'
   | 'plan:step:failed'
-  | 'plan:updated';
+  | 'plan:updated'
+  // Super loop events
+  | 'loop:progress'
+  | 'loop:checkpoint'
+  | 'loop:stop'
+  | 'evaluation:start'
+  | 'evaluation:complete'
+  | 'evaluation:retry'
+  | 'evaluation:inconsistency';
 
 /**
  * Base event data
@@ -1096,6 +1114,176 @@ export interface AgentMetricsConfig {
   /** Alert callback */
   onAlert?: (alert: unknown) => void;
 }
+
+// =============================================================================
+// Super Loop Configuration (Infinite Agentic Loop)
+// =============================================================================
+
+/**
+ * Super loop configuration for infinite agentic loop with intelligent termination
+ * @description Enables autonomous operation with smart stopping conditions
+ */
+export interface SuperLoopConfig {
+  /**
+   * Enable infinite loop mode (default: false)
+   * When true, the agent will run until stop conditions are met instead of maxIterations
+   */
+  infiniteLoop?: boolean;
+
+  /**
+   * Quality threshold for task completion (0-1, default: 0.7)
+   * Used with evaluator to determine when output quality is acceptable
+   */
+  qualityThreshold?: number;
+
+  /**
+   * Enable task completion detection (default: true when infiniteLoop is enabled)
+   * Uses LLM or patterns to detect when the task is complete
+   */
+  detectTaskCompletion?: boolean;
+
+  /**
+   * Patterns that indicate task completion
+   * @example ['task complete', 'done', /finished\s+successfully/i]
+   */
+  completionPatterns?: (string | RegExp)[];
+
+  /**
+   * Checkpoint interval in iterations (default: 5)
+   * Creates checkpoints every N iterations for recovery
+   */
+  checkpointInterval?: number;
+
+  /**
+   * Enable progress reporting (default: true)
+   * Emits progress events for monitoring
+   */
+  enableProgressReporting?: boolean;
+}
+
+/**
+ * Default super loop configuration
+ */
+export const DEFAULT_SUPER_LOOP_CONFIG: SuperLoopConfig = {
+  infiniteLoop: false,
+  qualityThreshold: 0.7,
+  detectTaskCompletion: true,
+  checkpointInterval: 5,
+  enableProgressReporting: true,
+};
+
+// =============================================================================
+// Self-Reflection Configuration
+// =============================================================================
+
+/**
+ * Self-reflection configuration for automatic quality evaluation and retry
+ */
+export interface AgentSelfReflectionConfig {
+  /**
+   * Enable self-reflection (default: false)
+   * When enabled, evaluates response quality and retries if needed
+   */
+  enabled?: boolean;
+
+  /**
+   * Pass threshold for evaluation (0-1, default: 0.7)
+   * Responses scoring below this will trigger retry
+   */
+  passThreshold?: number;
+
+  /**
+   * Maximum retry attempts (default: 1)
+   * Number of times to retry on low-quality response
+   */
+  maxRetries?: number;
+
+  /**
+   * Enable consistency self-check (default: true)
+   * Checks response for internal consistency and factual accuracy
+   */
+  enableSelfCheck?: boolean;
+
+  /**
+   * Model to use for evaluation (optional)
+   * Can use a cheaper/faster model for evaluation
+   */
+  evalModel?: string;
+
+  /**
+   * Include evaluation feedback in retry prompt (default: true)
+   */
+  includeFeedback?: boolean;
+}
+
+/**
+ * Default self-reflection configuration
+ */
+export const DEFAULT_SELF_REFLECTION_CONFIG: AgentSelfReflectionConfig = {
+  enabled: false,
+  passThreshold: 0.7,
+  maxRetries: 1,
+  enableSelfCheck: true,
+  includeFeedback: true,
+};
+
+// =============================================================================
+// Context Compaction Configuration
+// =============================================================================
+
+/**
+ * Context compaction configuration for automatic memory management
+ */
+export interface AgentCompactionConfig {
+  /**
+   * Enable automatic compaction (default: true when memory is enabled)
+   */
+  enabled?: boolean;
+
+  /**
+   * Soft threshold percentage (default: 0.6)
+   * When context usage exceeds this, emit warning
+   */
+  softThreshold?: number;
+
+  /**
+   * Hard threshold percentage (default: 0.8)
+   * When context usage exceeds this, trigger compaction
+   */
+  hardThreshold?: number;
+
+  /**
+   * Maximum context tokens (default: 128000)
+   * Total available context window size
+   */
+  maxContextTokens?: number;
+
+  /**
+   * Reserve tokens for response (default: 4000)
+   */
+  reserveTokens?: number;
+
+  /**
+   * Callback when compaction is triggered
+   */
+  onCompaction?: (result: {
+    flushedTokens: number;
+    summary: string;
+    tokensBefore: number;
+    tokensAfter: number;
+  }) => void;
+}
+
+/**
+ * Default compaction configuration
+ */
+export const DEFAULT_COMPACTION_CONFIG: AgentCompactionConfig = {
+  enabled: true,
+  softThreshold: 0.6,
+  hardThreshold: 0.8,
+  maxContextTokens: 128000,
+  reserveTokens: 4000,
+};
 
 // =============================================================================
 // Guardrail Configuration

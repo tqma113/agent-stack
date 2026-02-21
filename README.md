@@ -8,8 +8,8 @@
   [ ] 这一步由 AI 代替？
 [x] 权限管控
 [ ] Agent
-  [ ] AGENT.md 是什么？有什么用？最佳实践是什么？
-  [ ] iteration
+  [x] AGENT.md 是什么？有什么用？最佳实践是什么？
+  [x] iteration
   [ ] multi sub task/agent 并行提效
   [ ] loop 的最佳实践
 

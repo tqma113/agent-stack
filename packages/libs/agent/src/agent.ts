@@ -33,6 +33,7 @@ import {
   createMemoryManager,
   TaskStateReducer,
   TaskActions,
+  createCompactionManager,
   type MemoryManagerConfig,
   type MemoryBundle,
   type TaskState,
@@ -42,6 +43,7 @@ import {
   type IMemoryObserver,
   type IMemoryBudgeter,
   type MemoryStores,
+  type ICompactionManager,
 } from '@ai-stack/memory';
 import {
   createSqliteStores,
@@ -70,6 +72,9 @@ import type {
   AgentRouterConfig,
   AgentMetricsConfig,
   AgentGuardrailConfig,
+  SuperLoopConfig,
+  AgentSelfReflectionConfig,
+  AgentCompactionConfig,
   Tool,
   AgentResponse,
   ToolCallResult,
@@ -80,8 +85,24 @@ import type {
   AgentEvent,
   AgentEventType,
   AgentEventListener,
+  ExecutionContext,
+  StopCheckResult,
 } from './types.js';
-import { DEFAULT_TOOL_EXECUTION_CONFIG } from './types.js';
+import {
+  DEFAULT_TOOL_EXECUTION_CONFIG,
+  DEFAULT_SUPER_LOOP_CONFIG,
+  DEFAULT_SELF_REFLECTION_CONFIG,
+  DEFAULT_COMPACTION_CONFIG,
+} from './types.js';
+import {
+  createStopChecker,
+  createExecutionContext,
+  type StopCheckerInstance,
+} from './stop-checker.js';
+import {
+  createTaskCompletionDetector,
+  type TaskCompletionDetectorInstance,
+} from './task-completion.js';
 import {
   createPermissionPolicy,
   type PermissionPolicyInstance,
@@ -116,8 +137,11 @@ import {
 import {
   createEvaluator,
   type EvaluatorInstance,
-  type EvalContext,
+  type EvalContext as EvalContextType,
 } from './evaluator/index.js';
+
+// Re-alias for local use
+type EvalContext = EvalContextType;
 import {
   createModelRouter,
   type ModelRouterInstance,
@@ -159,10 +183,12 @@ export interface AgentInstance {
   // Memory Integration
   initializeMemory(): Promise<void>;
   getMemoryManager(): MemoryManagerInstance | null;
+  getCompactionManager(): ICompactionManager | null;
   getSessionId(): string | null;
   newSession(): string | null;
   retrieveMemory(query?: string): Promise<MemoryBundle | null>;
   getMemoryContext(query?: string): Promise<string>;
+  triggerCompaction(): Promise<void>;
   closeMemory(): Promise<void>;
 
   // Knowledge Integration
@@ -473,6 +499,34 @@ export function createAgent(config: AgentConfig = {}): AgentInstance {
   let currentPlan: PlanDAGInstance | null = null;
   const plannerConfig = config.planner;
   // Planner will be initialized later when we have the chat function
+
+  // ==========================================================================
+  // Super Loop Configuration
+  // ==========================================================================
+
+  // Super loop config
+  const superLoopConfig: SuperLoopConfig = {
+    ...DEFAULT_SUPER_LOOP_CONFIG,
+    ...config.superLoop,
+  };
+
+  // Self-reflection config
+  const selfReflectionConfig: AgentSelfReflectionConfig = {
+    ...DEFAULT_SELF_REFLECTION_CONFIG,
+    ...config.selfReflection,
+  };
+
+  // Compaction config
+  const compactionConfig: AgentCompactionConfig = {
+    ...DEFAULT_COMPACTION_CONFIG,
+    ...config.compaction,
+  };
+
+  // Compaction manager (created when memory is enabled and compaction is enabled)
+  let compactionManager: ICompactionManager | null = null;
+
+  // Task completion detector (created lazily when needed)
+  let taskCompletionDetector: TaskCompletionDetectorInstance | null = null;
 
   /**
    * Emit an agent event
@@ -924,10 +978,44 @@ export function createAgent(config: AgentConfig = {}): AgentInstance {
 
       memoryManager = createMemoryManager(stores, memManagerConfig);
       await memoryManager.initialize();
+
+      // Initialize compaction manager if enabled
+      if (compactionConfig.enabled !== false) {
+        const maxTokens = compactionConfig.maxContextTokens ?? 128000;
+        const softThreshold = compactionConfig.softThreshold ?? 0.6;
+        const hardThreshold = compactionConfig.hardThreshold ?? 0.8;
+
+        compactionManager = createCompactionManager({
+          maxContextTokens: maxTokens,
+          reserveTokens: compactionConfig.reserveTokens ?? 4000,
+          autoCompact: true,
+          flush: {
+            enabled: true,
+            softThresholdTokens: Math.floor(maxTokens * softThreshold),
+            hardThresholdTokens: Math.floor(maxTokens * hardThreshold),
+            minEventsSinceFlush: 10,
+            eventTypesToAnalyze: ['USER_MSG', 'ASSISTANT_MSG', 'DECISION', 'TOOL_RESULT'],
+            includeSummary: true,
+            flushTags: ['auto-compaction'],
+          },
+          onCompaction: compactionConfig.onCompaction
+            ? (result) => compactionConfig.onCompaction!({
+                flushedTokens: result.tokensBefore - result.tokensAfter,
+                summary: result.summary?.short ?? '',
+                tokensBefore: result.tokensBefore,
+                tokensAfter: result.tokensAfter,
+              })
+            : undefined,
+        });
+      }
     },
 
     getMemoryManager(): MemoryManagerInstance | null {
       return memoryManager;
+    },
+
+    getCompactionManager(): ICompactionManager | null {
+      return compactionManager;
     },
 
     getSessionId(): string | null {
@@ -951,7 +1039,38 @@ export function createAgent(config: AgentConfig = {}): AgentInstance {
       return memoryManager.inject(bundle);
     },
 
+    async triggerCompaction(): Promise<void> {
+      if (!compactionManager || !memoryManager) {
+        return;
+      }
+
+      const recentEvents = await (async () => {
+        const bundle = await memoryManager!.retrieve({});
+        return bundle?.recentEvents ?? [];
+      })();
+
+      if (recentEvents.length > 0) {
+        const result = await compactionManager.compact(recentEvents, {
+          sessionId: memoryManager.getSessionId() ?? undefined,
+        });
+
+        if (result.success) {
+          emitEvent({
+            type: 'memory:compaction',
+            tokensBefore: result.tokensBefore,
+            tokensAfter: result.tokensAfter,
+            eventsProcessed: result.eventsProcessed,
+            hasSummary: !!result.summary,
+          });
+        }
+      }
+    },
+
     async closeMemory(): Promise<void> {
+      if (compactionManager) {
+        compactionManager.resetState();
+        compactionManager = null;
+      }
       if (memoryManager) {
         await memoryManager.close();
         memoryManager = null;
@@ -1617,6 +1736,38 @@ export function createAgent(config: AgentConfig = {}): AgentInstance {
 
       const { maxIterations = 10, signal } = options;
 
+      // ==========================================================
+      // Phase: Initialize Super Loop Components
+      // ==========================================================
+
+      // Create StopChecker for intelligent termination
+      const useInfiniteLoop = superLoopConfig.infiniteLoop === true;
+      const stopChecker: StopCheckerInstance | null = createStopChecker({
+        ...config.stopConditions,
+        // Override maxIterations if infinite loop is enabled
+        maxIterations: useInfiniteLoop ? Infinity : (config.stopConditions?.maxIterations ?? maxIterations),
+      });
+
+      // Initialize task completion detector if enabled
+      if (superLoopConfig.detectTaskCompletion && !taskCompletionDetector) {
+        taskCompletionDetector = createTaskCompletionDetector(
+          {
+            completionPatterns: superLoopConfig.completionPatterns,
+            useLLM: false, // Use pattern-based detection by default
+            minConfidence: superLoopConfig.qualityThreshold ?? 0.7,
+          },
+          // Provide LLM function if evaluator is enabled with LLM
+          evaluatorConfig?.useLLMEval
+            ? async (prompt: string) => instance.complete(prompt)
+            : undefined
+        );
+      }
+
+      // Token tracking for compaction
+      let totalPromptTokens = 0;
+      let totalCompletionTokens = 0;
+      let lastCompactionCheck = 0;
+
       // Record user message to memory
       if (memoryManager) {
         const observer = memoryManager.getObserver();
@@ -1630,6 +1781,7 @@ export function createAgent(config: AgentConfig = {}): AgentInstance {
 
       // Build system prompt with memory and knowledge context
       let effectiveSystemPrompt = agentConfig.systemPrompt;
+      let injectedSummary: string | undefined; // For compaction summaries
 
       // Inject memory context
       if (memoryManager && memoryConfig?.autoInject !== false) {
@@ -1662,41 +1814,115 @@ export function createAgent(config: AgentConfig = {}): AgentInstance {
 
       const toolCallResults: ToolCallResult[] = [];
       let iterations = 0;
+      let selfReflectionRetries = 0;
 
       while (true) {
         if (signal?.aborted) {
           throw new Error('Request aborted');
         }
 
-        // Check if max iterations reached
-        if (iterations >= maxIterations) {
-          if (options.onMaxIterations) {
-            const shouldContinue = await options.onMaxIterations({
-              currentIterations: iterations,
-              maxIterations,
-              toolCallCount: toolCallResults.length,
+        // ==========================================================
+        // Super Loop: Stop Condition Check (before iteration)
+        // ==========================================================
+        if (stopChecker) {
+          const executionContext = createExecutionContext({
+            iterations,
+            toolCalls: toolCallResults,
+            promptTokens: totalPromptTokens,
+            completionTokens: totalCompletionTokens,
+          });
+
+          const stopResult = await stopChecker.check(executionContext);
+
+          if (stopResult.shouldStop) {
+            // Emit stop event
+            emitEvent({
+              type: 'loop:stop',
+              reason: stopResult.reason,
+              stopType: stopResult.type,
+              iterations,
+              totalTokens: totalPromptTokens + totalCompletionTokens,
             });
 
-            if (shouldContinue) {
-              // Reset counter, user gets another maxIterations rounds
-              iterations = 0;
-            } else {
-              // User chose to stop, return gracefully instead of throwing
-              const content = 'Task stopped: max iterations reached and user chose not to continue.';
+            // Hard stops cannot be overridden
+            if (stopResult.type === 'hard') {
+              const content = `Task stopped: ${stopResult.reason}`;
               conversationHistory.push(assistantMessage(content));
               return {
                 content,
                 toolCalls: toolCallResults.length > 0 ? toolCallResults : undefined,
               };
             }
-          } else {
-            // No callback provided, throw error (backward compatible)
-            throw new Error(`Max iterations (${maxIterations}) reached`);
+
+            // Soft stops can be overridden by callback
+            if (config.stopConditions?.onStopCondition) {
+              const shouldContinue = await config.stopConditions.onStopCondition(stopResult, executionContext);
+              if (!shouldContinue) {
+                const content = `Task stopped: ${stopResult.reason}`;
+                conversationHistory.push(assistantMessage(content));
+                return {
+                  content,
+                  toolCalls: toolCallResults.length > 0 ? toolCallResults : undefined,
+                };
+              }
+            } else if (!useInfiniteLoop) {
+              // Legacy behavior: use onMaxIterations callback
+              if (stopResult.reason?.includes('Max iterations') && options.onMaxIterations) {
+                const shouldContinue = await options.onMaxIterations({
+                  currentIterations: iterations,
+                  maxIterations,
+                  toolCallCount: toolCallResults.length,
+                });
+
+                if (!shouldContinue) {
+                  const content = 'Task stopped: max iterations reached and user chose not to continue.';
+                  conversationHistory.push(assistantMessage(content));
+                  return {
+                    content,
+                    toolCalls: toolCallResults.length > 0 ? toolCallResults : undefined,
+                  };
+                }
+              } else {
+                // No callback, throw error (backward compatible)
+                throw new Error(stopResult.reason ?? 'Stop condition triggered');
+              }
+            }
           }
         }
 
         iterations++;
         const iterationStartTime = Date.now();
+
+        // ==========================================================
+        // Super Loop: Checkpoint Creation
+        // ==========================================================
+        if (
+          stateMachine &&
+          superLoopConfig.checkpointInterval &&
+          iterations % superLoopConfig.checkpointInterval === 0
+        ) {
+          const checkpointId = await stateMachine.checkpoint(`auto-checkpoint-iter-${iterations}`);
+          if (checkpointId) {
+            emitEvent({
+              type: 'loop:checkpoint',
+              checkpointId,
+              iteration: iterations,
+            });
+          }
+        }
+
+        // ==========================================================
+        // Super Loop: Progress Reporting
+        // ==========================================================
+        if (superLoopConfig.enableProgressReporting) {
+          emitEvent({
+            type: 'loop:progress',
+            iteration: iterations,
+            toolCallCount: toolCallResults.length,
+            totalTokens: totalPromptTokens + totalCompletionTokens,
+            elapsedMs: Date.now() - chatStartTime,
+          });
+        }
 
         // Emit iteration start event
         emitEvent({
@@ -1757,10 +1983,14 @@ export function createAgent(config: AgentConfig = {}): AgentInstance {
         const llmDurationMs = Date.now() - llmStartTime;
 
         // ==========================================================
-        // Record LLM Metrics
+        // Record LLM Metrics + Token Tracking for Compaction
         // ==========================================================
         metricsAggregator?.recordLatency('llm_chat', llmDurationMs);
         if (response.usage) {
+          // Update cumulative token counts for stop checker
+          totalPromptTokens += response.usage.promptTokens ?? 0;
+          totalCompletionTokens += response.usage.completionTokens ?? 0;
+
           metricsAggregator?.recordTokens(
             effectiveModel,
             response.usage.promptTokens ?? 0,
@@ -1776,6 +2006,60 @@ export function createAgent(config: AgentConfig = {}): AgentInstance {
               }
             );
           }
+
+          // Record consecutive failures for stop checker
+          stopChecker?.recordFailure(false); // Successful LLM call
+
+          // ==========================================================
+          // Super Loop: Context Compaction Check
+          // ==========================================================
+          if (compactionManager && iterations > lastCompactionCheck) {
+            compactionManager.updateTokenCount(totalPromptTokens + totalCompletionTokens);
+            const health = compactionManager.checkHealth();
+
+            if (health.recommendation === 'flush_now' || health.recommendation === 'critical') {
+              try {
+                // Get recent events for compaction
+                const recentEvents = memoryManager
+                  ? await (async () => {
+                      const bundle = await memoryManager!.retrieve({});
+                      return bundle?.recentEvents ?? [];
+                    })()
+                  : [];
+
+                if (recentEvents.length > 0) {
+                  const compactionResult = await compactionManager.compact(recentEvents, {
+                    sessionId: memoryManager?.getSessionId() ?? undefined,
+                  });
+
+                  if (compactionResult.success) {
+                    // Inject summary into next context
+                    if (compactionResult.summary?.short) {
+                      injectedSummary = compactionResult.summary.short;
+                    }
+
+                    // Emit compaction event
+                    emitEvent({
+                      type: 'memory:compaction',
+                      tokensBefore: compactionResult.tokensBefore,
+                      tokensAfter: compactionResult.tokensAfter,
+                      eventsProcessed: compactionResult.eventsProcessed,
+                      hasSummary: !!compactionResult.summary,
+                    });
+                  }
+                }
+
+                lastCompactionCheck = iterations;
+              } catch (compactionError) {
+                // Log but don't fail on compaction errors
+                metricsAggregator?.recordError(
+                  'compaction',
+                  'compaction_error',
+                  compactionError instanceof Error ? compactionError.message : String(compactionError)
+                );
+              }
+            }
+          }
         }
 
         // Emit LLM response event
@@ -1789,7 +2073,7 @@ export function createAgent(config: AgentConfig = {}): AgentInstance {
           durationMs: llmDurationMs,
         });
 
-        // If no tool calls, we're done
+        // If no tool calls, we're done (potentially)
         if (!response.toolCalls || response.toolCalls.length === 0) {
           let content = response.content ?? '';
 
@@ -1803,6 +2087,98 @@ export function createAgent(config: AgentConfig = {}): AgentInstance {
               // Filter/modify output instead of blocking entirely
               content = `[Content filtered: ${violation?.message ?? 'Policy violation'}]`;
               metricsAggregator?.recordError('chat', 'guardrail_output_filtered', violation?.message);
+            }
+          }
+
+          // ==========================================================
+          // Super Loop: Self-Reflection Evaluation
+          // ==========================================================
+          if (selfReflectionConfig.enabled && evaluator) {
+            emitEvent({
+              type: 'evaluation:start',
+              iteration: iterations,
+              retryCount: selfReflectionRetries,
+            });
+
+            const evalContext: EvalContext = {
+              originalRequest: input,
+              toolResults: toolCallResults.map((tc) => ({
+                name: tc.name,
+                args: tc.args,
+                result: tc.result,
+                success: !tc.result.toLowerCase().includes('error'),
+              })),
+              retryCount: selfReflectionRetries,
+              maxRetries: selfReflectionConfig.maxRetries ?? 1,
+            };
+
+            const evalResult = await evaluator.evaluate(content, evalContext);
+
+            emitEvent({
+              type: 'evaluation:complete',
+              score: evalResult.score,
+              passed: evalResult.passed,
+              issues: evalResult.issues,
+            });
+
+            // Check if we should retry
+            if (!evalResult.passed && selfReflectionRetries < (selfReflectionConfig.maxRetries ?? 1)) {
+              selfReflectionRetries++;
+
+              emitEvent({
+                type: 'evaluation:retry',
+                retryCount: selfReflectionRetries,
+                reason: evalResult.retryReason,
+                suggestions: evalResult.suggestions,
+              });
+
+              // Add feedback to prompt for retry
+              if (selfReflectionConfig.includeFeedback !== false) {
+                const feedback = `The previous response scored ${evalResult.score.toFixed(2)} which is below the quality threshold. ` +
+                  `Issues identified: ${evalResult.issues.join(', ')}. ` +
+                  `Suggestions: ${evalResult.suggestions.join(', ')}. ` +
+                  `Please provide an improved response.`;
+                messages.push(userMessage(feedback));
+              }
+
+              // Continue the loop for retry
+              continue;
+            }
+
+            // Consistency self-check
+            if (selfReflectionConfig.enableSelfCheck && evalResult.passed) {
+              const selfCheckResult = await evaluator.selfCheck(content, evalContext);
+              if (!selfCheckResult.consistent) {
+                emitEvent({
+                  type: 'evaluation:inconsistency',
+                  problems: selfCheckResult.problems,
+                  corrections: selfCheckResult.corrections,
+                });
+              }
+            }
+          }
+
+          // ==========================================================
+          // Super Loop: Task Completion Detection
+          // ==========================================================
+          if (useInfiniteLoop && taskCompletionDetector) {
+            const completionResult = await taskCompletionDetector.detect(content, {
+              originalRequest: input,
+              toolCalls: toolCallResults,
+              iterations,
+            });
+
+            // If task is not complete and we haven't hit stop conditions, continue
+            if (!completionResult.isComplete && completionResult.confidence < 0.7) {
+              // Add a hint to the model to continue
+              const continuePrompt = `The task may not be complete yet (confidence: ${completionResult.confidence.toFixed(2)}). ` +
+                `Reason: ${completionResult.reason}. ` +
+                (completionResult.suggestions?.length
+                  ? `Consider: ${completionResult.suggestions.join(', ')}`
+                  : 'Please continue with the task.');
+
+              messages.push(userMessage(continuePrompt));
+              continue;
             }
           }
 

@@ -2,7 +2,14 @@
 
 ## Project Overview
 
-AI Stack is a TypeScript-based AI Agent development framework using Rush monorepo architecture. It provides multi-model LLM abstraction (OpenAI, Anthropic, Google Gemini), MCP protocol support, Skill system, Memory system, Knowledge indexing, Permission control, and TUI components.
+AI Stack is a TypeScript-based AI Agent development framework using Rush monorepo architecture. It provides:
+
+- **Multi-model LLM abstraction** - OpenAI, Anthropic, Google Gemini
+- **MCP protocol support** - Model Context Protocol integration
+- **Skill system** - Extensible agent capabilities
+- **Memory system** - Multiple storage backends (SQLite, JSON)
+- **Knowledge indexing** - Code and document indexing
+- **TUI components** - Terminal UI with Ink framework
 
 ## Quick Commands
 
@@ -24,27 +31,44 @@ cd packages/libs/agent && rushx start
 
 # Type check
 cd packages/libs/agent && rushx typecheck
+
+# Watch mode (in package directory)
+rushx dev
+
+# Run tests
+rushx test
 ```
 
 ## Project Structure
 
 ```
 packages/
-├── libs/           # Core libraries (@ai-stack/*)
-│   ├── provider/   # Multi-model LLM abstraction
-│   ├── mcp/        # MCP protocol support
-│   ├── skill/      # Skill system
-│   ├── memory/     # Memory strategies
-│   ├── memory-store-sqlite/  # SQLite storage
-│   ├── memory-store-json/    # JSON storage
-│   ├── knowledge/  # Code/doc indexing
-│   ├── tui/        # Terminal UI (Ink)
-│   ├── agent/      # Agent implementation + CLI
-│   ├── assistant/  # Personal AI assistant
-│   └── code/       # Code editing agent
-├── skills/         # Custom skills (@ai-stack-skill/*)
-├── mcp-servers/    # MCP servers (@ai-stack-mcp/*)
-└── examples/       # Usage examples
+├── libs/                    # Core libraries (@ai-stack/*)
+│   ├── provider/            # Multi-model LLM abstraction
+│   ├── mcp/                 # MCP protocol support
+│   ├── skill/               # Skill system
+│   ├── memory/              # Memory strategies & pipelines
+│   ├── memory-store-sqlite/ # SQLite storage backend
+│   ├── memory-store-json/   # JSON file storage backend
+│   ├── knowledge/           # Code/doc indexing
+│   ├── tui/                 # Terminal UI (Ink)
+│   ├── agent/               # Core agent implementation
+│   ├── assistant/           # Personal AI assistant
+│   └── code/                # Code editing agent
+├── skills/                  # Custom skills (@ai-stack-skill/*)
+│   ├── memory/              # Memory management skill
+│   └── knowledge/           # Knowledge base skill
+├── mcp-servers/             # MCP servers (@ai-stack-mcp/*)
+│   ├── fetch/               # Web content fetching
+│   ├── time/                # Time/timezone operations
+│   ├── git/                 # Git operations
+│   ├── bash/                # Bash execution
+│   ├── lsp/                 # Language server protocol
+│   └── electron-cdp/        # Electron CDP integration
+└── examples/                # Usage examples (@ai-stack-example/*)
+    ├── agent/               # Agent usage example
+    ├── assistant/           # Assistant usage example
+    └── code/                # Code agent example
 ```
 
 ## Coding Conventions
@@ -54,35 +78,43 @@ packages/
 Always use factory functions with closures:
 
 ```typescript
-// CORRECT
+// CORRECT - Factory function pattern
 export function createMyComponent(config: MyConfig): MyComponentInstance {
   // Private state via closure
   let state = initialState;
 
-  // Return interface
+  function privateMethod() { /* ... */ }
+
+  // Return public interface
   return {
-    method() { ... },
+    method() { /* ... */ },
     getState() { return state; },
   };
 }
 
 // WRONG - Don't use classes
-export class MyComponent { ... }
+export class MyComponent { /* ... */ }
 ```
 
-### Type Naming
+### Type Naming Conventions
 
-- Factory function: `createXxx`
-- Return type interface: `XxxInstance`
-- Config type: `XxxConfig`
+| Type | Pattern | Example |
+|------|---------|---------|
+| Factory function | `createXxx` | `createAgent` |
+| Instance interface | `XxxInstance` | `AgentInstance` |
+| Config type | `XxxConfig` | `AgentConfig` |
+| Options type | `XxxOptions` | `SearchOptions` |
 
 ### File Organization
 
-- `index.ts` - Public exports only
-- `types.ts` - Type definitions
-- `*.ts` - Implementation files
+```
+src/
+├── index.ts     # Public exports only
+├── types.ts     # Type definitions
+└── [feature].ts # Implementation files
+```
 
-### Imports
+### Import Conventions
 
 ```typescript
 // Use .js extension for local imports (ESM)
@@ -91,15 +123,6 @@ import { foo } from './foo.js';
 // Workspace dependencies
 import { createAgent } from '@ai-stack/agent';
 ```
-
-## Documentation Requirements
-
-After modifying the project, update these files in `/spec/`:
-- `README.md` - Project overview
-- `tech-stack.md` - Technology details
-- `project-structure.md` - Structure details
-- `business-logic.md` - Business logic
-- `api-reference.md` - API reference
 
 ## Key Dependencies
 
@@ -111,17 +134,22 @@ After modifying the project, update these files in `/spec/`:
 | Rush | 5.165.0 | Monorepo tool |
 | tsup | ^8.3.5 | Build tool |
 | openai | ^4.77.0 | OpenAI SDK |
+| @anthropic-ai/sdk | latest | Anthropic SDK |
+| @google/generative-ai | latest | Google Gemini SDK |
+| @modelcontextprotocol/sdk | latest | MCP SDK |
 | ink | ^5.0.1 | TUI framework |
-| better-sqlite3 | ^11.7.0 | Database |
+| better-sqlite3 | ^11.7.0 | SQLite database |
 | zod | ^3.24.0 | Schema validation |
+| vitest | latest | Testing framework |
 
-## Package Dependencies
+## Package Dependency Graph
 
 ```
 @ai-stack/provider → openai, @anthropic-ai/sdk, @google/generative-ai
 @ai-stack/mcp → @modelcontextprotocol/sdk
-@ai-stack/memory → @ai-stack/memory-store-sqlite (types)
+@ai-stack/memory → @ai-stack/memory-store-sqlite (types), @ai-stack/provider
 @ai-stack/knowledge → @ai-stack/memory-store-sqlite, @ai-stack/memory
+@ai-stack/skill → @ai-stack/provider
 @ai-stack/tui → ink, @inkjs/ui, chalk, boxen, ora, diff, react
 @ai-stack/agent → provider, mcp, skill, memory, knowledge, tui
 @ai-stack/assistant → agent, memory, memory-store-sqlite, tui
@@ -140,9 +168,11 @@ After modifying the project, update these files in `/spec/`:
 ### Adding a New Package
 
 1. Create directory under `packages/libs/`, `packages/skills/`, or `packages/mcp-servers/`
-2. Add `package.json`, `tsconfig.json`, `tsup.config.ts`
-3. Register in `rush.json`
-4. Run `rush update`
+2. Add `package.json` with proper workspace dependencies
+3. Add `tsconfig.json` extending common config
+4. Add `tsup.config.ts` for build
+5. Register in `rush.json` projects array
+6. Run `rush update`
 
 ### Adding Dependencies
 
@@ -158,6 +188,9 @@ rush update
 # Agent example
 cd packages/examples/agent && rushx start
 
+# Assistant example
+cd packages/examples/assistant && rushx start
+
 # Code agent example
 cd packages/examples/code && rushx start
 ```
@@ -165,6 +198,9 @@ cd packages/examples/code && rushx start
 ## Testing
 
 ```bash
+# Run tests for a package
+cd packages/libs/memory && rushx test
+
 # Type check all packages
 rush build
 
@@ -179,12 +215,74 @@ Use the unified error system from `@ai-stack/provider`:
 ```typescript
 import { AIError, ErrorCode, ErrorSeverity } from '@ai-stack/provider';
 
-throw new AIError('Message', ErrorCode.VALIDATION_ERROR, ErrorSeverity.CRITICAL);
+throw new AIError(
+  'Descriptive message',
+  ErrorCode.VALIDATION_ERROR,
+  ErrorSeverity.CRITICAL,
+  { context: 'additional info' }
+);
 ```
 
 ## TUI Components
 
 The `@ai-stack/tui` package provides:
+
 - **Ink components**: DiffView, Confirm, Select, TaskBoard, HistoryBrowser
 - **Classic utilities**: StreamRenderer, spinners, themed output
 - **Hybrid architecture**: Ink for interactive UI, direct stdout for streaming
+
+## Documentation Requirements
+
+After modifying the project, update relevant docs in `/spec/`:
+
+| Document | Purpose |
+|----------|---------|
+| `README.md` | Project overview and introduction |
+| `getting-started.md` | Quick start guide and setup instructions |
+| `architecture.md` | System architecture and design patterns |
+| `tech-stack.md` | Technology stack details |
+| `project-structure.md` | Directory and package structure |
+| `business-logic.md` | Core business logic documentation |
+| `api-reference.md` | API reference and usage examples |
+| `knowledge-design.md` | Knowledge system design details |
+
+## Workflow
+
+### Plan-first, then edit
+
+Before making any code changes — including but not limited to:
+- adding, deleting, refactoring, or moving files
+- modifying configurations
+- updating dependencies
+- writing or modifying tests
+- changing scripts or build logic
+
+You MUST first produce a written PLAN, regardless of the complexity or size of the change. In complexity change, you can use plan mode.
+
+### Save paln after confirm
+
+When you are in plan mode, every time you make a new plan, you need to save all content of plan into dir /plan as a new markdown file after user confirm the paln.
+
+### Test after editing
+
+After completing any approved changes:
+
+1. Run all relevant tests.
+2. Add testcase if there is no relevant testcases
+3. Run type checks and linters if applicable.
+4. Verify that the project builds successfully.
+5. Summarize:
+   - What was changed
+   - What tests were run
+   - Test results
+   - Any warnings or remaining risks
+
+If any test fails:
+- Stop immediately.
+- Diagnose the issue.
+- Present a correction PLAN before applying further changes.
+
+### Update document for this project
+
+Should update docs under /spec, /plan, CLAUDE.md, AGENT.md every time after finish some change.
+

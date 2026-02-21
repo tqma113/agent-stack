@@ -425,9 +425,173 @@ idle ──────► planning ──────► executing ────
 
 ---
 
-## 6. 安全架构
+## 6. Super Agent 增强模块 (NEW)
 
-### 6.1 权限管控
+### 6.1 无限 Agentic Loop + 智能终止
+
+Super Loop 提供更自主的执行能力，支持无限迭代直到任务真正完成。
+
+```typescript
+const agent = createAgent({
+  superLoop: {
+    infiniteLoop: true,         // 启用无限循环
+    qualityThreshold: 0.7,      // 质量阈值
+    detectTaskCompletion: true, // 启用任务完成检测
+    checkpointInterval: 5,      // 每 5 次迭代创建检查点
+  },
+  stopConditions: {
+    maxCost: 1.0,               // 成本限制
+    maxDurationMs: 5 * 60000,   // 时间限制
+    maxTotalTokens: 100000,     // Token 限制
+  },
+});
+```
+
+**终止条件层次**：
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                      智能终止决策                                │
+├─────────────────────────────────────────────────────────────────┤
+│  1. 硬限制 (Hard Stop) - 不可覆盖                               │
+│     - Token 超限                                                │
+│     - 成本超限                                                  │
+│     - 时间超限                                                  │
+├─────────────────────────────────────────────────────────────────┤
+│  2. 软限制 (Soft Stop) - 可通过回调覆盖                         │
+│     - 迭代次数达到                                              │
+│     - 连续工具失败                                              │
+│     - 停止模式匹配                                              │
+├─────────────────────────────────────────────────────────────────┤
+│  3. 任务完成检测                                                │
+│     - 完成模式匹配                                              │
+│     - LLM 完成度评估                                            │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### 6.2 自动上下文压缩 (Auto Compaction)
+
+当上下文接近模型限制时自动触发压缩。
+
+```typescript
+const agent = createAgent({
+  memory: { enabled: true },
+  compaction: {
+    enabled: true,
+    softThreshold: 0.6,        // 60% 时警告
+    hardThreshold: 0.8,        // 80% 时压缩
+    maxContextTokens: 128000,  // 最大上下文
+    onCompaction: (result) => {
+      console.log(`压缩: ${result.tokensBefore} → ${result.tokensAfter}`);
+    },
+  },
+});
+```
+
+**压缩流程**：
+
+```
+上下文使用量监控
+        │
+        ▼
+┌───────────────────┐
+│ 检查 Token 使用率 │
+└────────┬──────────┘
+         │
+   ┌─────▼─────┐     ┌─────────────┐
+   │ < 60%     │────►│ 正常运行    │
+   └───────────┘     └─────────────┘
+         │
+   ┌─────▼─────┐     ┌─────────────┐
+   │ 60-80%    │────►│ 发出警告    │
+   └───────────┘     └─────────────┘
+         │
+   ┌─────▼─────┐     ┌─────────────────────────────┐
+   │ > 80%     │────►│ 触发压缩                     │
+   └───────────┘     │ 1. 提取关键事件             │
+                     │ 2. 生成摘要                 │
+                     │ 3. 写入语义存储             │
+                     │ 4. 清理旧事件               │
+                     └─────────────────────────────┘
+```
+
+### 6.3 自我反思循环 (Self-Reflection)
+
+自动评估响应质量，不满足标准时重试。
+
+```typescript
+const agent = createAgent({
+  evaluator: { enabled: true, useLLMEval: true },
+  selfReflection: {
+    enabled: true,
+    passThreshold: 0.7,    // 通过阈值
+    maxRetries: 1,         // 最多重试 1 次
+    enableSelfCheck: true, // 启用一致性检查
+    includeFeedback: true, // 重试时包含反馈
+  },
+});
+```
+
+**反思流程**：
+
+```
+Agent 生成响应
+        │
+        ▼
+┌───────────────────┐
+│ Evaluator 评估    │
+│ - 准确性          │
+│ - 完整性          │
+│ - 相关性          │
+│ - 安全性          │
+└────────┬──────────┘
+         │
+   ┌─────▼─────┐
+   │ 评分 ≥ 0.7│────► 返回响应
+   └───────────┘
+         │
+   ┌─────▼─────────────┐
+   │ 评分 < 0.7        │
+   │ 重试次数 < 上限   │
+   └─────────┬─────────┘
+             │
+             ▼
+   ┌─────────────────────┐
+   │ 生成改进反馈        │
+   │ 重新生成响应        │
+   └─────────────────────┘
+```
+
+### 6.4 工具编排器 (Tool Orchestrator)
+
+智能工具选择和执行规划。
+
+```typescript
+import { createToolOrchestrator } from '@ai-stack/agent';
+
+const orchestrator = createToolOrchestrator({
+  maxSteps: 10,
+  maxConcurrency: 3,
+  retryFailedSteps: true,
+});
+
+// 规划工具链
+const chain = await orchestrator.plan('查找并修改所有 TODO 注释', {
+  availableTools: agent.getTools(),
+});
+
+// 获取下一步建议
+const suggestions = orchestrator.suggestNextTools({
+  lastToolCall: { name: 'Glob', result: '...' },
+  availableTools: ['Read', 'Edit', 'Grep'],
+});
+```
+
+---
+
+## 7. 安全架构
+
+### 7.1 权限管控
 
 ```
 工具调用请求
@@ -456,7 +620,7 @@ idle ──────► planning ──────► executing ────
 └─────────────────────────┘
 ```
 
-### 6.2 Guardrail (安全检查)
+### 7.2 Guardrail (安全检查)
 
 **内置规则**：
 - PII 检测 (个人信息)
@@ -467,9 +631,9 @@ idle ──────► planning ──────► executing ────
 
 ---
 
-## 7. 扩展点
+## 8. 扩展点
 
-### 7.1 自定义 Provider
+### 8.1 自定义 Provider
 
 ```typescript
 const customProvider = createProvider({
@@ -479,7 +643,7 @@ const customProvider = createProvider({
 });
 ```
 
-### 7.2 自定义 MCP 服务器
+### 8.2 自定义 MCP 服务器
 
 ```typescript
 // mcp-servers/my-server/src/server.ts
@@ -488,7 +652,7 @@ server.setRequestHandler('tools/call', handleToolCall);
 server.run();
 ```
 
-### 7.3 自定义 Skill
+### 8.3 自定义 Skill
 
 ```json
 // skills/my-skill/skill.json
@@ -501,7 +665,7 @@ server.run();
 }
 ```
 
-### 7.4 自定义存储
+### 8.4 自定义存储
 
 ```typescript
 // 实现 MemoryStores 接口
@@ -518,9 +682,9 @@ const memory = createMemoryManager(customStores);
 
 ---
 
-## 8. 最佳实践
+## 9. 最佳实践
 
-### 8.1 工厂函数模式
+### 9.1 工厂函数模式
 
 ```typescript
 // 正确
@@ -536,7 +700,7 @@ export function createMyComponent(config: MyConfig): MyComponentInstance {
 export class MyComponent { ... }
 ```
 
-### 8.2 依赖注入
+### 9.2 依赖注入
 
 ```typescript
 // 通过构造函数注入依赖
@@ -547,7 +711,7 @@ const agent = createAgent({
 });
 ```
 
-### 8.3 错误处理
+### 9.3 错误处理
 
 ```typescript
 try {
@@ -564,7 +728,7 @@ try {
 }
 ```
 
-### 8.4 资源清理
+### 9.4 资源清理
 
 ```typescript
 const agent = createAgent(config);
