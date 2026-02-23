@@ -10,6 +10,16 @@ import type {
   EmbedFunction,
   DatabaseType,
 } from '@ai-stack/memory-store-sqlite';
+import {
+  createDocTreeBuilder,
+  createTreeStore,
+  type DocTreeBuilderInstance,
+  type DocSource as TreeDocSource,
+  type DocPage as TreeDocPage,
+  type DocSection as TreeDocSection,
+  type TreeStoreInstance,
+  type TreeRoot,
+} from '@ai-stack/tree-index';
 
 import type {
   DocIndexerConfig,
@@ -149,6 +159,15 @@ export interface DocIndexerInstance {
 
   /** Set database for persistent storage */
   setDatabase(db: DatabaseType): void;
+
+  /** Enable tree indexing */
+  enableTreeIndex(enabled?: boolean): void;
+
+  /** Get tree store instance (for search integration) */
+  getTreeStore(): TreeStoreInstance | null;
+
+  /** Get current tree root (if tree indexing enabled) */
+  getTreeRoot(): TreeRoot | null;
 }
 
 /**
@@ -174,6 +193,15 @@ export function createDocIndexer(
   const registryStore = createDocRegistryStore();
   let dbSet = false;
 
+  // Tree indexing support
+  let treeIndexEnabled = false;
+  let treeStore: TreeStoreInstance | null = null;
+  let treeBuilder: DocTreeBuilderInstance | null = null;
+  let currentTreeRoot: TreeRoot | null = null;
+
+  // Accumulated pages for tree building
+  const allPagesForTree: Array<DocPage & { chunkIds?: string[] }> = [];
+
   /**
    * Index a page into semantic chunks
    */
@@ -183,6 +211,7 @@ export function createDocIndexer(
     }
 
     let chunksAdded = 0;
+    const chunkIds: string[] = [];
 
     // If page has sections, index each section
     if (page.sections && page.sections.length > 0) {
@@ -214,8 +243,9 @@ export function createDocIndexer(
             }
           }
 
-          await store.add(chunkInput);
+          const addedChunk = await store.add(chunkInput);
           chunksAdded++;
+          chunkIds.push(addedChunk.id);
         }
       }
     } else {
@@ -244,9 +274,18 @@ export function createDocIndexer(
           }
         }
 
-        await store.add(chunkInput);
+        const addedChunk = await store.add(chunkInput);
         chunksAdded++;
+        chunkIds.push(addedChunk.id);
       }
+    }
+
+    // Collect page data for tree building
+    if (treeIndexEnabled) {
+      allPagesForTree.push({
+        ...page,
+        chunkIds,
+      });
     }
 
     return chunksAdded;
@@ -301,6 +340,19 @@ export function createDocIndexer(
     // Create in-memory registry as fallback (or use persistent store)
     // The registry interface is used for in-memory operations during crawling
     registry = createRegistry();
+
+    // Initialize tree indexing if enabled and database is set
+    if (treeIndexEnabled && dbSet) {
+      const database = registryStore.getDatabase();
+      if (database) {
+        treeStore = createTreeStore();
+        treeStore.setDatabase(database);
+        await treeStore.initialize();
+
+        treeBuilder = createDocTreeBuilder();
+        treeBuilder.setDatabase(database);
+      }
+    }
 
     initialized = true;
   }
@@ -579,6 +631,51 @@ export function createDocIndexer(
       }
     }
 
+    // Build tree index after all sources are crawled
+    if (treeIndexEnabled && allPagesForTree.length > 0 && treeBuilder) {
+      try {
+        // Group pages by source for tree building
+        const pagesBySource = new Map<string, Array<DocPage & { chunkIds?: string[] }>>();
+        for (const page of allPagesForTree) {
+          const sourcePages = pagesBySource.get(page.sourceId) || [];
+          sourcePages.push(page);
+          pagesBySource.set(page.sourceId, sourcePages);
+        }
+
+        // Build tree for each source
+        for (const [sourceId, pages] of pagesBySource) {
+          const source = dbSet
+            ? registryStore.getSource(sourceId)
+            : registry?.getSource(sourceId);
+
+          if (source) {
+            // Convert knowledge DocPage to tree-index DocPage format
+            const treePages: TreeDocPage[] = pages.map(p => ({
+              url: p.url,
+              title: p.title,
+              chunkId: p.chunkIds?.[0], // Link first chunk as representative
+              sections: p.sections?.map((s): TreeDocSection => ({
+                heading: s.title,
+                level: s.level || 1,
+                anchor: s.id,
+              })),
+            }));
+
+            const treeInput: TreeDocSource = {
+              sourceId: source.id,
+              name: source.name,
+              baseUrl: source.url,
+              pages: treePages,
+            };
+
+            currentTreeRoot = await treeBuilder.build(treeInput);
+          }
+        }
+      } catch (error) {
+        console.warn('[DocIndexer] Failed to build tree index:', (error as Error).message);
+      }
+    }
+
     summary.totalDurationMs = Date.now() - startTime;
     return summary;
   }
@@ -719,5 +816,10 @@ export function createDocIndexer(
     setStore,
     setEmbedFunction,
     setDatabase,
+    enableTreeIndex: (enabled = true) => {
+      treeIndexEnabled = enabled;
+    },
+    getTreeStore: () => treeStore,
+    getTreeRoot: () => currentTreeRoot,
   };
 }

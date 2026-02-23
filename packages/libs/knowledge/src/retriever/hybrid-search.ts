@@ -2,17 +2,20 @@
  * Hybrid Search
  *
  * Combines FTS and vector search with result reranking.
+ * Supports tree-aware search with subtree filtering and ancestor breadcrumbs.
  */
 
 import type {
   SemanticStoreInstance,
   SemanticSearchResult,
 } from '@ai-stack/memory-store-sqlite';
+import type { TreeStoreInstance, TreeNode } from '@ai-stack/tree-index';
 
 import type {
   KnowledgeSearchResult,
   KnowledgeSearchOptions,
   KnowledgeSourceType,
+  BreadcrumbItem,
 } from '../types.js';
 
 /**
@@ -34,6 +37,18 @@ export interface HybridSearchConfig {
     enabled: boolean;
     lambda: number;
     diversityThreshold: number;
+  };
+}
+
+/**
+ * Convert TreeNode to BreadcrumbItem
+ */
+function toBreadcrumb(node: TreeNode): BreadcrumbItem {
+  return {
+    id: node.id,
+    name: node.name,
+    path: node.path,
+    nodeType: node.nodeType,
   };
 }
 
@@ -190,6 +205,12 @@ export interface HybridSearchInstance {
 
   /** Get current configuration */
   getConfig(): HybridSearchConfig;
+
+  /** Set code tree store for tree-aware search */
+  setCodeTreeStore(store: TreeStoreInstance | null): void;
+
+  /** Set doc tree store for tree-aware search */
+  setDocTreeStore(store: TreeStoreInstance | null): void;
 }
 
 /**
@@ -199,6 +220,59 @@ export function createHybridSearch(
   config: Partial<HybridSearchConfig> = {}
 ): HybridSearchInstance {
   let cfg: HybridSearchConfig = { ...DEFAULT_CONFIG, ...config };
+
+  // Tree store references for tree-aware search
+  let codeTreeStore: TreeStoreInstance | null = null;
+  let docTreeStore: TreeStoreInstance | null = null;
+
+  /**
+   * Get ancestor breadcrumbs for a chunk
+   */
+  async function getAncestorBreadcrumbs(
+    chunkId: string,
+    sourceType: KnowledgeSourceType
+  ): Promise<BreadcrumbItem[]> {
+    const treeStore = sourceType === 'code' ? codeTreeStore : docTreeStore;
+    if (!treeStore) return [];
+
+    try {
+      // Find tree nodes by chunk ID (may be multiple, use first)
+      const nodes = await treeStore.getNodesByChunkId(chunkId);
+      if (nodes.length === 0) return [];
+
+      // Get ancestors for the first matching node
+      const ancestors = await treeStore.getAncestors(nodes[0].id);
+      return ancestors.map(toBreadcrumb);
+    } catch {
+      return [];
+    }
+  }
+
+  /**
+   * Filter results by subtree
+   */
+  async function filterBySubtree(
+    results: KnowledgeSearchResult[],
+    subtreeRootId: string,
+    sourceType: KnowledgeSourceType
+  ): Promise<KnowledgeSearchResult[]> {
+    const treeStore = sourceType === 'code' ? codeTreeStore : docTreeStore;
+    if (!treeStore) return results;
+
+    try {
+      // Get all chunk IDs in the subtree
+      const chunkIds = await treeStore.getChunksInSubtree(subtreeRootId);
+      const chunkIdSet = new Set(chunkIds);
+
+      // Filter results to only include those with chunks in the subtree
+      return results.filter((r) => {
+        if (r.sourceType !== sourceType) return true;
+        return r.chunk.id && chunkIdSet.has(r.chunk.id);
+      });
+    } catch {
+      return results;
+    }
+  }
 
   /**
    * Execute hybrid search
@@ -276,6 +350,23 @@ export function createHybridSearch(
       });
     }
 
+    // Tree-aware filtering
+    if (options?.tree?.subtreeRootId) {
+      // Determine source type for subtree filter (default to code)
+      const sourceType: KnowledgeSourceType = options.sources?.includes('doc') ? 'doc' : 'code';
+      results = await filterBySubtree(results, options.tree.subtreeRootId, sourceType);
+    }
+
+    // Add ancestor breadcrumbs if requested
+    if (options?.tree?.includeAncestors) {
+      results = await Promise.all(
+        results.map(async (r) => {
+          const ancestors = await getAncestorBreadcrumbs(r.chunk.id, r.sourceType);
+          return { ...r, ancestors };
+        })
+      );
+    }
+
     // Apply temporal decay
     results = applyTemporalDecay(results, cfg.temporalDecay);
 
@@ -307,9 +398,25 @@ export function createHybridSearch(
     return { ...cfg };
   }
 
+  /**
+   * Set code tree store
+   */
+  function setCodeTreeStore(store: TreeStoreInstance | null): void {
+    codeTreeStore = store;
+  }
+
+  /**
+   * Set doc tree store
+   */
+  function setDocTreeStore(store: TreeStoreInstance | null): void {
+    docTreeStore = store;
+  }
+
   return {
     search,
     setConfig,
     getConfig,
+    setCodeTreeStore,
+    setDocTreeStore,
   };
 }

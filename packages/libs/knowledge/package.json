@@ -21,6 +21,7 @@
   "dependencies": {
     "@ai-stack/memory-store-sqlite": "workspace:*",
     "@ai-stack/memory": "workspace:*",
+    "@ai-stack/tree-index": "workspace:*",
     "node-html-markdown": "^1.3.0",
     "glob": "^11.0.0",
     "chokidar": "^4.0.0"

@@ -58,6 +58,7 @@ export type {
   KnowledgeManagerConfig,
   KnowledgeSemanticConfig,
   KnowledgeStats,
+  BreadcrumbItem,
 
   // User interaction
   IndexAction,

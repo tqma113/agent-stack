@@ -16,6 +16,7 @@ import {
   type EmbedFunction,
   type SemanticStoreConfig,
 } from '@ai-stack/memory-store-sqlite';
+import type { TreeStoreInstance, TreeRoot } from '@ai-stack/tree-index';
 
 import type {
   KnowledgeManagerConfig,
@@ -96,6 +97,21 @@ export interface KnowledgeManagerInstance {
 
   /** Stop code file watching */
   stopWatching(): void;
+
+  /** Enable/disable tree indexing */
+  enableTreeIndex(enabled?: boolean): void;
+
+  /** Get code tree store instance */
+  getCodeTreeStore(): TreeStoreInstance | null;
+
+  /** Get document tree store instance */
+  getDocTreeStore(): TreeStoreInstance | null;
+
+  /** Get code tree root */
+  getCodeTreeRoot(): TreeRoot | null;
+
+  /** Get document tree root */
+  getDocTreeRoot(): TreeRoot | null;
 }
 
 /**
@@ -112,6 +128,7 @@ export function createKnowledgeManager(
   let hybridSearch: HybridSearchInstance | null = null;
   let embedFunction: EmbedFunction | undefined;
   let initialized = false;
+  let treeIndexEnabled = config.treeIndex?.enabled ?? false;
 
   // Configuration
   const dbPath = config.dbPath || DEFAULT_KNOWLEDGE_DB_PATH;
@@ -173,6 +190,9 @@ export function createKnowledgeManager(
       if (embedFunction) {
         codeIndexer.setEmbedFunction(embedFunction);
       }
+      if (treeIndexEnabled) {
+        codeIndexer.enableTreeIndex(true);
+      }
       await codeIndexer.initialize();
     }
 
@@ -183,6 +203,9 @@ export function createKnowledgeManager(
       docIndexer.setStore(semanticStore);
       if (embedFunction) {
         docIndexer.setEmbedFunction(embedFunction);
+      }
+      if (treeIndexEnabled) {
+        docIndexer.enableTreeIndex(true);
       }
       await docIndexer.initialize();
     }
@@ -202,6 +225,16 @@ export function createKnowledgeManager(
         diversityThreshold: 0.8,
       },
     });
+
+    // Wire up tree stores for tree-aware search
+    if (treeIndexEnabled) {
+      if (codeIndexer) {
+        hybridSearch.setCodeTreeStore(codeIndexer.getTreeStore());
+      }
+      if (docIndexer) {
+        hybridSearch.setDocTreeStore(docIndexer.getTreeStore());
+      }
+    }
 
     initialized = true;
   }
@@ -440,6 +473,47 @@ export function createKnowledgeManager(
     }
   }
 
+  /**
+   * Enable/disable tree indexing
+   */
+  function enableTreeIndex(enabled = true): void {
+    treeIndexEnabled = enabled;
+    if (codeIndexer) {
+      codeIndexer.enableTreeIndex(enabled);
+    }
+    if (docIndexer) {
+      docIndexer.enableTreeIndex(enabled);
+    }
+  }
+
+  /**
+   * Get code tree store
+   */
+  function getCodeTreeStore(): TreeStoreInstance | null {
+    return codeIndexer?.getTreeStore() || null;
+  }
+
+  /**
+   * Get document tree store
+   */
+  function getDocTreeStore(): TreeStoreInstance | null {
+    return docIndexer?.getTreeStore() || null;
+  }
+
+  /**
+   * Get code tree root
+   */
+  function getCodeTreeRoot(): TreeRoot | null {
+    return codeIndexer?.getTreeRoot() || null;
+  }
+
+  /**
+   * Get document tree root
+   */
+  function getDocTreeRoot(): TreeRoot | null {
+    return docIndexer?.getTreeRoot() || null;
+  }
+
   return {
     initialize,
     close,
@@ -459,5 +533,10 @@ export function createKnowledgeManager(
     setEmbedFunction,
     startWatching,
     stopWatching,
+    enableTreeIndex,
+    getCodeTreeStore,
+    getDocTreeStore,
+    getCodeTreeRoot,
+    getDocTreeRoot,
   };
 }

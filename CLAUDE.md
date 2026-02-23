@@ -148,6 +148,7 @@ import { createAgent } from '@ai-stack/agent';
 @ai-stack/provider → openai, @anthropic-ai/sdk, @google/generative-ai
 @ai-stack/mcp → @modelcontextprotocol/sdk
 @ai-stack/memory → @ai-stack/memory-store-sqlite (types), @ai-stack/provider
+@ai-stack/tree-index → @ai-stack/memory-store-sqlite, better-sqlite3
 @ai-stack/knowledge → @ai-stack/memory-store-sqlite, @ai-stack/memory
 @ai-stack/skill → @ai-stack/provider
 @ai-stack/tui → ink, @inkjs/ui, chalk, boxen, ora, diff, react

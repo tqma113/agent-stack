@@ -1,0 +1,46 @@
+{
+  "name": "@ai-stack/tree-index",
+  "version": "0.0.1",
+  "description": "Hybrid Tree Index for AI Stack - Closure Table + Path Enumeration for hierarchical navigation",
+  "main": "./dist/index.js",
+  "module": "./dist/index.mjs",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.mjs",
+      "require": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "clean": "rimraf dist",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "dependencies": {
+    "@ai-stack/memory-store-sqlite": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^7.6.12",
+    "@types/node": "^20.10.0",
+    "better-sqlite3": "^11.7.0",
+    "rimraf": "^5.0.5",
+    "tsup": "^8.3.5",
+    "typescript": "~5.7.2",
+    "vitest": "^2.1.8"
+  },
+  "peerDependencies": {
+    "better-sqlite3": "^11.0.0"
+  },
+  "peerDependenciesMeta": {
+    "better-sqlite3": {
+      "optional": false
+    }
+  }
+}

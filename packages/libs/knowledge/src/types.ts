@@ -73,12 +73,30 @@ export interface DocMetadata {
 /**
  * Knowledge search result
  */
+/**
+ * Breadcrumb item for tree navigation context
+ */
+export interface BreadcrumbItem {
+  /** Node ID */
+  id: string;
+  /** Node name/title */
+  name: string;
+  /** Node path */
+  path: string;
+  /** Node type */
+  nodeType: string;
+}
+
 export interface KnowledgeSearchResult extends SemanticSearchResult {
   chunk: KnowledgeChunk;
   /** Source type */
   sourceType: KnowledgeSourceType;
   /** Code snippet highlight */
   highlight?: string;
+  /** Ancestor breadcrumbs (if tree indexing enabled) */
+  ancestors?: BreadcrumbItem[];
+  /** Tree node ID (if linked) */
+  treeNodeId?: string;
 }
 
 /**
@@ -101,6 +119,15 @@ export interface KnowledgeSearchOptions {
   useVector?: boolean;
   /** Hybrid search weights */
   weights?: { fts: number; vector: number };
+  /** Tree-related options */
+  tree?: {
+    /** Search within a specific subtree (node ID) */
+    subtreeRootId?: string;
+    /** Include ancestor breadcrumbs in results */
+    includeAncestors?: boolean;
+    /** Filter by node types */
+    nodeTypes?: string[];
+  };
 }
 
 // =============================================================================
@@ -557,6 +584,12 @@ export interface KnowledgeManagerConfig {
       enabled?: boolean;
       lambda?: number;
     };
+  };
+
+  /** Tree index config */
+  treeIndex?: {
+    /** Enable tree indexing */
+    enabled?: boolean;
   };
 }
 

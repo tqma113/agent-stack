@@ -270,7 +270,59 @@ packages/libs/memory/
 
 ---
 
-### 2.7 @ai-stack/knowledge
+### 2.7 @ai-stack/tree-index
+
+树形层级索引。
+
+```
+packages/libs/tree-index/
+├── src/
+│   ├── index.ts                # 包入口
+│   ├── types.ts                # 类型定义
+│   ├── errors.ts               # 错误类
+│   ├── tree-store.ts           # 树存储 (SQLite)
+│   │
+│   ├── builders/               # 树构建器
+│   │   ├── index.ts
+│   │   ├── code-tree-builder.ts    # 代码树构建
+│   │   ├── doc-tree-builder.ts     # 文档树构建
+│   │   ├── event-tree-builder.ts   # 事件树构建
+│   │   └── task-tree-builder.ts    # 任务树构建
+│   │
+│   ├── search/                 # 树感知搜索
+│   │   ├── index.ts
+│   │   ├── tree-search.ts      # 子树搜索
+│   │   └── tree-filter.ts      # 结果过滤
+│   │
+│   └── utils/                  # 工具函数
+│       ├── index.ts
+│       ├── path-utils.ts       # 路径工具
+│       └── closure-utils.ts    # 闭包表工具
+│
+├── tests/
+│   ├── tree-store.test.ts
+│   ├── path-utils.test.ts
+│   └── builders.test.ts
+├── package.json
+├── tsconfig.json
+├── tsup.config.ts
+└── vitest.config.ts
+```
+
+**依赖**：
+- `@ai-stack/memory-store-sqlite`
+- `better-sqlite3`
+
+**核心功能**：
+- Closure Table + Path Enumeration 混合架构
+- O(1) 祖先/后代查询
+- 四种树类型：code, doc, event, task
+- 与 SemanticStore 双向链接
+- 树感知搜索和子树过滤
+
+---
+
+### 2.8 @ai-stack/knowledge
 
 知识索引。
 

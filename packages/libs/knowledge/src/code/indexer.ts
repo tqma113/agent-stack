@@ -1,7 +1,7 @@
 /**
  * Code Indexer
  *
- * Indexes code files into semantic chunks for search.
+ * Indexes code files into semantic chunks for search with optional tree indexing.
  */
 
 import { glob } from 'glob';
@@ -14,6 +14,14 @@ import type {
   EmbedFunction,
   DatabaseType,
 } from '@ai-stack/memory-store-sqlite';
+import {
+  createCodeTreeBuilder,
+  createTreeStore,
+  type CodeTreeBuilderInstance,
+  type CodeBlock as TreeCodeBlock,
+  type TreeStoreInstance,
+  type TreeRoot,
+} from '@ai-stack/tree-index';
 
 import type {
   CodeIndexerConfig,
@@ -84,6 +92,15 @@ export interface CodeIndexerInstance {
 
   /** Set database for persistent storage */
   setDatabase(db: DatabaseType): void;
+
+  /** Enable tree indexing */
+  enableTreeIndex(enabled?: boolean): void;
+
+  /** Get tree store instance (for search integration) */
+  getTreeStore(): TreeStoreInstance | null;
+
+  /** Get current tree root (if tree indexing enabled) */
+  getTreeRoot(): TreeRoot | null;
 }
 
 /**
@@ -108,6 +125,15 @@ export function createCodeIndexer(
   // Persistent index status store
   const indexStore = createCodeIndexStore();
   let dbSet = false;
+
+  // Tree indexing support
+  let treeIndexEnabled = false;
+  let treeStore: TreeStoreInstance | null = null;
+  let treeBuilder: CodeTreeBuilderInstance | null = null;
+  let currentTreeRoot: TreeRoot | null = null;
+
+  // Accumulated blocks for tree building (across all indexed files)
+  const allBlocksWithChunks: Array<TreeCodeBlock & { chunkId?: string }> = [];
 
   /**
    * Compute content hash
@@ -239,8 +265,21 @@ export function createCodeIndexer(
           }
         }
 
-        await store.add(chunkInput);
+        const addedChunk = await store.add(chunkInput);
         chunksAdded++;
+
+        // Collect blocks with chunk IDs for tree building
+        if (treeIndexEnabled) {
+          allBlocksWithChunks.push({
+            filePath: relativePath,
+            symbolName: block.symbolName,
+            symbolKind: block.symbolType,
+            parentSymbol: block.parentSymbol,
+            lineRange: { start: block.startLine, end: block.endLine },
+            language: block.language,
+            chunkId: addedChunk.id,
+          });
+        }
       }
 
       // Update status (persistent store if available)
@@ -365,6 +404,19 @@ export function createCodeIndexer(
             inProgress.splice(i, 1);
           }
         }
+      }
+    }
+
+    // Build tree index after all files are processed
+    if (treeIndexEnabled && allBlocksWithChunks.length > 0 && treeBuilder) {
+      try {
+        currentTreeRoot = await treeBuilder.build(allBlocksWithChunks, {
+          includeDirectories: true,
+          includeFiles: true,
+          includeSymbols: true,
+        });
+      } catch (error) {
+        console.warn('[CodeIndexer] Failed to build tree index:', (error as Error).message);
       }
     }
 
@@ -617,6 +669,19 @@ export function createCodeIndexer(
       watcher = createWatcher(watcherConfig);
     }
 
+    // Initialize tree indexing if enabled and database is set
+    if (treeIndexEnabled && dbSet) {
+      const database = indexStore.getDatabase();
+      if (database) {
+        treeStore = createTreeStore();
+        treeStore.setDatabase(database);
+        await treeStore.initialize();
+
+        treeBuilder = createCodeTreeBuilder();
+        treeBuilder.setDatabase(database);
+      }
+    }
+
     initialized = true;
   }
 
@@ -673,5 +738,10 @@ export function createCodeIndexer(
     setStore,
     setEmbedFunction,
     setDatabase,
+    enableTreeIndex: (enabled = true) => {
+      treeIndexEnabled = enabled;
+    },
+    getTreeStore: () => treeStore,
+    getTreeRoot: () => currentTreeRoot,
   };
 }

@@ -30,6 +30,9 @@ export interface CodeIndexStoreInstance {
   /** Set the database instance */
   setDatabase(db: DatabaseType): void;
 
+  /** Get the database instance */
+  getDatabase(): DatabaseType | null;
+
   /** Initialize the store (create tables) */
   initialize(): Promise<void>;
 
@@ -89,6 +92,10 @@ export function createCodeIndexStore(): CodeIndexStoreInstance {
   return {
     setDatabase(database: DatabaseType): void {
       db = database;
+    },
+
+    getDatabase(): DatabaseType | null {
+      return db;
     },
 
     async initialize(): Promise<void> {
