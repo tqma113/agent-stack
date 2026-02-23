@@ -42,6 +42,57 @@ export const MCPConfigSchema = z.object({
 });
 
 /**
+ * Knowledge code configuration schema
+ */
+export const KnowledgeCodeConfigSchema = z.object({
+  enabled: z.boolean().optional(),
+  rootDir: z.string().optional(),
+  include: z.array(z.string()).optional(),
+  exclude: z.array(z.string()).optional(),
+  watch: z.boolean().optional(),
+  autoIndex: z.boolean().optional(),
+});
+
+/**
+ * Knowledge doc source schema
+ */
+export const DocSourceSchema = z.object({
+  name: z.string(),
+  type: z.enum(['url', 'website', 'sitemap', 'github', 'local']),
+  url: z.string(),
+  tags: z.array(z.string()).optional(),
+  enabled: z.boolean().optional(),
+});
+
+/**
+ * Knowledge doc configuration schema
+ */
+export const KnowledgeDocConfigSchema = z.object({
+  enabled: z.boolean().optional(),
+  sources: z.array(DocSourceSchema).optional(),
+  autoIndex: z.boolean().optional(),
+});
+
+/**
+ * Knowledge search configuration schema
+ */
+export const KnowledgeSearchConfigSchema = z.object({
+  minScore: z.number().min(0).max(1).optional(),
+  maxResults: z.number().positive().optional(),
+});
+
+/**
+ * Knowledge configuration schema
+ */
+export const KnowledgeConfigSchema = z.object({
+  enabled: z.boolean().optional(),
+  dbPath: z.string().optional(),
+  code: KnowledgeCodeConfigSchema.optional(),
+  doc: KnowledgeDocConfigSchema.optional(),
+  search: KnowledgeSearchConfigSchema.optional(),
+});
+
+/**
  * Code configuration schema
  */
 export const CodeConfigSchema = z.object({
@@ -56,6 +107,7 @@ export const CodeConfigSchema = z.object({
   history: HistoryConfigSchema.optional(),
   tasks: TaskConfigSchema.optional(),
   mcp: MCPConfigSchema.optional(),
+  knowledge: KnowledgeConfigSchema.optional(),
 });
 
 /**

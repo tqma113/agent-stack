@@ -13,8 +13,8 @@ AI Stack 是一个功能完整的 AI Agent 开发框架，提供多模型 LLM �
 | **多模型支持** | OpenAI、Anthropic Claude、Google Gemini、OpenAI 兼容 API (Ollama, Groq 等) |
 | **MCP 协议** | Model Context Protocol 支持，连接外部工具服务器 (stdio/http/sse) |
 | **技能系统** | 动态加载本地技能，热插拔工具扩展 |
-| **记忆系统** | 五层记忆架构，持久化对话和任务状态 (SQLite + FTS5 + 向量搜索) |
-| **知识索引** | 代码库和文档索引，混合搜索 (FTS + Vector) |
+| **记忆系统** | 五层记忆架构 + **双层记忆架构** (Markdown Memory + Agent Memory)，持久化对话和任务状态 |
+| **知识索引** | 代码库和文档索引，混合搜索 (FTS + Vector)，Assistant 和 Code 均支持 |
 | **权限管控** | 工具执行前确认、审计日志、规则引擎 |
 | **终端 UI** | Ink + 直接输出混合架构，流式渲染、Diff 视图、任务看板 |
 | **高级编排** | 状态机、恢复策略、计划 DAG、评估器、模型路由 |

@@ -470,7 +470,62 @@ pnpm run undo
 }
 ```
 
-### 11.2 mcp.json
+### 11.2 assistant.json
+
+```json
+{
+  "name": "My Personal Assistant",
+  "agent": {
+    "model": "gpt-4o",
+    "temperature": 0.7,
+    "systemPrompt": "You are a helpful personal AI assistant."
+  },
+  "memory": {
+    "enabled": true,
+    "syncOnStartup": true,
+    "watchFiles": true
+  },
+  "agentMemory": {
+    "enabled": true,
+    "syncFromMarkdown": true
+  },
+  "agentKnowledge": {
+    "enabled": false
+  },
+  "scheduler": {
+    "enabled": true
+  }
+}
+```
+
+### 11.3 code.json
+
+```json
+{
+  "model": "gpt-4o",
+  "temperature": 0.7,
+  "maxTokens": 8192,
+  "safety": {
+    "workingDir": ".",
+    "allowedPaths": ["**/*"],
+    "blockedPaths": ["**/node_modules/**", "**/.git/**"],
+    "confirmDestructive": true
+  },
+  "history": {
+    "enabled": true
+  },
+  "tasks": {
+    "enabled": true
+  },
+  "knowledge": {
+    "enabled": false,
+    "code": { "enabled": true, "autoIndex": false },
+    "doc": { "enabled": true, "autoIndex": false }
+  }
+}
+```
+
+### 11.4 mcp.json
 
 ```json
 {

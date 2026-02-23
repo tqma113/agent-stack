@@ -6,7 +6,7 @@
   "description": "Example project for @ai-stack/assistant personal AI assistant",
   "scripts": {
     "build": "echo 'No build needed'",
-    "start": "assistant chat",
+    "start": "ai-assistant chat",
     "chat": "assistant chat",
     "daemon": "assistant daemon start",
     "daemon:stop": "assistant daemon stop",

@@ -277,7 +277,56 @@ Assistant 采用**双层记忆架构**，结合显式和隐式记忆：
 }
 ```
 
-### 3.6 TUI (@ai-stack/tui)
+### 3.7 Code Agent Knowledge
+
+Code Agent 也支持 Knowledge 系统，用于增强代码理解能力：
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                         Code Agent Knowledge 架构                            │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                             │
+│  ┌───────────────────────────────────────────────────────────────────────┐  │
+│  │                    Knowledge Manager (可选)                            │  │
+│  │                                                                       │  │
+│  │  .ai-stack/knowledge/sqlite.db:                                       │  │
+│  │  - Code chunks (代码索引) - 手动触发                                   │  │
+│  │  - Doc chunks (文档索引) - 手动触发                                    │  │
+│  │                                                                       │  │
+│  │  API Methods:                                                         │  │
+│  │  - searchKnowledge(query) - 语义搜索代码/文档                         │  │
+│  │  - indexCode({ force }) - 手动索引代码                                │  │
+│  │  - crawlDocs({ force }) - 手动爬取文档                                │  │
+│  │  - addDocSource(source) - 添加文档源                                  │  │
+│  │  - getKnowledgeStats() - 获取索引统计                                 │  │
+│  └───────────────────────────────────────────────────────────────────────┘  │
+│                                                                             │
+│  ┌───────────────────────────────────────────────────────────────────────┐  │
+│  │                    File Tools + History + Tasks                        │  │
+│  │                                                                       │  │
+│  │  .ai-stack/history/sqlite.db - 文件变更历史（Undo/Redo）              │  │
+│  │  .ai-stack/tasks/sqlite.db - 任务管理                                 │  │
+│  └───────────────────────────────────────────────────────────────────────┘  │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+**配置示例**：
+```json
+{
+  "knowledge": {
+    "enabled": false,
+    "code": { "enabled": true, "autoIndex": false },
+    "doc": { "enabled": true, "autoIndex": false }
+  }
+}
+```
+
+**设计原则**：
+- `enabled: false` 默认禁用，按需开启
+- `autoIndex: false` 不自动索引，用户手动触发
+- 与 Assistant Knowledge 使用相同的 `@ai-stack/knowledge` 包
+
+### 3.8 TUI (@ai-stack/tui)
 
 **职责**：终端 UI 组件，混合架构支持 TTY 和非 TTY 环境
 

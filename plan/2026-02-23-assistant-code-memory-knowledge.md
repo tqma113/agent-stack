@@ -133,12 +133,40 @@ tasks/
 | `packages/libs/code/package.json` | 添加依赖 |
 | `packages/examples/assistant/assistant.json` | 更新配置 |
 | `packages/examples/code/code.json` | 更新配置 |
+| `packages/mcp-servers/lsp/src/language-client.ts` | 类型修复 |
+| `packages/libs/code/src/config-schema.ts` | 添加 Knowledge Schema |
 | `spec/project-structure.md` | 更新文档 |
 | `spec/architecture.md` | 更新文档 |
+
+### 10. LSP 包类型修复
+
+**文件**: `packages/mcp-servers/lsp/src/language-client.ts`
+
+- 修复 vscode-languageserver-protocol 与 vscode-jsonrpc 类型不兼容问题
+- 使用字符串方法名替代 Protocol 类型对象
+- 添加显式类型断言处理 LSP 响应
+
+### 11. Code 配置 Schema 更新
+
+**文件**: `packages/libs/code/src/config-schema.ts`
+
+- 添加 `KnowledgeConfigSchema` 验证 schema
+- 添加 `KnowledgeCodeConfigSchema`、`KnowledgeDocConfigSchema`、`KnowledgeSearchConfigSchema`
+- 添加 `DocSourceSchema` 用于文档源验证
+
+### 12. 目录自动创建
+
+**文件**: `packages/libs/code/src/code-agent/code-agent.ts`
+
+- 在初始化 history store 前自动创建目录
+- 在初始化 task store 前自动创建目录
 
 ## 验证结果
 
 ✅ `rush build` 成功完成，所有 22 个包编译通过
+✅ `better-sqlite3` native 模块重新编译成功
+✅ Assistant 初始化测试通过，Agent Memory 正常加载
+✅ Code Agent 初始化测试通过，Knowledge 配置正确解析
 
 ## 使用示例
 

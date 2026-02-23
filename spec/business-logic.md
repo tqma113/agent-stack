@@ -601,19 +601,59 @@ await history.restoreCheckpoint('my-checkpoint');
 
 ## 11. Assistant 特性
 
-### 11.1 Markdown Memory
+### 11.1 双层记忆架构
+
+Assistant 采用**双层记忆架构**，结合显式和隐式记忆：
 
 ```
-Source of Truth (Markdown)
-         │
-         ├─ MEMORY.md (长期记忆)
-         └─ memory/YYYY-MM-DD.md (每日日志)
-                  │
-                  ▼
-         Derived Index (SQLite)
-         ├─ FTS5 索引
-         └─ sqlite-vec 向量索引 (可选)
+┌─────────────────────────────────────────────────────────────────────────┐
+│                          双层记忆架构                                     │
+├─────────────────────────────────────────────────────────────────────────┤
+│                                                                         │
+│  Layer 1: Markdown Memory (显式记忆)                                    │
+│  ┌─────────────────────────────────────────────────────────────────┐   │
+│  │  Source of Truth - 用户可编辑                                    │   │
+│  │  - MEMORY.md: Profile, Facts, Todos, Notes                       │   │
+│  │  - logs/YYYY-MM-DD.md: 每日日志                                  │   │
+│  │  - markdown-index.db: BM25 全文索引                              │   │
+│  └─────────────────────────────────────────────────────────────────┘   │
+│                              │                                          │
+│                              │ 启动时同步 (增量，hash 比较)             │
+│                              ▼                                          │
+│  Layer 2: Agent Memory (隐式记忆)                                       │
+│  ┌─────────────────────────────────────────────────────────────────┐   │
+│  │  自动管理 - 语义搜索                                             │   │
+│  │  - agent.db: Events, Profiles, Summaries, SemanticChunks        │   │
+│  │  - 支持 Token Budget 管理                                        │   │
+│  │  - 支持 Write Policy (事件自动记录)                              │   │
+│  └─────────────────────────────────────────────────────────────────┘   │
+│                                                                         │
+│  Layer 3: Agent Knowledge (可选)                                        │
+│  ┌─────────────────────────────────────────────────────────────────┐   │
+│  │  手动触发索引 - 代码/文档语义搜索                                │   │
+│  │  - knowledge/sqlite.db: Code chunks, Doc chunks                  │   │
+│  └─────────────────────────────────────────────────────────────────┘   │
+└─────────────────────────────────────────────────────────────────────────┘
 ```
+
+**同步流程**：
+```typescript
+// 启动时自动执行
+await assistant.initialize();  // 触发 Markdown → Agent Memory 同步
+
+// 手动触发同步
+await assistant.syncMarkdownToAgentMemory();
+
+// 同步策略：
+// 1. 计算 Markdown 内容 hash
+// 2. 与上次同步 hash 比较
+// 3. 只同步变化的内容
+// 4. Profile → Agent Profile store
+// 5. Facts/Todos → Memory events (tag: 'markdown-sync')
+// 6. Notes → Semantic chunks
+```
+
+### 11.2 Markdown Memory
 
 **MEMORY.md 格式**：
 ```markdown
@@ -633,7 +673,7 @@ Source of Truth (Markdown)
 User mentioned interest in Rust.
 ```
 
-### 11.2 多通道网关
+### 11.3 多通道网关
 
 ```
 ┌─────────────────────────────────────────────┐
@@ -643,7 +683,7 @@ User mentioned interest in Rust.
 └─────────────────────────────────────────────┘
 ```
 
-### 11.3 调度器
+### 11.4 调度器
 
 ```typescript
 // Cron 定时

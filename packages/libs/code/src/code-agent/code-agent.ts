@@ -127,8 +127,14 @@ export function createCodeAgent(config?: CodeConfig | string): CodeAgentInstance
     async initialize(): Promise<void> {
       // Initialize history store
       if (resolvedConfig.history.enabled) {
+        const historyDbPath = resolvedConfig.history.dbPath!;
+        // Ensure directory exists
+        const historyDir = dirname(historyDbPath);
+        if (!existsSync(historyDir)) {
+          mkdirSync(historyDir, { recursive: true });
+        }
         historyStore = createFileHistoryStore({
-          dbPath: resolvedConfig.history.dbPath!,
+          dbPath: historyDbPath,
           maxChanges: resolvedConfig.history.maxChanges!,
         });
         historyStore.initialize();
@@ -136,8 +142,14 @@ export function createCodeAgent(config?: CodeConfig | string): CodeAgentInstance
 
       // Initialize task store
       if (resolvedConfig.tasks.enabled) {
+        const tasksDbPath = resolvedConfig.tasks.dbPath!;
+        // Ensure directory exists
+        const tasksDir = dirname(tasksDbPath);
+        if (!existsSync(tasksDir)) {
+          mkdirSync(tasksDir, { recursive: true });
+        }
         taskStore = createTaskStore({
-          dbPath: resolvedConfig.tasks.dbPath!,
+          dbPath: tasksDbPath,
         });
         taskStore.initialize();
       }

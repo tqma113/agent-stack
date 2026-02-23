@@ -3322,10 +3322,177 @@ ai-assistant memory search "query" -n 5
 
 ---
 
-### 8.3 从 @ai-stack/assistant 导出
+### 8.3 createAssistant() 工厂函数
+
+创建 Assistant 实例，支持双层记忆架构和知识索引。
+
+```typescript
+import { createAssistant, type AssistantInstance } from '@ai-stack/assistant';
+
+const assistant = createAssistant(config?: AssistantConfig | string): AssistantInstance
+```
+
+**AssistantConfig**:
+
+| 参数 | 类型 | 默认值 | 描述 |
+|------|------|--------|------|
+| `name` | `string` | `'Assistant'` | 助手名称 |
+| `agent` | `AgentConfigSection` | - | 底层 Agent 配置 |
+| `memory` | `MarkdownMemoryConfig` | `{ enabled: true }` | Markdown Memory 配置 |
+| `agentMemory` | `AgentMemoryConfigSection` | `{ enabled: true }` | Agent Memory 配置 |
+| `agentKnowledge` | `AgentKnowledgeConfigSection` | `{ enabled: false }` | Agent Knowledge 配置 |
+| `gateway` | `GatewayConfig` | - | 多通道网关配置 |
+| `scheduler` | `SchedulerConfig` | - | 调度器配置 |
+
+**AgentMemoryConfigSection**:
+
+| 参数 | 类型 | 默认值 | 描述 |
+|------|------|--------|------|
+| `enabled` | `boolean` | `true` | 是否启用 Agent Memory |
+| `dbPath` | `string` | `'memory/agent.db'` | SQLite 数据库路径 |
+| `syncFromMarkdown` | `boolean` | `true` | 是否从 Markdown 同步 |
+| `debug` | `boolean` | `false` | 调试模式 |
+
+**AgentKnowledgeConfigSection**:
+
+| 参数 | 类型 | 默认值 | 描述 |
+|------|------|--------|------|
+| `enabled` | `boolean` | `false` | 是否启用 Knowledge |
+| `dbPath` | `string` | `'knowledge/sqlite.db'` | SQLite 数据库路径 |
+| `code.enabled` | `boolean` | `true` | 启用代码索引 |
+| `code.autoIndex` | `boolean` | `false` | 自动索引代码 |
+| `doc.enabled` | `boolean` | `true` | 启用文档索引 |
+| `doc.autoIndex` | `boolean` | `false` | 自动索引文档 |
+
+---
+
+#### AssistantInstance 方法
+
+**基础方法**:
+
+```typescript
+// 初始化
+async initialize(options?: InitializeOptions): Promise<void>
+
+// 关闭
+async close(): Promise<void>
+
+// 对话
+async chat(input: string): Promise<string>
+
+// 流式对话
+async stream(input: string, onToken?: (token: string) => void): Promise<string>
+```
+
+**获取器方法**:
+
+```typescript
+// 获取底层 Agent
+getAgent(): AgentInstance
+
+// 获取 Markdown Memory
+getMemory(): MarkdownMemoryInstance | null
+
+// 获取 Agent Memory Manager
+getAgentMemory(): MemoryManagerInstance | null
+
+// 获取 Knowledge Manager
+getKnowledge(): KnowledgeManagerInstance | null
+
+// 获取配置
+getConfig(): AssistantConfig
+
+// 获取名称
+getName(): string
+```
+
+**Agent Memory 方法**:
+
+```typescript
+// 检索 Agent Memory bundle
+async retrieveAgentMemory(query?: string): Promise<MemoryBundle | null>
+
+// 获取 Agent Memory 上下文字符串
+async getAgentMemoryContext(query?: string): Promise<string>
+
+// 手动触发 Markdown → Agent Memory 同步
+async syncMarkdownToAgentMemory(): Promise<SyncResult | null>
+```
+
+**Knowledge 方法**:
+
+```typescript
+// 搜索知识库
+async searchKnowledge(query: string, options?: KnowledgeSearchOptions): Promise<KnowledgeSearchResult[]>
+
+// 手动索引代码
+async indexCode(options?: { force?: boolean }): Promise<IndexSummary | null>
+
+// 添加文档源
+async addDocSource(source: DocSourceInput): Promise<void>
+
+// 手动爬取文档
+async crawlDocs(options?: { force?: boolean }): Promise<CrawlSummary | null>
+
+// 获取知识库统计
+async getKnowledgeStats(): Promise<KnowledgeStats | null>
+```
+
+---
+
+#### 使用示例
+
+```typescript
+import { createAssistant, loadConfig } from '@ai-stack/assistant';
+
+// 从配置文件加载
+const { config } = loadConfig('./assistant.json');
+const assistant = createAssistant(config);
+
+await assistant.initialize();
+
+// 使用 Agent Memory
+const agentMemory = assistant.getAgentMemory();
+if (agentMemory) {
+  const context = await assistant.getAgentMemoryContext('user preferences');
+  console.log('Memory context:', context);
+}
+
+// 使用 Knowledge (如果启用)
+const knowledge = assistant.getKnowledge();
+if (knowledge) {
+  await assistant.indexCode({ force: true });
+  const results = await assistant.searchKnowledge('useEffect hook');
+  console.log('Search results:', results);
+}
+
+// 对话
+const response = await assistant.chat('What are my preferences?');
+console.log(response);
+
+await assistant.close();
+```
+
+---
+
+### 8.4 从 @ai-stack/assistant 导出
 
 ```typescript
 export {
+  // Assistant 工厂函数
+  createAssistant,
+  type AssistantInstance,
+  type InitializeOptions,
+
+  // 配置
+  loadConfig,
+  loadConfigFile,
+  findConfigFile,
+  resolveConfig,
+  getDefaultConfig,
+  type AssistantConfig,
+  type AgentConfigSection,
+
   // Memory 工厂函数
   createMarkdownMemory,
   type MarkdownMemoryInstance,
@@ -3336,6 +3503,8 @@ export {
 
   // 类型
   type MarkdownMemoryConfig,
+  type AgentMemoryConfigSection,
+  type AgentKnowledgeConfigSection,
   type MemorySearchResult,
   type MemoryQueryOptions,
   type HybridSearchOptions,
@@ -3685,4 +3854,210 @@ const dagResults = await manager.orchestrate({
   ],
   edges: [{ from: 'task_1', to: 'task_2' }],
 });
+```
+
+---
+
+## 10. @ai-stack/code
+
+### 10.1 createCodeAgent() 工厂函数
+
+创建 Code Agent 实例，支持文件操作、搜索、Undo/Redo 和知识索引。
+
+```typescript
+import { createCodeAgent, type CodeAgentInstance } from '@ai-stack/code';
+
+const code = createCodeAgent(config?: CodeConfig | string): CodeAgentInstance
+```
+
+**CodeConfig**:
+
+| 参数 | 类型 | 默认值 | 描述 |
+|------|------|--------|------|
+| `model` | `string` | `'gpt-4o'` | 使用的模型 |
+| `temperature` | `number` | `0.7` | 温度参数 |
+| `maxTokens` | `number` | `8192` | 最大 token 数 |
+| `maxIterations` | `number` | `50` | 最大迭代次数 |
+| `apiKey` | `string` | `process.env.OPENAI_API_KEY` | API 密钥 |
+| `baseURL` | `string` | - | 自定义 API 端点 |
+| `safety` | `SafetyConfig` | - | 安全配置 |
+| `history` | `HistoryConfig` | - | 文件历史配置 |
+| `tasks` | `TaskConfig` | - | 任务管理配置 |
+| `mcp` | `MCPConfig` | - | MCP 配置 |
+| `knowledge` | `CodeKnowledgeConfig` | - | 知识索引配置 |
+
+**SafetyConfig**:
+
+| 参数 | 类型 | 默认值 | 描述 |
+|------|------|--------|------|
+| `workingDir` | `string` | `process.cwd()` | 工作目录 |
+| `allowedPaths` | `string[]` | `['**/*']` | 允许的路径模式 |
+| `blockedPaths` | `string[]` | `['**/node_modules/**', '**/.git/**']` | 阻止的路径模式 |
+| `maxFileSize` | `number` | `1048576` | 最大文件大小 (字节) |
+| `blockSecrets` | `boolean` | `true` | 阻止包含密钥的文件 |
+| `confirmDestructive` | `boolean` | `true` | 确认破坏性操作 |
+
+**CodeKnowledgeConfig**:
+
+| 参数 | 类型 | 默认值 | 描述 |
+|------|------|--------|------|
+| `enabled` | `boolean` | `false` | 是否启用 Knowledge |
+| `dbPath` | `string` | `'.ai-stack/knowledge/sqlite.db'` | 数据库路径 |
+| `code.enabled` | `boolean` | `true` | 启用代码索引 |
+| `code.rootDir` | `string` | `workingDir` | 代码根目录 |
+| `code.autoIndex` | `boolean` | `false` | 自动索引 |
+| `doc.enabled` | `boolean` | `true` | 启用文档索引 |
+| `doc.autoIndex` | `boolean` | `false` | 自动索引 |
+| `search.minScore` | `number` | `0.5` | 最小相关性分数 |
+| `search.maxResults` | `number` | `10` | 最大结果数 |
+
+---
+
+#### CodeAgentInstance 方法
+
+**基础方法**:
+
+```typescript
+// 初始化
+async initialize(): Promise<void>
+
+// 关闭
+async close(): Promise<void>
+
+// 对话
+async chat(input: string): Promise<string>
+
+// 流式对话
+async stream(input: string, callbacks?: StreamCallbacks): Promise<string>
+
+// 获取底层 Agent
+getAgent(): AgentInstance
+
+// 获取配置
+getConfig(): CodeConfig
+
+// 获取所有工具
+getTools(): Tool[]
+
+// 注册自定义工具
+registerTool(tool: Tool): void
+```
+
+**Undo/Redo 方法**:
+
+```typescript
+// 撤销上一次文件更改
+async undo(): Promise<UndoResult | null>
+
+// 重做上一次撤销的更改
+async redo(): Promise<RedoResult | null>
+
+// 创建命名检查点
+async createCheckpoint(name: string): Promise<void>
+
+// 恢复到检查点
+async restoreCheckpoint(name: string): Promise<void>
+```
+
+**Knowledge 方法**:
+
+```typescript
+// 获取 Knowledge Manager (如果未启用则为 null)
+getKnowledge(): KnowledgeManagerInstance | null
+
+// 搜索知识库
+async searchKnowledge(query: string, options?: CodeKnowledgeSearchOptions): Promise<CodeKnowledgeSearchResult[]>
+
+// 手动索引代码
+async indexCode(options?: { force?: boolean }): Promise<CodeIndexSummary | null>
+
+// 添加文档源
+async addDocSource(source: { name: string; type: string; url: string; tags?: string[]; enabled: boolean }): Promise<void>
+
+// 手动爬取文档
+async crawlDocs(options?: { force?: boolean }): Promise<CodeCrawlSummary | null>
+
+// 获取知识库统计
+async getKnowledgeStats(): Promise<CodeKnowledgeStats | null>
+```
+
+---
+
+#### 使用示例
+
+```typescript
+import { createCodeAgent, loadConfig } from '@ai-stack/code';
+
+// 从配置文件加载
+const { config } = loadConfig('./code.json');
+const code = createCodeAgent(config);
+
+await code.initialize();
+
+// 基本对话
+const response = await code.chat('Read the package.json file');
+console.log(response);
+
+// 流式输出
+await code.stream('Explain the main function', {
+  onToken: (token) => process.stdout.write(token),
+  onComplete: (full) => console.log('\n--- Done ---'),
+});
+
+// Undo/Redo
+await code.chat('Add a console.log to index.ts');
+const undoResult = await code.undo();
+console.log('Undone:', undoResult?.file_path);
+
+// Knowledge (如果启用)
+const knowledge = code.getKnowledge();
+if (knowledge) {
+  await code.indexCode({ force: true });
+  const results = await code.searchKnowledge('error handling');
+  console.log('Found:', results.length, 'matches');
+}
+
+await code.close();
+```
+
+---
+
+### 10.2 从 @ai-stack/code 导出
+
+```typescript
+export {
+  // Code Agent 工厂函数
+  createCodeAgent,
+  type CodeAgentInstance,
+
+  // 配置
+  loadConfig,
+  loadConfigFile,
+  findConfigFile,
+  resolveConfig,
+  getDefaultConfig,
+  generateConfigTemplate,
+  type CodeConfig,
+  type SafetyConfig,
+  type HistoryConfig,
+  type TaskConfig,
+  type CodeKnowledgeConfig,
+
+  // 类型
+  type ReadParams,
+  type WriteParams,
+  type EditParams,
+  type GlobParams,
+  type GrepParams,
+  type TaskItem,
+  type TaskStatus,
+  type UndoResult,
+  type RedoResult,
+  type CodeKnowledgeSearchOptions,
+  type CodeKnowledgeSearchResult,
+  type CodeIndexSummary,
+  type CodeCrawlSummary,
+  type CodeKnowledgeStats,
+  type StreamCallbacks,
+};
 ```

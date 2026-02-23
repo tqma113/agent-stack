@@ -13,23 +13,8 @@ import {
   StreamMessageWriter,
 } from 'vscode-jsonrpc/node';
 import {
-  InitializeRequest,
   InitializeParams,
-  InitializedNotification,
-  DidOpenTextDocumentNotification,
-  DidCloseTextDocumentNotification,
   TextDocumentPositionParams,
-  DocumentDiagnosticRequest,
-  DefinitionRequest,
-  ReferencesRequest,
-  CompletionRequest,
-  HoverRequest,
-  DocumentSymbolRequest,
-  WorkspaceSymbolRequest,
-  DocumentFormattingRequest,
-  RenameRequest,
-  CodeActionRequest,
-  PublishDiagnosticsNotification,
   DiagnosticSeverity as LSPDiagnosticSeverity,
   SymbolKind,
   CompletionItemKind,
@@ -343,14 +328,14 @@ export function createLanguageClientManager(workingDir: string): LanguageClientM
       };
 
       // Handle diagnostics
-      connection.onNotification(PublishDiagnosticsNotification.type, (params) => {
-        const diagnostics: Diagnostic[] = params.diagnostics.map((d) => ({
+      connection.onNotification('textDocument/publishDiagnostics', (params: { uri: string; diagnostics: Array<{ range: LSPRange; severity?: LSPDiagnosticSeverity; code?: number | string; source?: string; message: string; relatedInformation?: Array<{ location: LSPLocation; message: string }> }> }) => {
+        const diagnostics: Diagnostic[] = params.diagnostics.map((d: { range: LSPRange; severity?: LSPDiagnosticSeverity; code?: number | string; source?: string; message: string; relatedInformation?: Array<{ location: LSPLocation; message: string }> }) => ({
           range: convertRange(d.range),
           severity: convertSeverity(d.severity),
           code: d.code?.toString(),
           source: d.source,
           message: d.message,
-          relatedInformation: d.relatedInformation?.map((ri) => ({
+          relatedInformation: d.relatedInformation?.map((ri: { location: LSPLocation; message: string }) => ({
             location: convertLocation(ri.location),
             message: ri.message,
           })),
@@ -420,8 +405,8 @@ export function createLanguageClientManager(workingDir: string): LanguageClientM
         workspaceFolders: [{ uri: rootUri, name: 'workspace' }],
       };
 
-      await connection.sendRequest(InitializeRequest.type, initParams);
-      connection.sendNotification(InitializedNotification.type, {});
+      await connection.sendRequest('initialize', initParams);
+      connection.sendNotification('initialized', {});
 
       client.initialized = true;
       clients.set(config.languageId, client);
@@ -476,7 +461,7 @@ export function createLanguageClientManager(workingDir: string): LanguageClientM
         text: content,
       };
 
-      client.connection.sendNotification(DidOpenTextDocumentNotification.type, { textDocument });
+      client.connection.sendNotification('textDocument/didOpen', { textDocument });
       client.openDocuments.add(uri);
     },
 
@@ -487,7 +472,7 @@ export function createLanguageClientManager(workingDir: string): LanguageClientM
       }
 
       const textDocument: TextDocumentIdentifier = { uri };
-      client.connection.sendNotification(DidCloseTextDocumentNotification.type, { textDocument });
+      client.connection.sendNotification('textDocument/didClose', { textDocument });
       client.openDocuments.delete(uri);
       client.diagnostics.delete(uri);
     },
@@ -523,7 +508,7 @@ export function createLanguageClientManager(workingDir: string): LanguageClientM
         position: { line, character },
       };
 
-      const result = await client.connection.sendRequest(DefinitionRequest.type, params);
+      const result = await client.connection.sendRequest('textDocument/definition', params);
       if (!result) return [];
 
       if (Array.isArray(result)) {
@@ -548,7 +533,7 @@ export function createLanguageClientManager(workingDir: string): LanguageClientM
         context: { includeDeclaration },
       };
 
-      const result = await client.connection.sendRequest(ReferencesRequest.type, params);
+      const result = await client.connection.sendRequest('textDocument/references', params) as LSPLocation[] | null;
       if (!result) return [];
 
       return result.map((loc) => convertLocation(loc));
@@ -569,7 +554,7 @@ export function createLanguageClientManager(workingDir: string): LanguageClientM
         position: { line, character },
       };
 
-      const result = await client.connection.sendRequest(CompletionRequest.type, params);
+      const result = await client.connection.sendRequest('textDocument/completion', params) as { items: Array<{ label: string; kind?: CompletionItemKind; detail?: string; documentation?: string | { value: string }; insertText?: string; sortText?: string }> } | Array<{ label: string; kind?: CompletionItemKind; detail?: string; documentation?: string | { value: string }; insertText?: string; sortText?: string }> | null;
       if (!result) return [];
 
       const items = Array.isArray(result) ? result : result.items;
@@ -598,7 +583,7 @@ export function createLanguageClientManager(workingDir: string): LanguageClientM
         position: { line, character },
       };
 
-      const result = await client.connection.sendRequest(HoverRequest.type, params);
+      const result = await client.connection.sendRequest('textDocument/hover', params) as { contents: string | { value: string } | Array<string | { value: string }>; range?: LSPRange } | null;
       if (!result) return null;
 
       let contents = '';
@@ -627,7 +612,8 @@ export function createLanguageClientManager(workingDir: string): LanguageClientM
       }
 
       const params = { textDocument: { uri } };
-      const result = await client.connection.sendRequest(DocumentSymbolRequest.type, params);
+      type DocSymbolResult = Array<{ name: string; kind: SymbolKind; range: LSPRange; selectionRange?: LSPRange; children?: DocSymbolResult; location?: LSPLocation }>;
+      const result = await client.connection.sendRequest('textDocument/documentSymbol', params) as DocSymbolResult | null;
       if (!result) return [];
 
       function convertDocSymbol(sym: any): DocumentSymbol {
@@ -661,7 +647,8 @@ export function createLanguageClientManager(workingDir: string): LanguageClientM
         throw new LSPServerError('No language server available', 'NO_SERVER');
       }
 
-      const result = await client.connection.sendRequest(WorkspaceSymbolRequest.type, { query });
+      type WorkspaceSymbolResult = Array<{ name: string; kind: SymbolKind; location: LSPLocation | { uri: string }; containerName?: string }>;
+      const result = await client.connection.sendRequest('workspace/symbol', { query }) as WorkspaceSymbolResult | null;
       if (!result) return [];
 
       return result.slice(0, limit).map((sym) => {
@@ -691,7 +678,8 @@ export function createLanguageClientManager(workingDir: string): LanguageClientM
       const options: FormattingOptions = { tabSize, insertSpaces };
       const params = { textDocument: { uri }, options };
 
-      const result = await client.connection.sendRequest(DocumentFormattingRequest.type, params);
+      type FormattingResult = Array<{ range: LSPRange; newText: string }>;
+      const result = await client.connection.sendRequest('textDocument/formatting', params) as FormattingResult | null;
       if (!result) return [];
 
       return result.map((edit) => ({
@@ -716,7 +704,8 @@ export function createLanguageClientManager(workingDir: string): LanguageClientM
         newName,
       };
 
-      const result = await client.connection.sendRequest(RenameRequest.type, params);
+      type RenameResult = { changes?: Record<string, Array<{ range: LSPRange; newText: string }>> };
+      const result = await client.connection.sendRequest('textDocument/rename', params) as RenameResult | null;
       if (!result || !result.changes) {
         return { changes: {} };
       }
@@ -774,7 +763,8 @@ export function createLanguageClientManager(workingDir: string): LanguageClientM
         },
       };
 
-      const result = await client.connection.sendRequest(CodeActionRequest.type, params);
+      type CodeActionResult = Array<{ title: string; command?: unknown; kind?: string; isPreferred?: boolean; edit?: { changes?: Record<string, Array<{ range: LSPRange; newText: string }>> } }>;
+      const result = await client.connection.sendRequest('textDocument/codeAction', params) as CodeActionResult | null;
       if (!result) return [];
 
       return result.map((action) => {
@@ -787,27 +777,25 @@ export function createLanguageClientManager(workingDir: string): LanguageClientM
         }
 
         // This is a CodeAction
-        const codeAction = action as { title: string; kind?: string; isPreferred?: boolean; edit?: { changes?: Record<string, Array<{ range: LSPRange; newText: string }>> } };
-
-        if (codeAction.edit?.changes) {
+        if (action.edit?.changes) {
           const changes: Record<string, TextEdit[]> = {};
-          for (const [fileUri, edits] of Object.entries(codeAction.edit.changes)) {
+          for (const [fileUri, edits] of Object.entries(action.edit.changes)) {
             changes[fileUri] = edits.map((edit) => ({
               range: convertRange(edit.range),
               newText: edit.newText,
             }));
           }
           return {
-            title: codeAction.title,
-            kind: codeAction.kind,
-            isPreferred: codeAction.isPreferred,
+            title: action.title,
+            kind: action.kind,
+            isPreferred: action.isPreferred,
             edit: { changes },
           };
         }
         return {
-          title: codeAction.title,
-          kind: codeAction.kind,
-          isPreferred: codeAction.isPreferred,
+          title: action.title,
+          kind: action.kind,
+          isPreferred: action.isPreferred,
         };
       });
     },
