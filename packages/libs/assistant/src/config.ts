@@ -10,7 +10,7 @@ import type { AssistantConfig } from './types.js';
 /**
  * Default base directory for assistant data
  */
-export const DEFAULT_BASE_DIR = join(homedir(), '.ai-assistant');
+export const DEFAULT_BASE_DIR = join(homedir(), '.ai-stack');
 
 /**
  * Configuration file names to search for
@@ -110,6 +110,13 @@ export function getDefaultConfig(): AssistantConfig {
       syncOnStartup: true,
       watchFiles: true,
     },
+    agentMemory: {
+      enabled: true,
+      syncFromMarkdown: true,
+    },
+    agentKnowledge: {
+      enabled: false,  // Disabled by default, enable on demand
+    },
     gateway: {
       sessionStrategy: 'per-peer',
       channels: {
@@ -152,15 +159,28 @@ export function resolveConfig(config: AssistantConfig, configDir?: string): Assi
     memory: config.memory
       ? {
           ...config.memory,
-          memoryFile: resolvePath(config.memory.memoryFile, 'MEMORY.md'),
-          logsDir: resolvePath(config.memory.logsDir, 'memory'),
-          dbPath: resolvePath(config.memory.dbPath, 'index.db'),
+          memoryFile: resolvePath(config.memory.memoryFile, 'memory/MEMORY.md'),
+          logsDir: resolvePath(config.memory.logsDir, 'memory/logs'),
+          // Renamed from sqlite.db to markdown-index.db to distinguish from agent.db
+          dbPath: resolvePath(config.memory.dbPath, 'memory/markdown-index.db'),
+        }
+      : undefined,
+    agentMemory: config.agentMemory
+      ? {
+          ...config.agentMemory,
+          dbPath: resolvePath(config.agentMemory.dbPath, 'memory/agent.db'),
+        }
+      : undefined,
+    agentKnowledge: config.agentKnowledge
+      ? {
+          ...config.agentKnowledge,
+          dbPath: resolvePath(config.agentKnowledge.dbPath, 'knowledge/sqlite.db'),
         }
       : undefined,
     scheduler: config.scheduler
       ? {
           ...config.scheduler,
-          persistencePath: resolvePath(config.scheduler.persistencePath, 'scheduler.json'),
+          persistencePath: resolvePath(config.scheduler.persistencePath, 'scheduler/jobs.json'),
         }
       : undefined,
   };
@@ -181,6 +201,13 @@ export function generateConfigTemplate(): AssistantConfig {
       enabled: true,
       syncOnStartup: true,
       watchFiles: true,
+    },
+    agentMemory: {
+      enabled: true,
+      syncFromMarkdown: true,
+    },
+    agentKnowledge: {
+      enabled: false,
     },
     gateway: {
       sessionStrategy: 'per-peer',
@@ -225,14 +252,23 @@ export function initConfig(baseDir: string = DEFAULT_BASE_DIR, force: boolean = 
   const config = generateConfigTemplate();
   writeFileSync(configPath, serializeConfig(config), 'utf-8');
 
-  // Create memory directory
+  // Create memory directories
   const memoryDir = join(baseDir, 'memory');
+  const logsDir = join(baseDir, 'memory/logs');
+  const schedulerDir = join(baseDir, 'scheduler');
+
   if (!existsSync(memoryDir)) {
     mkdirSync(memoryDir, { recursive: true });
   }
+  if (!existsSync(logsDir)) {
+    mkdirSync(logsDir, { recursive: true });
+  }
+  if (!existsSync(schedulerDir)) {
+    mkdirSync(schedulerDir, { recursive: true });
+  }
 
   // Create default MEMORY.md
-  const memoryFile = join(baseDir, 'MEMORY.md');
+  const memoryFile = join(baseDir, 'memory/MEMORY.md');
   if (!existsSync(memoryFile) || force) {
     writeFileSync(
       memoryFile,

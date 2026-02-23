@@ -26,6 +26,14 @@ export {
   writeDailyLogEntry,
 } from './markdown-writer.js';
 export { mergeHybridResults, mergeWithRRF } from './hybrid-merge.js';
+export {
+  syncMarkdownToAgentMemory,
+  createSyncState,
+  needsFullSync,
+  resetSyncState,
+  type SyncResult,
+  type SyncState,
+} from './markdown-to-agent-sync.js';
 export type {
   MemoryDocument,
   ProfileSection,

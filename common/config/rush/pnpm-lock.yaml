@@ -121,6 +121,9 @@ importers:
       '@ai-stack/agent':
         specifier: workspace:*
         version: link:../agent
+      '@ai-stack/knowledge':
+        specifier: workspace:*
+        version: link:../knowledge
       '@ai-stack/memory':
         specifier: workspace:*
         version: link:../memory
@@ -177,6 +180,9 @@ importers:
       '@ai-stack/agent':
         specifier: workspace:*
         version: link:../agent
+      '@ai-stack/knowledge':
+        specifier: workspace:*
+        version: link:../knowledge
       '@ai-stack/mcp':
         specifier: workspace:*
         version: link:../mcp

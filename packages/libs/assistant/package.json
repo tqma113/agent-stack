@@ -38,6 +38,7 @@
   "license": "MIT",
   "dependencies": {
     "@ai-stack/agent": "workspace:*",
+    "@ai-stack/knowledge": "workspace:*",
     "@ai-stack/memory": "workspace:*",
     "@ai-stack/memory-store-sqlite": "workspace:*",
     "@ai-stack/provider": "workspace:*",

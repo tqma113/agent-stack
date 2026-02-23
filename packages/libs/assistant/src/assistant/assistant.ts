@@ -1,14 +1,39 @@
 /**
  * @ai-stack/assistant - Main Assistant
  *
- * Personal AI assistant with Markdown memory, multi-channel gateway, and scheduler.
+ * Personal AI assistant with Markdown memory, Agent memory, Knowledge, multi-channel gateway, and scheduler.
  */
 
-import { dirname } from 'path';
+import { dirname, join } from 'path';
+import { existsSync, mkdirSync } from 'fs';
 import { createAgent, type AgentInstance, type AgentConfig } from '@ai-stack/agent';
+import {
+  createMemoryManager,
+  type MemoryManagerInstance,
+  type MemoryBundle,
+  type MemoryStores,
+} from '@ai-stack/memory';
+import { createSqliteStores } from '@ai-stack/memory-store-sqlite';
+import {
+  createKnowledgeManager,
+  type KnowledgeManagerInstance,
+  type KnowledgeSearchResult,
+  type KnowledgeSearchOptions,
+  type IndexSummary,
+  type CrawlSummary,
+  type KnowledgeStats,
+  type DocSourceInput,
+} from '@ai-stack/knowledge';
 import type { AssistantConfig, IncomingMessage, MessageContent, Session } from '../types.js';
 import { loadConfig, resolveConfig, getDefaultConfig } from '../config.js';
-import { createMarkdownMemory, type MarkdownMemoryInstance } from '../memory/index.js';
+import {
+  createMarkdownMemory,
+  type MarkdownMemoryInstance,
+  syncMarkdownToAgentMemory,
+  createSyncState,
+  type SyncState,
+  type SyncResult,
+} from '../memory/index.js';
 import { createGateway, type GatewayInstance } from '../gateway/index.js';
 import { createScheduler, type SchedulerInstance, type JobExecutor } from '../scheduler/index.js';
 import { createDaemon, type DaemonInstance } from '../daemon/index.js';
@@ -37,14 +62,38 @@ export interface AssistantInstance {
 
   /** Get the underlying agent */
   getAgent(): AgentInstance;
-  /** Get the memory system */
+  /** Get the Markdown memory system */
   getMemory(): MarkdownMemoryInstance | null;
+  /** Get the Agent memory manager */
+  getAgentMemory(): MemoryManagerInstance | null;
+  /** Get the Knowledge manager */
+  getKnowledge(): KnowledgeManagerInstance | null;
   /** Get the gateway */
   getGateway(): GatewayInstance | null;
   /** Get the scheduler */
   getScheduler(): SchedulerInstance | null;
   /** Get the daemon */
   getDaemon(): DaemonInstance | null;
+
+  // Agent Memory methods
+  /** Retrieve agent memory bundle */
+  retrieveAgentMemory(query?: string): Promise<MemoryBundle | null>;
+  /** Get agent memory context string */
+  getAgentMemoryContext(query?: string): Promise<string>;
+  /** Sync Markdown memory to Agent memory */
+  syncMarkdownToAgentMemory(): Promise<SyncResult | null>;
+
+  // Knowledge methods
+  /** Search knowledge base */
+  searchKnowledge(query: string, options?: KnowledgeSearchOptions): Promise<KnowledgeSearchResult[]>;
+  /** Index code (manual trigger) */
+  indexCode(options?: { force?: boolean }): Promise<IndexSummary | null>;
+  /** Add document source */
+  addDocSource(source: DocSourceInput): Promise<void>;
+  /** Crawl documents (manual trigger) */
+  crawlDocs(options?: { force?: boolean }): Promise<CrawlSummary | null>;
+  /** Get knowledge statistics */
+  getKnowledgeStats(): Promise<KnowledgeStats | null>;
 
   /** Start interactive CLI mode */
   startCLI(): void;
@@ -118,9 +167,14 @@ export function createAssistant(config?: AssistantConfig | string): AssistantIns
 
   // Optional subsystems
   let memory: MarkdownMemoryInstance | null = null;
+  let agentMemoryManager: MemoryManagerInstance | null = null;
+  let knowledgeManager: KnowledgeManagerInstance | null = null;
   let gateway: GatewayInstance | null = null;
   let scheduler: SchedulerInstance | null = null;
   let daemon: DaemonInstance | null = null;
+
+  // Sync state for Markdown -> Agent Memory synchronization
+  let markdownSyncState: SyncState = createSyncState();
 
   // Message handler for gateway
   const handleMessage = async (msg: IncomingMessage, session: Session): Promise<MessageContent | string> => {
@@ -216,7 +270,7 @@ export function createAssistant(config?: AssistantConfig | string): AssistantIns
         }
       }
 
-      // Initialize memory if enabled
+      // Initialize Markdown memory if enabled
       if (resolvedConfig.memory?.enabled) {
         memory = createMarkdownMemory({
           memoryFile: resolvedConfig.memory.memoryFile!,
@@ -234,6 +288,117 @@ export function createAssistant(config?: AssistantConfig | string): AssistantIns
           agent.configure({
             systemPrompt: `${currentPrompt}\n\n## Memory\n\n${memoryContext}`,
           });
+        }
+      }
+
+      // Initialize Agent Memory if enabled
+      if (resolvedConfig.agentMemory?.enabled !== false) {
+        const agentMemoryDbPath = resolvedConfig.agentMemory?.dbPath || join(resolvedConfig.baseDir!, 'memory/agent.db');
+
+        // Ensure directory exists
+        const agentMemoryDir = dirname(agentMemoryDbPath);
+        if (!existsSync(agentMemoryDir)) {
+          mkdirSync(agentMemoryDir, { recursive: true });
+        }
+
+        try {
+          // Create SQLite stores for Agent Memory
+          const agentMemoryStores: MemoryStores = await createSqliteStores({
+            dbPath: agentMemoryDbPath,
+          });
+
+          agentMemoryManager = createMemoryManager(agentMemoryStores, {
+            debug: resolvedConfig.agentMemory?.debug,
+          });
+          await agentMemoryManager.initialize();
+
+          // Sync Markdown memory to Agent memory if enabled
+          if (resolvedConfig.agentMemory?.syncFromMarkdown !== false && memory) {
+            const doc = memory.getDocument();
+            if (doc) {
+              const syncResult = await syncMarkdownToAgentMemory(
+                doc,
+                agentMemoryManager,
+                markdownSyncState,
+                resolvedConfig.agentMemory?.debug
+              );
+              if (resolvedConfig.agentMemory?.debug) {
+                console.log('[assistant] Markdown sync complete:', syncResult);
+              }
+            }
+          }
+        } catch (error) {
+          console.error('Failed to initialize Agent Memory:', error);
+        }
+      }
+
+      // Initialize Knowledge if enabled
+      if (resolvedConfig.agentKnowledge?.enabled) {
+        const knowledgeDbPath = resolvedConfig.agentKnowledge?.dbPath || join(resolvedConfig.baseDir!, 'knowledge/sqlite.db');
+
+        // Ensure directory exists
+        const knowledgeDir = dirname(knowledgeDbPath);
+        if (!existsSync(knowledgeDir)) {
+          mkdirSync(knowledgeDir, { recursive: true });
+        }
+
+        try {
+          knowledgeManager = createKnowledgeManager({
+            dbPath: knowledgeDbPath,
+            code: resolvedConfig.agentKnowledge.code?.enabled
+              ? {
+                  enabled: true,
+                  rootDir: resolvedConfig.agentKnowledge.code.rootDir || process.cwd(),
+                  include: resolvedConfig.agentKnowledge.code.include,
+                  exclude: resolvedConfig.agentKnowledge.code.exclude,
+                  watch: resolvedConfig.agentKnowledge.code.watch,
+                }
+              : undefined,
+            doc: resolvedConfig.agentKnowledge.doc?.enabled
+              ? {
+                  enabled: true,
+                }
+              : undefined,
+          });
+          await knowledgeManager.initialize();
+
+          // Auto-index code if configured
+          if (resolvedConfig.agentKnowledge.code?.autoIndex) {
+            try {
+              await knowledgeManager.indexCode();
+            } catch (error) {
+              console.error('Failed to auto-index code:', error);
+            }
+          }
+
+          // Add and auto-crawl doc sources if configured
+          if (resolvedConfig.agentKnowledge.doc?.sources) {
+            for (const source of resolvedConfig.agentKnowledge.doc.sources) {
+              if (source.enabled !== false) {
+                try {
+                  await knowledgeManager.addDocSource({
+                    name: source.name,
+                    type: source.type,
+                    url: source.url,
+                    tags: source.tags,
+                    enabled: true,
+                  });
+                } catch (error) {
+                  console.error(`Failed to add doc source ${source.name}:`, error);
+                }
+              }
+            }
+
+            if (resolvedConfig.agentKnowledge.doc.autoIndex) {
+              try {
+                await knowledgeManager.crawlDocs();
+              } catch (error) {
+                console.error('Failed to auto-crawl docs:', error);
+              }
+            }
+          }
+        } catch (error) {
+          console.error('Failed to initialize Knowledge:', error);
         }
       }
 
@@ -284,6 +449,16 @@ export function createAssistant(config?: AssistantConfig | string): AssistantIns
       if (gateway) {
         await gateway.close();
         gateway = null;
+      }
+
+      if (knowledgeManager) {
+        await knowledgeManager.close();
+        knowledgeManager = null;
+      }
+
+      if (agentMemoryManager) {
+        await agentMemoryManager.close();
+        agentMemoryManager = null;
       }
 
       if (memory) {
@@ -347,6 +522,14 @@ export function createAssistant(config?: AssistantConfig | string): AssistantIns
       return memory;
     },
 
+    getAgentMemory(): MemoryManagerInstance | null {
+      return agentMemoryManager;
+    },
+
+    getKnowledge(): KnowledgeManagerInstance | null {
+      return knowledgeManager;
+    },
+
     getGateway(): GatewayInstance | null {
       return gateway;
     },
@@ -357,6 +540,106 @@ export function createAssistant(config?: AssistantConfig | string): AssistantIns
 
     getDaemon(): DaemonInstance | null {
       return daemon;
+    },
+
+    // Agent Memory methods
+    async retrieveAgentMemory(query?: string): Promise<MemoryBundle | null> {
+      if (!agentMemoryManager) {
+        return null;
+      }
+      return agentMemoryManager.retrieve({ query });
+    },
+
+    async getAgentMemoryContext(query?: string): Promise<string> {
+      if (!agentMemoryManager) {
+        return '';
+      }
+      const bundle = await agentMemoryManager.retrieve({ query });
+      const parts: string[] = [];
+
+      // Add profile info
+      if (bundle.profile.length > 0) {
+        parts.push('### Profile');
+        for (const item of bundle.profile) {
+          parts.push(`- ${item.key}: ${JSON.stringify(item.value)}`);
+        }
+      }
+
+      // Add recent events
+      if (bundle.recentEvents.length > 0) {
+        parts.push('\n### Recent Events');
+        for (const event of bundle.recentEvents.slice(-5)) {
+          parts.push(`- [${event.type}] ${event.summary}`);
+        }
+      }
+
+      // Add relevant chunks
+      if (bundle.retrievedChunks.length > 0) {
+        parts.push('\n### Relevant Context');
+        for (const result of bundle.retrievedChunks.slice(0, 3)) {
+          parts.push(`- ${result.chunk.text.slice(0, 200)}...`);
+        }
+      }
+
+      // Add summary
+      if (bundle.summary) {
+        parts.push('\n### Summary');
+        parts.push(bundle.summary.short);
+      }
+
+      return parts.join('\n');
+    },
+
+    async syncMarkdownToAgentMemory(): Promise<SyncResult | null> {
+      if (!agentMemoryManager || !memory) {
+        return null;
+      }
+      const doc = memory.getDocument();
+      if (!doc) {
+        return null;
+      }
+      return syncMarkdownToAgentMemory(
+        doc,
+        agentMemoryManager,
+        markdownSyncState,
+        resolvedConfig.agentMemory?.debug
+      );
+    },
+
+    // Knowledge methods
+    async searchKnowledge(query: string, options?: KnowledgeSearchOptions): Promise<KnowledgeSearchResult[]> {
+      if (!knowledgeManager) {
+        return [];
+      }
+      return knowledgeManager.search(query, options);
+    },
+
+    async indexCode(options?: { force?: boolean }): Promise<IndexSummary | null> {
+      if (!knowledgeManager) {
+        return null;
+      }
+      return knowledgeManager.indexCode(options);
+    },
+
+    async addDocSource(source: DocSourceInput): Promise<void> {
+      if (!knowledgeManager) {
+        throw new Error('Knowledge manager not initialized');
+      }
+      await knowledgeManager.addDocSource(source);
+    },
+
+    async crawlDocs(options?: { force?: boolean }): Promise<CrawlSummary | null> {
+      if (!knowledgeManager) {
+        return null;
+      }
+      return knowledgeManager.crawlDocs(options);
+    },
+
+    async getKnowledgeStats(): Promise<KnowledgeStats | null> {
+      if (!knowledgeManager) {
+        return null;
+      }
+      return knowledgeManager.getStats();
     },
 
     startCLI(): void {

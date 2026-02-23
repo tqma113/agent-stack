@@ -15,17 +15,29 @@
 
   "history": {
     "enabled": true,
-    "dbPath": "history/sqlite.db",
+    "dbPath": ".ai-stack/history/sqlite.db",
     "maxChanges": 1000
   },
 
   "tasks": {
     "enabled": true,
-    "dbPath": "tasks/sqlite.db"
+    "dbPath": ".ai-stack/tasks/sqlite.db"
   },
 
   "mcp": {
     "configPath": "./mcp.json",
     "autoConnect": true
+  },
+
+  "knowledge": {
+    "enabled": false,
+    "code": {
+      "enabled": true,
+      "autoIndex": false
+    },
+    "doc": {
+      "enabled": true,
+      "autoIndex": false
+    }
   }
 }

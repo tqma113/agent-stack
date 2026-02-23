@@ -24,7 +24,7 @@
   },
   "memory": {
     "enabled": true,
-    "dbPath": "./memory/sqlite.db",
+    "dbPath": "./.ai-stack/memory/sqlite.db",
     "autoInitialize": true,
     "autoInject": true,
     "tokenBudget": {
@@ -48,7 +48,7 @@
   },
   "knowledge": {
     "enabled": true,
-    "dbPath": "knowledge/sqlite.db",
+    "dbPath": ".ai-stack/knowledge/sqlite.db",
     "code": {
       "enabled": false,
       "rootDir": ".",

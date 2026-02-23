@@ -16,11 +16,15 @@
   },
   "memory": {
     "enabled": true,
-    "memoryFile": "./MEMORY.md",
-    "logsDir": "./memory",
-    "dbPath": "./index.db",
     "syncOnStartup": true,
     "watchFiles": true
+  },
+  "agentMemory": {
+    "enabled": true,
+    "syncFromMarkdown": true
+  },
+  "agentKnowledge": {
+    "enabled": false
   },
   "gateway": {
     "sessionStrategy": "per-peer",
@@ -37,7 +41,6 @@
   },
   "scheduler": {
     "enabled": true,
-    "allowAgentControl": true,
-    "persistencePath": "./scheduler.json"
+    "allowAgentControl": true
   }
 }

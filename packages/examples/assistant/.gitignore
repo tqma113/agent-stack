@@ -1,16 +1,20 @@
-# Environment
-.env
+# AI Stack data directory
+.ai-stack/
+
+# Legacy directories (backward compatibility)
+memory/
+MEMORY.md
+index.db
+scheduler.json
 
 # Database files
 *.db
 *.db-wal
 *.db-shm
 
-# Memory logs (keep MEMORY.md, ignore daily logs)
-memory/*.md
-
-# Scheduler persistence
-scheduler.json
+# Environment
+.env
+.env.local
 
 # Node modules
 node_modules/

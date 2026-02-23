@@ -1,11 +1,21 @@
+# AI Stack data directory
+.ai-stack/
+
+# Legacy directories (backward compatibility)
+.ai-code/
+history/
+tasks/
+
+# Database files
+*.db
+*.db-wal
+*.db-shm
+
 # Dependencies
 node_modules/
 
 # Build output
 dist/
-
-# AI Code data
-.ai-code/
 
 # IDE
 .idea/

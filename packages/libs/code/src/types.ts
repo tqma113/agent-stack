@@ -62,6 +62,53 @@ export interface CodeMCPConfig {
 }
 
 /**
+ * Knowledge configuration for code agent
+ */
+export interface CodeKnowledgeConfig {
+  /** Enable knowledge system (default: false) */
+  enabled?: boolean;
+  /** SQLite database path (default: .ai-stack/knowledge/sqlite.db) */
+  dbPath?: string;
+  /** Code indexing configuration */
+  code?: {
+    /** Enable code indexing */
+    enabled?: boolean;
+    /** Root directory for indexing */
+    rootDir?: string;
+    /** Include glob patterns */
+    include?: string[];
+    /** Exclude glob patterns */
+    exclude?: string[];
+    /** Watch for file changes */
+    watch?: boolean;
+    /** Auto-index on startup (default: false) */
+    autoIndex?: boolean;
+  };
+  /** Document indexing configuration */
+  doc?: {
+    /** Enable document indexing */
+    enabled?: boolean;
+    /** Document sources */
+    sources?: Array<{
+      name: string;
+      type: 'url' | 'website' | 'sitemap' | 'github' | 'local';
+      url: string;
+      tags?: string[];
+      enabled?: boolean;
+    }>;
+    /** Auto-index on startup (default: false) */
+    autoIndex?: boolean;
+  };
+  /** Search configuration */
+  search?: {
+    /** Minimum relevance score */
+    minScore?: number;
+    /** Maximum results */
+    maxResults?: number;
+  };
+}
+
+/**
  * Code Agent configuration
  */
 export interface CodeConfig {
@@ -86,6 +133,8 @@ export interface CodeConfig {
   tasks?: TaskConfig;
   /** MCP configuration */
   mcp?: CodeMCPConfig;
+  /** Knowledge configuration */
+  knowledge?: CodeKnowledgeConfig;
 }
 
 // =============================================================================
@@ -334,6 +383,94 @@ export interface RedoResult {
 // =============================================================================
 
 /**
+ * Knowledge search options for Code agent
+ */
+export interface CodeKnowledgeSearchOptions {
+  /** Source types to search */
+  sources?: Array<'code' | 'doc'>;
+  /** Languages to filter (for code) */
+  languages?: string[];
+  /** File patterns to filter (for code) */
+  filePatterns?: string[];
+  /** URL prefixes to filter (for docs) */
+  urlPrefixes?: string[];
+  /** Result limit */
+  limit?: number;
+  /** Minimum relevance score */
+  minScore?: number;
+}
+
+/**
+ * Knowledge search result
+ */
+export interface CodeKnowledgeSearchResult {
+  /** Chunk text */
+  text: string;
+  /** Relevance score */
+  score: number;
+  /** Source type */
+  sourceType: 'code' | 'doc';
+  /** Source URI (file path or URL) */
+  sourceUri: string;
+  /** Code metadata (if code source) */
+  code?: {
+    language: string;
+    filePath: string;
+    startLine: number;
+    endLine: number;
+    symbolName?: string;
+  };
+  /** Doc metadata (if doc source) */
+  doc?: {
+    url: string;
+    title?: string;
+    section?: string;
+  };
+}
+
+/**
+ * Index summary result
+ */
+export interface CodeIndexSummary {
+  filesProcessed: number;
+  filesSkipped: number;
+  filesFailed: number;
+  chunksAdded: number;
+  chunksRemoved: number;
+  totalDurationMs: number;
+}
+
+/**
+ * Crawl summary result
+ */
+export interface CodeCrawlSummary {
+  sourcesProcessed: number;
+  totalPagesProcessed: number;
+  totalPagesAdded: number;
+  totalChunksAdded: number;
+  totalDurationMs: number;
+}
+
+/**
+ * Knowledge statistics
+ */
+export interface CodeKnowledgeStats {
+  code: {
+    enabled: boolean;
+    totalFiles: number;
+    totalChunks: number;
+    lastIndexedAt?: number;
+  };
+  doc: {
+    enabled: boolean;
+    totalSources: number;
+    totalPages: number;
+    totalChunks: number;
+    lastCrawledAt?: number;
+  };
+}
+
+/**
  * Code Agent instance
  */
 export interface CodeAgentInstance {
@@ -365,6 +502,20 @@ export interface CodeAgentInstance {
   createCheckpoint(name: string): Promise<void>;
   /** Restore to a checkpoint */
   restoreCheckpoint(name: string): Promise<void>;
+
+  // Knowledge methods
+  /** Get knowledge manager (null if not enabled) */
+  getKnowledge(): unknown | null;
+  /** Search knowledge base */
+  searchKnowledge(query: string, options?: CodeKnowledgeSearchOptions): Promise<CodeKnowledgeSearchResult[]>;
+  /** Index code (manual trigger) */
+  indexCode(options?: { force?: boolean }): Promise<CodeIndexSummary | null>;
+  /** Add document source */
+  addDocSource(source: { name: string; type: string; url: string; tags?: string[]; enabled: boolean }): Promise<void>;
+  /** Crawl documents (manual trigger) */
+  crawlDocs(options?: { force?: boolean }): Promise<CodeCrawlSummary | null>;
+  /** Get knowledge statistics */
+  getKnowledgeStats(): Promise<CodeKnowledgeStats | null>;
 
   /** Start interactive CLI mode */
   startCLI(): Promise<void>;

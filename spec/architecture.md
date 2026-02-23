@@ -226,6 +226,57 @@ await knowledge.crawlDocs();
 const results = await knowledge.search('useEffect');
 ```
 
+### 3.6 Assistant 双层记忆架构 (NEW)
+
+Assistant 采用**双层记忆架构**，结合显式和隐式记忆：
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                          Assistant 记忆架构                                  │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                             │
+│  ┌───────────────────────────────┐    ┌───────────────────────────────┐    │
+│  │     Markdown Memory           │    │      Agent Memory              │    │
+│  │     (Source of Truth)         │    │      (对话记忆)                 │    │
+│  │                               │    │                               │    │
+│  │  MEMORY.md:                   │    │  agent.db:                    │    │
+│  │  - ## Profile (用户画像)      │───►│  - Events (事件日志)           │    │
+│  │  - ## Facts (事实列表)        │    │  - Profiles (从 MD 同步)       │    │
+│  │  - ## Todos (待办事项)        │    │  - Summaries (摘要)           │    │
+│  │  - ## Notes (笔记)            │    │  - SemanticChunks (语义)      │    │
+│  │                               │    │                               │    │
+│  │  用户可编辑                    │    │  自动管理                      │    │
+│  │  显式记忆                      │    │  隐式记忆                      │    │
+│  └───────────────────────────────┘    └───────────────────────────────┘    │
+│                                                │                            │
+│                                                ▼                            │
+│  ┌─────────────────────────────────────────────────────────────────────┐   │
+│  │                      Agent Knowledge (可选)                          │   │
+│  │                                                                     │   │
+│  │  knowledge/sqlite.db:                                               │   │
+│  │  - Code chunks (代码索引)                                           │   │
+│  │  - Doc chunks (文档索引)                                            │   │
+│  │                                                                     │   │
+│  │  手动触发索引，提供语义搜索能力                                      │   │
+│  └─────────────────────────────────────────────────────────────────────┘   │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+**同步策略**：
+- 启动时：Markdown Memory → Agent Memory 单向同步（增量）
+- 使用内容 hash 跳过未变更内容
+- Profile/Facts/Todos 转换为 Agent Memory 事件
+- Notes 转换为语义分块
+
+**配置示例**：
+```json
+{
+  "memory": { "enabled": true, "syncOnStartup": true },
+  "agentMemory": { "enabled": true, "syncFromMarkdown": true },
+  "agentKnowledge": { "enabled": false }
+}
+```
+
 ### 3.6 TUI (@ai-stack/tui)
 
 **职责**：终端 UI 组件，混合架构支持 TTY 和非 TTY 环境

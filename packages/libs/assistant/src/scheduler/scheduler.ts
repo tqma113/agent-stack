@@ -86,7 +86,7 @@ export function createScheduler(config: SchedulerConfig = {}): SchedulerInstance
   const {
     enabled = true,
     allowAgentControl = true,
-    persistencePath = 'scheduler.json',
+    persistencePath = 'scheduler/jobs.json',
   } = config;
 
   const taskQueue = createTaskQueue(persistencePath);

@@ -38,6 +38,7 @@
   "license": "MIT",
   "dependencies": {
     "@ai-stack/agent": "workspace:*",
+    "@ai-stack/knowledge": "workspace:*",
     "@ai-stack/mcp": "workspace:*",
     "@ai-stack/provider": "workspace:*",
     "@ai-stack/tui": "workspace:*",

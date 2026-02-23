@@ -1,0 +1,27 @@
+{
+  "jobs": [
+    {
+      "id": "job-1771821114832-pl53ca",
+      "name": "Reminder: 吃饭...",
+      "type": "reminder",
+      "enabled": true,
+      "schedule": {
+        "type": "reminder",
+        "triggerAt": "2026-02-23T04:36:54.832Z",
+        "reminderText": "吃饭"
+      },
+      "execution": {
+        "mode": "template",
+        "template": "吃饭"
+      },
+      "delivery": {
+        "channels": [
+          "cli"
+        ]
+      },
+      "createdAt": "2026-02-23T04:31:54.832Z",
+      "nextRunAt": "2026-02-23T04:36:54.832Z"
+    }
+  ],
+  "history": []
+}

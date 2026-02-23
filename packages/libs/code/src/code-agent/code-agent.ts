@@ -1,10 +1,17 @@
 /**
  * @ai-stack/code - Code Agent Factory
  *
- * Creates a Code Agent instance with file operations, search, and undo/redo capabilities.
+ * Creates a Code Agent instance with file operations, search, undo/redo, and knowledge capabilities.
  */
 
+import { dirname } from 'path';
+import { existsSync, mkdirSync } from 'fs';
 import { createAgent, type AgentInstance, type AgentConfig, type Tool } from '@ai-stack/agent';
+import {
+  createKnowledgeManager,
+  type KnowledgeManagerInstance,
+  type KnowledgeSearchResult,
+} from '@ai-stack/knowledge';
 import type {
   CodeConfig,
   CodeAgentInstance,
@@ -13,6 +20,11 @@ import type {
   UndoResult,
   RedoResult,
   SafetyConfig,
+  CodeKnowledgeSearchOptions,
+  CodeKnowledgeSearchResult,
+  CodeIndexSummary,
+  CodeCrawlSummary,
+  CodeKnowledgeStats,
 } from '../types.js';
 import { loadConfig, resolveConfig, getDefaultConfig } from '../config.js';
 import { buildCodePrompt } from '../prompts/code-prompt.js';
@@ -87,6 +99,7 @@ export function createCodeAgent(config?: CodeConfig | string): CodeAgentInstance
   // Initialize stores
   let historyStore: FileHistoryStore | null = null;
   let taskStore: TaskStore | null = null;
+  let knowledgeManager: KnowledgeManagerInstance | null = null;
 
   // Tool context
   const toolContext: ToolContext = {
@@ -161,9 +174,83 @@ export function createCodeAgent(config?: CodeConfig | string): CodeAgentInstance
           console.error('Failed to initialize MCP:', error);
         }
       }
+
+      // Initialize Knowledge if enabled
+      if (resolvedConfig.knowledge.enabled) {
+        const knowledgeDbPath = resolvedConfig.knowledge.dbPath!;
+
+        // Ensure directory exists
+        const knowledgeDir = dirname(knowledgeDbPath);
+        if (!existsSync(knowledgeDir)) {
+          mkdirSync(knowledgeDir, { recursive: true });
+        }
+
+        try {
+          knowledgeManager = createKnowledgeManager({
+            dbPath: knowledgeDbPath,
+            code: resolvedConfig.knowledge.code?.enabled
+              ? {
+                  enabled: true,
+                  rootDir: resolvedConfig.knowledge.code.rootDir || resolvedConfig.safety.workingDir || process.cwd(),
+                  include: resolvedConfig.knowledge.code.include,
+                  exclude: resolvedConfig.knowledge.code.exclude,
+                  watch: resolvedConfig.knowledge.code.watch,
+                }
+              : undefined,
+            doc: resolvedConfig.knowledge.doc?.enabled
+              ? {
+                  enabled: true,
+                }
+              : undefined,
+          });
+          await knowledgeManager.initialize();
+
+          // Auto-index code if configured
+          if (resolvedConfig.knowledge.code?.autoIndex) {
+            try {
+              await knowledgeManager.indexCode();
+            } catch (error) {
+              console.error('Failed to auto-index code:', error);
+            }
+          }
+
+          // Add doc sources if configured
+          if (resolvedConfig.knowledge.doc?.sources) {
+            for (const source of resolvedConfig.knowledge.doc.sources) {
+              if (source.enabled !== false) {
+                try {
+                  await knowledgeManager.addDocSource({
+                    name: source.name,
+                    type: source.type,
+                    url: source.url,
+                    tags: source.tags,
+                    enabled: true,
+                  });
+                } catch (error) {
+                  console.error(`Failed to add doc source ${source.name}:`, error);
+                }
+              }
+            }
+
+            if (resolvedConfig.knowledge.doc.autoIndex) {
+              try {
+                await knowledgeManager.crawlDocs();
+              } catch (error) {
+                console.error('Failed to auto-crawl docs:', error);
+              }
+            }
+          }
+        } catch (error) {
+          console.error('Failed to initialize Knowledge:', error);
+        }
+      }
     },
 
     async close(): Promise<void> {
+      if (knowledgeManager) {
+        await knowledgeManager.close();
+        knowledgeManager = null;
+      }
       if (historyStore) {
         historyStore.close();
         historyStore = null;
@@ -249,6 +336,92 @@ export function createCodeAgent(config?: CodeConfig | string): CodeAgentInstance
           await instance.undo();
         }
       }
+    },
+
+    // Knowledge methods
+    getKnowledge(): unknown | null {
+      return knowledgeManager;
+    },
+
+    async searchKnowledge(query: string, options?: CodeKnowledgeSearchOptions): Promise<CodeKnowledgeSearchResult[]> {
+      if (!knowledgeManager) {
+        return [];
+      }
+      const results = await knowledgeManager.search(query, {
+        sources: options?.sources,
+        languages: options?.languages,
+        filePatterns: options?.filePatterns,
+        urlPrefixes: options?.urlPrefixes,
+        limit: options?.limit ?? resolvedConfig.knowledge.search?.maxResults,
+        minScore: options?.minScore ?? resolvedConfig.knowledge.search?.minScore,
+      });
+      return results.map((r: KnowledgeSearchResult) => ({
+        text: r.chunk.text,
+        score: r.score,
+        sourceType: r.sourceType as 'code' | 'doc',
+        sourceUri: r.chunk.sourceUri,
+        code: r.chunk.code ? {
+          language: r.chunk.code.language,
+          filePath: r.chunk.code.filePath,
+          startLine: r.chunk.code.startLine,
+          endLine: r.chunk.code.endLine,
+          symbolName: r.chunk.code.symbolName,
+        } : undefined,
+        doc: r.chunk.doc ? {
+          url: r.chunk.doc.url,
+          title: r.chunk.doc.title,
+          section: r.chunk.doc.section,
+        } : undefined,
+      }));
+    },
+
+    async indexCode(options?: { force?: boolean }): Promise<CodeIndexSummary | null> {
+      if (!knowledgeManager) {
+        return null;
+      }
+      const result = await knowledgeManager.indexCode(options);
+      return {
+        filesProcessed: result.filesProcessed,
+        filesSkipped: result.filesSkipped,
+        filesFailed: result.filesFailed,
+        chunksAdded: result.chunksAdded,
+        chunksRemoved: result.chunksRemoved,
+        totalDurationMs: result.totalDurationMs,
+      };
+    },
+
+    async addDocSource(source: { name: string; type: string; url: string; tags?: string[]; enabled: boolean }): Promise<void> {
+      if (!knowledgeManager) {
+        throw new Error('Knowledge manager not initialized');
+      }
+      await knowledgeManager.addDocSource({
+        name: source.name,
+        type: source.type as 'url' | 'website' | 'sitemap' | 'github' | 'local',
+        url: source.url,
+        tags: source.tags,
+        enabled: source.enabled,
+      });
+    },
+
+    async crawlDocs(options?: { force?: boolean }): Promise<CodeCrawlSummary | null> {
+      if (!knowledgeManager) {
+        return null;
+      }
+      const result = await knowledgeManager.crawlDocs(options);
+      return {
+        sourcesProcessed: result.sourcesProcessed,
+        totalPagesProcessed: result.totalPagesProcessed,
+        totalPagesAdded: result.totalPagesAdded,
+        totalChunksAdded: result.totalChunksAdded,
+        totalDurationMs: result.totalDurationMs,
+      };
+    },
+
+    async getKnowledgeStats(): Promise<CodeKnowledgeStats | null> {
+      if (!knowledgeManager) {
+        return null;
+      }
+      return knowledgeManager.getStats();
     },
 
     startCLI(): Promise<void> {

@@ -18,6 +18,10 @@ export interface AssistantConfig {
   agent?: AgentConfigSection;
   /** Markdown memory configuration */
   memory?: MarkdownMemoryConfig;
+  /** Agent memory configuration (semantic memory system) */
+  agentMemory?: AgentMemoryConfigSection;
+  /** Agent knowledge configuration (code/doc indexing) */
+  agentKnowledge?: AgentKnowledgeConfigSection;
   /** Multi-channel gateway configuration */
   gateway?: GatewayConfig;
   /** Scheduler configuration */
@@ -90,6 +94,107 @@ export interface MarkdownMemoryConfig {
     fts: number;
     /** Vector search weight (default: 0.7) */
     vector: number;
+  };
+}
+
+// ============================================
+// Agent Memory Types
+// ============================================
+
+/**
+ * Agent memory configuration (semantic memory system from @ai-stack/memory)
+ * This provides automatic event tracking, summaries, and semantic search.
+ */
+export interface AgentMemoryConfigSection {
+  /** Enable agent memory (default: true) */
+  enabled?: boolean;
+  /** SQLite database path (default: memory/agent.db) */
+  dbPath?: string;
+  /** Token budget configuration */
+  tokenBudget?: {
+    profile?: number;
+    taskState?: number;
+    recentEvents?: number;
+    semanticChunks?: number;
+    summary?: number;
+    total?: number;
+  };
+  /** Write policy configuration */
+  writePolicy?: {
+    minConfidence?: number;
+    autoSummarize?: boolean;
+    summarizeEveryNEvents?: number;
+    summarizeTokenThreshold?: number;
+  };
+  /** Retrieval configuration */
+  retrieval?: {
+    maxRecentEvents?: number;
+    maxSemanticChunks?: number;
+    recentEventsWindowMs?: number;
+    enableSemanticSearch?: boolean;
+    enableFtsSearch?: boolean;
+  };
+  /** Enable semantic search (requires embeddings) */
+  enableSemanticSearch?: boolean;
+  /** Sync facts/todos from Markdown memory on startup (default: true) */
+  syncFromMarkdown?: boolean;
+  /** Debug logging */
+  debug?: boolean;
+}
+
+// ============================================
+// Agent Knowledge Types
+// ============================================
+
+/**
+ * Agent knowledge configuration (code/doc indexing from @ai-stack/knowledge)
+ * This enables semantic search over code and documentation.
+ */
+export interface AgentKnowledgeConfigSection {
+  /** Enable agent knowledge (default: false) */
+  enabled?: boolean;
+  /** SQLite database path (default: knowledge/sqlite.db) */
+  dbPath?: string;
+  /** Code indexing configuration */
+  code?: {
+    /** Enable code indexing */
+    enabled?: boolean;
+    /** Root directory for code indexing */
+    rootDir?: string;
+    /** Include glob patterns */
+    include?: string[];
+    /** Exclude glob patterns */
+    exclude?: string[];
+    /** Watch for file changes */
+    watch?: boolean;
+    /** Auto-index on startup (default: false) */
+    autoIndex?: boolean;
+  };
+  /** Document indexing configuration */
+  doc?: {
+    /** Enable document indexing */
+    enabled?: boolean;
+    /** Document sources to index */
+    sources?: Array<{
+      name: string;
+      type: 'url' | 'website' | 'sitemap' | 'github' | 'local';
+      url: string;
+      tags?: string[];
+      enabled?: boolean;
+    }>;
+    /** Auto-index on startup (default: false) */
+    autoIndex?: boolean;
+  };
+  /** Search configuration */
+  search?: {
+    /** Auto-search knowledge on user queries */
+    autoSearch?: boolean;
+    /** Auto-inject knowledge into context */
+    autoInject?: boolean;
+    /** Minimum relevance score */
+    minScore?: number;
+    /** Maximum results to return */
+    maxResults?: number;
   };
 }
 

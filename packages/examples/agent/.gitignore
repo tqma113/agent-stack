@@ -1,4 +1,17 @@
+# AI Stack data directory
+.ai-stack/
+
+# Legacy directories (backward compatibility)
+memory/
+knowledge/
+
+# Database files
+*.db
+*.db-wal
+*.db-shm
+
 # Environment
+.env
 .env.local
 
 # Node
@@ -6,4 +19,4 @@ node_modules/
 
 # Logs
 *.log
-rush-logs
+rush-logs/

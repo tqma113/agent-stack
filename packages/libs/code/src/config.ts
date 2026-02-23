@@ -16,7 +16,7 @@ const CONFIG_FILE_NAMES = ['code.json', '.code.json', 'ai-code.json'];
 /**
  * Default base directory for code agent data
  */
-export const DEFAULT_BASE_DIR = '.ai-code';
+export const DEFAULT_BASE_DIR = '.ai-stack';
 
 /**
  * Find configuration file starting from a directory
@@ -109,13 +109,25 @@ export function getDefaultConfig(): CodeConfig {
 
     history: {
       enabled: true,
-      dbPath: join(DEFAULT_BASE_DIR, 'history.db'),
+      dbPath: join(DEFAULT_BASE_DIR, 'history/sqlite.db'),
       maxChanges: 1000,
     },
 
     tasks: {
       enabled: true,
-      dbPath: join(DEFAULT_BASE_DIR, 'tasks.db'),
+      dbPath: join(DEFAULT_BASE_DIR, 'tasks/sqlite.db'),
+    },
+
+    knowledge: {
+      enabled: false,  // Disabled by default, enable on demand
+      code: {
+        enabled: true,
+        autoIndex: false,  // Manual trigger only
+      },
+      doc: {
+        enabled: true,
+        autoIndex: false,  // Manual trigger only
+      },
     },
   };
 }
@@ -152,18 +164,40 @@ export function resolveConfig(config: CodeConfig, workingDir?: string): Required
 
     history: {
       enabled: config.history?.enabled ?? defaults.history!.enabled!,
-      dbPath: config.history?.dbPath || join(dataDir, 'history.db'),
+      dbPath: config.history?.dbPath || join(dataDir, 'history/sqlite.db'),
       maxChanges: config.history?.maxChanges || defaults.history!.maxChanges!,
     },
 
     tasks: {
       enabled: config.tasks?.enabled ?? defaults.tasks!.enabled!,
-      dbPath: config.tasks?.dbPath || join(dataDir, 'tasks.db'),
+      dbPath: config.tasks?.dbPath || join(dataDir, 'tasks/sqlite.db'),
     },
 
     mcp: {
       configPath: config.mcp?.configPath,
       autoConnect: config.mcp?.autoConnect ?? false,
+    },
+
+    knowledge: {
+      enabled: config.knowledge?.enabled ?? false,
+      dbPath: config.knowledge?.dbPath || join(dataDir, 'knowledge/sqlite.db'),
+      code: {
+        enabled: config.knowledge?.code?.enabled ?? true,
+        rootDir: config.knowledge?.code?.rootDir || baseDir,
+        include: config.knowledge?.code?.include,
+        exclude: config.knowledge?.code?.exclude,
+        watch: config.knowledge?.code?.watch ?? false,
+        autoIndex: config.knowledge?.code?.autoIndex ?? false,
+      },
+      doc: {
+        enabled: config.knowledge?.doc?.enabled ?? true,
+        sources: config.knowledge?.doc?.sources,
+        autoIndex: config.knowledge?.doc?.autoIndex ?? false,
+      },
+      search: {
+        minScore: config.knowledge?.search?.minScore ?? 0.5,
+        maxResults: config.knowledge?.search?.maxResults ?? 10,
+      },
     },
   };
 }
@@ -189,18 +223,30 @@ export function generateConfigTemplate(): CodeConfig {
 
     history: {
       enabled: true,
-      dbPath: '.ai-code/history.db',
+      dbPath: '.ai-stack/history/sqlite.db',
       maxChanges: 1000,
     },
 
     tasks: {
       enabled: true,
-      dbPath: '.ai-code/tasks.db',
+      dbPath: '.ai-stack/tasks/sqlite.db',
     },
 
     mcp: {
       configPath: 'mcp.json',
       autoConnect: true,
+    },
+
+    knowledge: {
+      enabled: false,
+      code: {
+        enabled: true,
+        autoIndex: false,
+      },
+      doc: {
+        enabled: true,
+        autoIndex: false,
+      },
     },
   };
 }

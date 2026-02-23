@@ -355,7 +355,7 @@ export function generateConfigTemplate(): AgentStackConfig {
     },
     memory: {
       enabled: true,
-      dbPath: 'memory/sqlite.db',
+      dbPath: '.ai-stack/memory/sqlite.db',
       autoInitialize: true,
       autoInject: true,
     },

@@ -28,15 +28,15 @@
       "command": "npx",
       "args": ["mcp-bash"]
     },
-    "github": {
-      "command": "npx",
-      "args": ["-y", "@modelcontextprotocol/server-github"],
-      "env": {}
-    },
-    "chrome-devtools": {
-      "command": "npx",
-      "args": ["-y", "@modelcontextprotocol/server-chrome-devtools"],
-      "env": {}
-    }
+    // "github": {
+    //   "command": "npx",
+    //   "args": ["-y", "@modelcontextprotocol/server-github"],
+    //   "env": {}
+    // },
+    // "chrome-devtools": {
+    //   "command": "npx",
+    //   "args": ["-y", "@modelcontextprotocol/server-chrome-devtools"],
+    //   "env": {}
+    // }
   }
 }

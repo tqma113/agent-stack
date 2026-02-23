@@ -841,8 +841,9 @@ packages/examples/agent/
 ├── mcp.json                    # MCP 配置
 ├── skills/                     # 自定义 Skill
 │   └── search-skill/
-├── memory/                     # Memory 数据
-├── knowledge/                  # Knowledge 数据
+├── .ai-stack/                  # 数据目录
+│   ├── memory/sqlite.db        # Memory 数据
+│   └── knowledge/sqlite.db     # Knowledge 数据
 └── README.md
 ```
 
@@ -861,8 +862,17 @@ packages/examples/assistant/
 ├── package.json
 ├── assistant.json              # Assistant 配置
 ├── mcp.json                    # MCP 配置
-├── MEMORY.md                   # Markdown 记忆
 └── README.md
+
+# 数据存储于 ~/.ai-stack/ (用户目录):
+~/.ai-stack/
+├── memory/
+│   ├── MEMORY.md               # Markdown 记忆
+│   ├── sqlite.db               # 搜索索引
+│   └── logs/                   # 每日日志
+│       └── YYYY-MM-DD.md
+└── scheduler/
+    └── jobs.json               # 调度任务
 ```
 
 **命令**：
@@ -882,9 +892,9 @@ packages/examples/code/
 ├── package.json
 ├── code.json                   # Code Agent 配置
 ├── mcp.json                    # MCP 配置
-├── .ai-code/                   # 数据目录
-│   ├── history.db
-│   └── tasks.db
+├── .ai-stack/                  # 数据目录
+│   ├── history/sqlite.db       # 文件历史
+│   └── tasks/sqlite.db         # 任务管理
 └── README.md
 ```
 
@@ -955,4 +965,240 @@ import { foo } from './foo.js';
 
 // Workspace 依赖
 import { createAgent } from '@ai-stack/agent';
+```
+
+---
+
+## 9. 数据存储目录结构
+
+所有 AI Stack 应用统一使用 `.ai-stack` 作为数据存储目录名。
+
+### 9.1 存储位置规范
+
+| 包 | 定位 | 默认根目录 | 说明 |
+|----|------|-----------|------|
+| `@ai-stack/agent` | 项目级工具 | `./.ai-stack/` | 数据跟随项目 |
+| `@ai-stack/code` | 项目级工具 | `./.ai-stack/` | 数据跟随项目 |
+| `@ai-stack/assistant` | 个人助手 | `~/.ai-stack/` | 跨项目共享 |
+
+### 9.2 Agent 存储结构
+
+```
+.ai-stack/                              # 项目根目录下
+├── memory/
+│   └── sqlite.db                       # Memory 数据库 (记忆系统)
+│       ├── events                      # 事件表 - 对话历史
+│       ├── profiles                    # 用户画像表
+│       ├── task_states                 # 任务状态表
+│       ├── summaries                   # 摘要表
+│       ├── semantic_chunks             # 语义分块表
+│       └── embedding_cache             # 嵌入缓存表
+│
+└── knowledge/
+    └── sqlite.db                       # Knowledge 数据库 (知识库)
+        ├── code_chunks                 # 代码分块表
+        ├── code_index_state            # 代码索引状态表
+        ├── doc_sources                 # 文档源注册表
+        ├── doc_chunks                  # 文档分块表
+        └── semantic_chunks             # 语义搜索表
+```
+
+**配置示例** (`agent.json`):
+```json
+{
+  "memory": {
+    "enabled": true,
+    "dbPath": ".ai-stack/memory/sqlite.db"
+  },
+  "knowledge": {
+    "enabled": true,
+    "dbPath": ".ai-stack/knowledge/sqlite.db"
+  }
+}
+```
+
+### 9.3 Code 存储结构
+
+```
+.ai-stack/                              # 项目根目录下
+├── history/
+│   └── sqlite.db                       # 文件历史数据库 (Undo/Redo)
+│       ├── changes                     # 文件变更记录表
+│       │   ├── id                      # 变更 ID
+│       │   ├── file_path               # 文件路径
+│       │   ├── old_content             # 原内容
+│       │   ├── new_content             # 新内容
+│       │   ├── operation               # 操作类型 (create/modify/delete)
+│       │   └── timestamp               # 时间戳
+│       └── checkpoints                 # 检查点表
+│
+├── tasks/
+│   └── sqlite.db                       # 任务管理数据库
+│       ├── tasks                       # 任务表
+│       │   ├── id                      # 任务 ID
+│       │   ├── subject                 # 任务标题
+│       │   ├── description             # 任务描述
+│       │   ├── status                  # 状态 (pending/in_progress/completed)
+│       │   ├── owner                   # 所有者
+│       │   └── metadata                # 元数据 JSON
+│       └── task_blocks                 # 任务依赖关系表
+│           ├── task_id                 # 任务 ID
+│           └── blocks_id               # 被阻塞的任务 ID
+│
+└── knowledge/                          # Agent Knowledge (新增)
+    └── sqlite.db                       # 知识索引数据库
+        ├── code_chunks                 # 代码分块表
+        ├── code_index_state            # 代码索引状态表
+        ├── doc_sources                 # 文档源注册表
+        ├── doc_chunks                  # 文档分块表
+        └── semantic_chunks             # 语义搜索表
+```
+
+**配置示例** (`code.json`):
+```json
+{
+  "history": {
+    "enabled": true,
+    "dbPath": ".ai-stack/history/sqlite.db",
+    "maxChanges": 1000
+  },
+  "tasks": {
+    "enabled": true,
+    "dbPath": ".ai-stack/tasks/sqlite.db"
+  },
+  "knowledge": {
+    "enabled": false,
+    "code": {
+      "enabled": true,
+      "autoIndex": false
+    },
+    "doc": {
+      "enabled": true,
+      "autoIndex": false
+    }
+  }
+}
+```
+
+### 9.4 Assistant 存储结构
+
+Assistant 采用**双层记忆架构**:
+- **Markdown Memory** = Source of Truth（用户可编辑的事实、待办、笔记）
+- **Agent Memory** = 对话记忆（自动管理的事件、摘要、语义搜索）
+- **Agent Knowledge** = 知识索引（代码和文档的语义搜索）
+
+```
+~/.ai-stack/                            # 用户主目录下 (跨项目共享)
+├── memory/
+│   ├── MEMORY.md                       # Markdown Memory (Source of Truth)
+│   │   ├── ## Profile                  # 用户画像
+│   │   │   ├── Name                    # 姓名
+│   │   │   ├── Timezone                # 时区
+│   │   │   └── Language                # 语言
+│   │   ├── ## Facts                    # 事实列表
+│   │   ├── ## Todos                    # 待办事项
+│   │   └── ## Notes                    # 笔记
+│   │
+│   ├── markdown-index.db               # Markdown 派生索引数据库 (用于搜索)
+│   │   ├── facts                       # 事实索引表
+│   │   ├── todos                       # 待办索引表
+│   │   ├── notes                       # 笔记索引表
+│   │   └── log_entries                 # 日志条目索引表
+│   │
+│   ├── agent.db                        # Agent Memory 数据库 (新增)
+│   │   ├── events                      # 事件表 - 对话历史
+│   │   ├── profiles                    # 用户画像表 (从 Markdown 同步)
+│   │   ├── task_states                 # 任务状态表
+│   │   ├── summaries                   # 摘要表
+│   │   ├── semantic_chunks             # 语义分块表
+│   │   └── embedding_cache             # 嵌入缓存表
+│   │
+│   └── logs/                           # 每日日志目录
+│       ├── 2026-02-23.md               # 每日日志文件
+│       │   ├── ## Conversations        # 对话记录
+│       │   ├── ## Events               # 事件记录
+│       │   └── ## Notes                # 当日笔记
+│       ├── 2026-02-22.md
+│       └── ...
+│
+├── knowledge/                          # Agent Knowledge (新增)
+│   └── sqlite.db                       # 知识索引数据库
+│       ├── code_chunks                 # 代码分块表
+│       ├── code_index_state            # 代码索引状态表
+│       ├── doc_sources                 # 文档源注册表
+│       ├── doc_chunks                  # 文档分块表
+│       └── semantic_chunks             # 语义搜索表
+│
+└── scheduler/
+    └── jobs.json                       # 调度任务持久化文件
+        ├── jobs[]                      # 任务列表
+        │   ├── id                      # 任务 ID
+        │   ├── name                    # 任务名称
+        │   ├── schedule                # 调度配置
+        │   │   ├── type                # 类型 (cron/once/interval)
+        │   │   ├── cron                # Cron 表达式
+        │   │   ├── runAt               # 一次性运行时间
+        │   │   └── interval            # 间隔毫秒数
+        │   ├── action                  # 执行动作
+        │   ├── nextRun                 # 下次运行时间
+        │   └── status                  # 状态 (active/paused/completed)
+        └── watchers[]                  # 文件监听器列表
+            ├── id                      # 监听器 ID
+            ├── path                    # 监听路径
+            ├── events                  # 监听事件类型
+            └── action                  # 触发动作
+```
+
+**配置示例** (`assistant.json`):
+```json
+{
+  "memory": {
+    "enabled": true,
+    "syncOnStartup": true,
+    "watchFiles": true
+  },
+  "agentMemory": {
+    "enabled": true,
+    "syncFromMarkdown": true
+  },
+  "agentKnowledge": {
+    "enabled": false
+  },
+  "scheduler": {
+    "enabled": true,
+    "allowAgentControl": true
+  }
+}
+```
+
+> **注意**: Assistant 的路径配置相对于 `baseDir`（默认 `~/.ai-stack`），通常不需要显式指定路径，使用默认值即可。启动时 Markdown Memory 会自动同步到 Agent Memory。
+
+### 9.5 存储汇总对比
+
+| 包 | 根目录 | 存储文件 | 格式 | 说明 |
+|---|--------|----------|------|------|
+| **Agent** | `./.ai-stack/` | `memory/sqlite.db` | SQLite | Memory 数据库 |
+| | | `knowledge/sqlite.db` | SQLite | Knowledge 数据库 |
+| **Code** | `./.ai-stack/` | `history/sqlite.db` | SQLite | 文件历史 |
+| | | `tasks/sqlite.db` | SQLite | 任务管理 |
+| | | `knowledge/sqlite.db` | SQLite | 知识索引 (新增) |
+| **Assistant** | `~/.ai-stack/` | `memory/MEMORY.md` | Markdown | Markdown Memory |
+| | | `memory/markdown-index.db` | SQLite | Markdown 派生索引 |
+| | | `memory/agent.db` | SQLite | Agent Memory (新增) |
+| | | `memory/logs/*.md` | Markdown | 每日日志 |
+| | | `knowledge/sqlite.db` | SQLite | Agent Knowledge (新增) |
+| | | `scheduler/jobs.json` | JSON | 调度任务 |
+
+### 9.6 .gitignore 配置
+
+项目级 `.gitignore` 应包含：
+
+```gitignore
+# AI Stack 数据目录
+.ai-stack/
+
+# 数据库文件
+*.db
+*.db-wal
+*.db-shm
 ```

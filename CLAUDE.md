@@ -261,7 +261,7 @@ You MUST first produce a written PLAN, regardless of the complexity or size of t
 
 ### Save paln after confirm
 
-When you are in plan mode, every time you make a new plan, you need to save all content of plan into dir /plan as a new markdown file after user confirm the paln.
+When you are in plan mode, every time you make a new plan, you need to save all content of plan into dir /plan as a new markdown file after user confirm the paln before start implement.
 
 ### Test after editing
 
