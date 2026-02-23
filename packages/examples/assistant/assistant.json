@@ -24,7 +24,25 @@
     "syncFromMarkdown": true
   },
   "agentKnowledge": {
-    "enabled": false
+    "enabled": true,
+    "dbPath": ".ai-stack/knowledge/sqlite.db",
+    "code": {
+      "enabled": false,
+      "rootDir": ".",
+      "include": ["**/*.ts", "**/*.js", "**/*.json", "**/*.md"],
+      "exclude": ["node_modules/**", "dist/**", ".git/**", "**/*.db*"]
+    },
+    "doc": {
+      "enabled": true,
+      "sources": []
+    },
+    "search": {
+      "autoSearch": true,
+      "autoInject": true,
+      "minScore": 0.3,
+      "maxResults": 5
+    },
+    "autoInitialize": true
   },
   "gateway": {
     "sessionStrategy": "per-peer",
