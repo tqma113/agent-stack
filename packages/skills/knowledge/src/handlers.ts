@@ -245,6 +245,52 @@ export async function removeDocSource(args: Record<string, unknown>): Promise<st
 }
 
 /**
+ * Update a documentation source (rename, change tags, enable/disable)
+ */
+export async function updateDocSource(args: Record<string, unknown>): Promise<string> {
+  const sourceId = args.sourceId as string;
+
+  if (!sourceId) {
+    return JSON.stringify({ error: 'Source ID is required' });
+  }
+
+  const ctx = await getKnowledgeContext();
+
+  try {
+    const update: { name?: string; tags?: string[]; enabled?: boolean } = {};
+    if (args.name !== undefined) update.name = args.name as string;
+    if (args.tags !== undefined) update.tags = args.tags as string[];
+    if (args.enabled !== undefined) update.enabled = args.enabled as boolean;
+
+    const source = await ctx.manager.updateDocSource(sourceId, update);
+
+    if (!source) {
+      return JSON.stringify({
+        success: false,
+        error: 'Source not found',
+      });
+    }
+
+    return JSON.stringify({
+      success: true,
+      source: {
+        id: source.id,
+        name: source.name,
+        url: source.url,
+        type: source.type,
+        tags: source.tags,
+        enabled: source.enabled,
+      },
+    }, null, 2);
+  } catch (error) {
+    return JSON.stringify({
+      success: false,
+      error: (error as Error).message,
+    });
+  }
+}
+
+/**
  * List documentation sources
  */
 export async function listDocSources(args: Record<string, unknown>): Promise<string> {

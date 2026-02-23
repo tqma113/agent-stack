@@ -139,6 +139,34 @@
       }
     },
     {
+      "name": "update_doc_source",
+      "description": "Update a documentation source - rename, change tags, or enable/disable it.",
+      "handler": "./handlers.cjs#updateDocSource",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "sourceId": {
+            "type": "string",
+            "description": "ID of the documentation source to update"
+          },
+          "name": {
+            "type": "string",
+            "description": "New name for the documentation source"
+          },
+          "tags": {
+            "type": "array",
+            "items": { "type": "string" },
+            "description": "New tags for the documentation source"
+          },
+          "enabled": {
+            "type": "boolean",
+            "description": "Enable or disable the documentation source"
+          }
+        },
+        "required": ["sourceId"]
+      }
+    },
+    {
       "name": "list_doc_sources",
       "description": "List all registered documentation sources.",
       "handler": "./handlers.cjs#listDocSources",

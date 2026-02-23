@@ -45,6 +45,9 @@ importers:
       '@ai-stack-mcp/time':
         specifier: workspace:*
         version: link:../../mcp-servers/time
+      '@ai-stack-skill/knowledge':
+        specifier: workspace:*
+        version: link:../../skills/knowledge
       '@ai-stack/assistant':
         specifier: workspace:*
         version: link:../../libs/assistant

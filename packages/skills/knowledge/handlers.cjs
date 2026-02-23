@@ -187,6 +187,42 @@ async function removeDocSource(args) {
     });
   }
 }
+async function updateDocSource(args) {
+  const sourceId = args.sourceId;
+  if (!sourceId) {
+    return JSON.stringify({ error: "Source ID is required" });
+  }
+  const ctx = await getKnowledgeContext();
+  try {
+    const update = {};
+    if (args.name !== void 0) update.name = args.name;
+    if (args.tags !== void 0) update.tags = args.tags;
+    if (args.enabled !== void 0) update.enabled = args.enabled;
+    const source = await ctx.manager.updateDocSource(sourceId, update);
+    if (!source) {
+      return JSON.stringify({
+        success: false,
+        error: "Source not found"
+      });
+    }
+    return JSON.stringify({
+      success: true,
+      source: {
+        id: source.id,
+        name: source.name,
+        url: source.url,
+        type: source.type,
+        tags: source.tags,
+        enabled: source.enabled
+      }
+    }, null, 2);
+  } catch (error) {
+    return JSON.stringify({
+      success: false,
+      error: error.message
+    });
+  }
+}
 async function listDocSources(args) {
   const ctx = await getKnowledgeContext();
   try {
@@ -299,5 +335,6 @@ exports.listDocSources = listDocSources;
 exports.removeDocSource = removeDocSource;
 exports.searchCode = searchCode;
 exports.searchDocs = searchDocs;
+exports.updateDocSource = updateDocSource;
 //# sourceMappingURL=handlers.cjs.map
 //# sourceMappingURL=handlers.cjs.map

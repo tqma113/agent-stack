@@ -4,14 +4,22 @@
     "model": "gpt-5.2",
     "temperature": 0.7,
     "maxTokens": 4096,
-    "systemPrompt": "You are a helpful personal AI assistant. You can:\n- Remember facts and preferences about the user\n- Set reminders and schedule tasks\n- Answer questions and help with daily tasks\n\nAlways be concise and helpful. When the user asks to be reminded about something, use the create_reminder tool.",
+    "systemPrompt": "You are a helpful personal AI assistant. You can:\n- Remember facts and preferences about the user\n- Set reminders and schedule tasks\n- Answer questions and help with daily tasks\n- Index and search documentation websites using Knowledge tools\n\nKnowledge: To index a documentation website, use add_doc_source (with type 'website' for recursive crawl) followed by crawl_docs. Use search_docs to search indexed content.\n\nAlways be concise and helpful. When the user asks to be reminded about something, use the create_reminder tool.",
     "mcp": {
       "configPath": "./mcp.json",
       "autoConnect": true
     },
     "skill": {
       "directories": ["./skills"],
+      "skills": {
+        "knowledge": {
+          "path": "./node_modules/@ai-stack-skill/knowledge"
+        }
+      },
       "autoLoad": true
+    },
+    "toolExecution": {
+      "toolTimeout": 300000
     }
   },
   "memory": {

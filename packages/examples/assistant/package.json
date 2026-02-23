@@ -19,6 +19,7 @@
   },
   "dependencies": {
     "@ai-stack/assistant": "workspace:*",
+    "@ai-stack-skill/knowledge": "workspace:*",
     "@ai-stack-mcp/fetch": "workspace:*",
     "@ai-stack-mcp/time": "workspace:*",
     "@ai-stack-mcp/bash": "workspace:*"

@@ -158,8 +158,14 @@ export function createAssistant(config?: AssistantConfig | string): AssistantIns
   if (resolvedConfig.agent?.skill) {
     agentConfig.skill = {
       directories: resolvedConfig.agent.skill.directories,
+      skills: resolvedConfig.agent.skill.skills,
       autoLoad: resolvedConfig.agent.skill.autoLoad,
     };
+  }
+
+  // Add tool execution config if present
+  if (resolvedConfig.agent?.toolExecution) {
+    agentConfig.toolExecution = resolvedConfig.agent.toolExecution;
   }
 
   // Create agent

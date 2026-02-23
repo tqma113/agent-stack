@@ -79,6 +79,9 @@ export interface KnowledgeManagerInstance {
   /** Remove document source */
   removeDocSource(sourceId: UUID): Promise<void>;
 
+  /** Update document source */
+  updateDocSource(sourceId: UUID, update: { name?: string; tags?: string[]; enabled?: boolean }): Promise<DocSource | undefined>;
+
   /** Get statistics */
   getStats(): Promise<KnowledgeStats>;
 
@@ -340,6 +343,17 @@ export function createKnowledgeManager(
   }
 
   /**
+   * Update document source
+   */
+  async function updateDocSource(sourceId: UUID, update: { name?: string; tags?: string[]; enabled?: boolean }): Promise<DocSource | undefined> {
+    if (!docIndexer) {
+      throw new KnowledgeError('Document indexer not enabled');
+    }
+
+    return docIndexer.updateSource(sourceId, update);
+  }
+
+  /**
    * Get statistics
    */
   async function getStats(): Promise<KnowledgeStats> {
@@ -439,6 +453,7 @@ export function createKnowledgeManager(
     crawlDocs,
     addDocSource,
     removeDocSource,
+    updateDocSource,
     getStats,
     clear,
     setEmbedFunction,

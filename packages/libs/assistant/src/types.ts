@@ -52,7 +52,15 @@ export interface AgentConfigSection {
   /** Skill configuration */
   skill?: {
     directories?: string[];
+    skills?: Record<string, { path: string }>;
     autoLoad?: boolean;
+  };
+  /** Tool execution configuration */
+  toolExecution?: {
+    /** Enable parallel tool execution */
+    parallelExecution?: boolean;
+    /** Timeout for individual tool execution (ms), default: 30000 */
+    toolTimeout?: number;
   };
 }
 

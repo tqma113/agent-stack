@@ -111,6 +111,9 @@ export interface DocIndexerInstance {
   /** Remove a document source */
   removeSource(sourceId: UUID): Promise<void>;
 
+  /** Update a document source */
+  updateSource(sourceId: UUID, update: { name?: string; tags?: string[]; enabled?: boolean }): Promise<DocSource | undefined>;
+
   /** Get a document source */
   getSource(sourceId: UUID): Promise<DocSource | null>;
 
@@ -344,6 +347,20 @@ export function createDocIndexer(
       registryStore.removeSource(sourceId);
     }
     registry.removeSource(sourceId);
+  }
+
+  /**
+   * Update a document source
+   */
+  async function updateSource(sourceId: UUID, update: { name?: string; tags?: string[]; enabled?: boolean }): Promise<DocSource | undefined> {
+    if (!registry) {
+      throw new CrawlError('Indexer not initialized');
+    }
+
+    if (dbSet) {
+      return registryStore.updateSource(sourceId, update);
+    }
+    return registry.updateSource(sourceId, update);
   }
 
   /**
@@ -689,6 +706,7 @@ export function createDocIndexer(
     close,
     addSource,
     removeSource,
+    updateSource,
     getSource,
     listSources,
     crawlSource,
